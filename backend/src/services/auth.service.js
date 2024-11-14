@@ -13,8 +13,9 @@ const {
   BadRequestError,
   AlreadyExistError,
 } = require('../utils/errorResponse');
-const { pickFields } = require('../utils/helpers');
+const { pickFields, removeLocalFile } = require('../utils/helpers');
 const TokenService = require('./token.service');
+const cloudinary = require('../helpers/cloudinary.helper');
 
 class AuthService {
   constructor() {
@@ -211,6 +212,35 @@ class AuthService {
   async forgotPasswordRequest({ email }) {}
 
   async resetPassword({ resetToken, newPassword }) {}
+
+  async updateUserAvatar({ file, user }) {
+    if (!file) {
+      throw new BadRequestError('Please upload a file');
+    }
+
+    try {
+      const result = await cloudinary.uploader.upload(file.path, {
+        public_id: `${user.id}`,
+        folder: 'shareandcare/avatars',
+        transformation: [
+          { width: 1000, height: 1000, crop: 'thumb' },
+          { quality: 'auto:eco', fetch_format: 'auto' },
+        ],
+      });
+
+      const updatedUser = await this.userRepository.updateById(user.id, {
+        usr_avatar: result.secure_url,
+      });
+
+      return {
+        image_url: updatedUser.avatar,
+      };
+    } catch (error) {
+      throw new InternalServerError('Failed to upload avatar');
+    } finally {
+      removeLocalFile(file.path); // Đảm bảo xóa file cục bộ
+    }
+  }
 }
 
 module.exports = AuthService;

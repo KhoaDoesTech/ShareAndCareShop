@@ -70,6 +70,16 @@ class AuthController {
       }),
     }).send(res);
   };
+
+  updateUserAvatar = async (req, res, next) => {
+    new ActionSuccess({
+      message: 'Avatar uploaded successfully',
+      metadata: await this.authService.updateUserAvatar({
+        file: req.file,
+        user: req.user,
+      }),
+    }).send(res);
+  };
 }
 
 module.exports = AuthController;

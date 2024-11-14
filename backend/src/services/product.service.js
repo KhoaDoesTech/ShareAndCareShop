@@ -59,45 +59,6 @@ class ProductService {
       object: newProduct,
     });
   }
-
-  async updateProduct(
-    productId,
-    {
-      name,
-      mainImage,
-      subImages,
-      price,
-      quantity,
-      description,
-      category,
-      attributes,
-      variants,
-      skuList,
-    }
-  ) {
-    const productData = {
-      product_name: name,
-      product_main_image: mainImage,
-      product_sub_images: updatedSubImages,
-      product_price: price,
-      product_quantity: totalQuantity,
-      product_description: description,
-      product_category: category,
-      product_attributes: attributes,
-      product_variants: variants.map((variant) => ({
-        variant_name: variant.name,
-        variant_images: variant.images,
-        variant_options: variant.options,
-      })),
-    };
-    const product = await this.productRepository.update(id, data);
-    if (!product) throw new BadRequestError('Failed to update product');
-
-    return omitFields({
-      fields: ['rating', 'views', 'uniqueViews', 'createdAt', 'updatedAt'],
-      object: product,
-    });
-  }
 }
 
 module.exports = ProductService;

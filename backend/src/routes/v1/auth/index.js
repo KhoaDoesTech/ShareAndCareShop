@@ -16,6 +16,8 @@ const {
 const CONFIG_PERMISSIONS = require('../../../constants/permissions');
 const ERROR_CODES = require('../../../constants/error');
 
+const upload = require('../../../middlewares/multer.middleware');
+
 const router = express.Router();
 const authController = new AuthController();
 
@@ -45,6 +47,12 @@ router.get(
   '/refresh-token',
   authentication,
   asyncHandler(authController.refreshAccessToken)
+);
+router.patch(
+  '/avatar',
+  authentication,
+  upload.single('avatar'),
+  asyncHandler(authController.updateUserAvatar)
 );
 
 // OAuth routes

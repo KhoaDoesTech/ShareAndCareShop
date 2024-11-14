@@ -1,7 +1,8 @@
 'use strict';
 
+const fs = require('fs');
+const logger = require('../helpers/logger.helper');
 const { Types } = require('mongoose');
-
 const _ = require('lodash');
 
 const convertToObjectIdMongodb = (id) => new Types.ObjectId(id);
@@ -24,10 +25,20 @@ const generateVariantSlug = (variants, tierIndex) => {
     .join('/');
 };
 
+const removeLocalFile = (localPath) => {
+  fs.unlink(localPath, (err) => {
+    if (err) logger.error('Error while removing local files: ', err);
+    else {
+      logger.info('Removed local: ', localPath);
+    }
+  });
+};
+
 module.exports = {
   convertToObjectIdMongodb,
   getRandomNumber,
   pickFields,
   omitFields,
   generateVariantSlug,
+  removeLocalFile,
 };
