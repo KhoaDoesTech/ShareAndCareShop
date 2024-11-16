@@ -8,7 +8,7 @@
     "dev": "cross-env NODE_ENV=development nodemon --env-file=.env.development ./src/server.js",
     "prod": "cross-env NODE_ENV=production nodemon ./src/server.js",
     "data:import": "node --env-file=.env.development ./src/seeder.js",
-    "data:destroy": "node ./src/seeder.js --destroy"
+    "data:destroy": "node --env-file=.env.development ./src/seeder.js --destroy"
   },
   "keywords": [
     "ecommerce",

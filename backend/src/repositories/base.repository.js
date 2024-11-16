@@ -48,11 +48,18 @@ class BaseRepository {
     return this.formatDocument(document);
   }
 
-  async getAll(filter = {}, queryOptions = {}) {
+  async getAll({ filter = {}, queryOptions = {} }) {
+    if (queryOptions.fields) {
+      queryOptions.fields = this.mapFields(queryOptions.fields);
+    }
+    if (queryOptions.sort) {
+      queryOptions.sort = this.mapFields(queryOptions.sort);
+    }
+
     const features = new APIFeatures(this.model.find(filter), queryOptions)
       .filter()
-      .sort()
       .limitFields()
+      .sort()
       .paginate();
 
     const documents = await features.query;
@@ -61,6 +68,10 @@ class BaseRepository {
 
   formatDocument(document) {
     return document;
+  }
+
+  mapFields(fields) {
+    return fields;
   }
 }
 

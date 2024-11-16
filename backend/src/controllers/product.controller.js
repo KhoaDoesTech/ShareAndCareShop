@@ -16,6 +16,13 @@ class ProductController {
       metadata: await this.productService.createProduct(req.body),
     }).send(res);
   };
+
+  getAllProductsByUser = async (req, res, next) => {
+    new ActionSuccess({
+      message: 'Products retrieved successfully',
+      metadata: await this.productService.getAllProductsPublic(req.query),
+    }).send(res);
+  };
 }
 
 module.exports = ProductController;

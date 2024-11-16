@@ -1,3 +1,4 @@
+const { ProductStatus } = require('../constants/status');
 const ProductRepository = require('../repositories/product.repository');
 const { BadRequestError } = require('../utils/errorResponse');
 const { omitFields } = require('../utils/helpers');
@@ -58,6 +59,20 @@ class ProductService {
       fields: ['rating', 'views', 'uniqueViews', 'createdAt', 'updatedAt'],
       object: newProduct,
     });
+  }
+
+  async getAllProductsPublic(query) {
+    console.log(query);
+    const products = await this.productRepository.getAll({
+      filter: {},
+      queryOptions: query,
+    });
+    return products.map((product) =>
+      omitFields({
+        fields: ['rating', 'views', 'uniqueViews', 'createdAt', 'updatedAt'],
+        object: product,
+      })
+    );
   }
 }
 

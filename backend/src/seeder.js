@@ -4,10 +4,10 @@ const DataInitializer = require('./initializers/data.init');
 const logger = require('./helpers/logger.helper');
 
 const database = new Database();
-database.connect();
 
 const importData = async () => {
   try {
+    database.connect();
     const dataInitializer = new DataInitializer();
     await dataInitializer.initializeData();
 
@@ -21,6 +21,7 @@ const importData = async () => {
 
 const destroyData = async () => {
   try {
+    database.connect();
     const dataInitializer = new DataInitializer();
     await dataInitializer.destroyData();
 

@@ -19,4 +19,6 @@ router.post(
   asyncHandler(productController.createProduct)
 );
 
+router.get('/', asyncHandler(productController.getAllProductsByUser));
+
 module.exports = router;

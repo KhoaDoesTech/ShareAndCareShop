@@ -3,6 +3,10 @@ const { UserStatus, UserLoginType, UserRoles } = require('../constants/status');
 const { generateHashedPassword } = require('../helpers/crypto.helper');
 const mongoose = require('mongoose');
 
+const productModel = require('../models/product.model');
+const profileModel = require('../models/profile.model');
+const variantModel = require('../models/variant.model');
+
 const RoleRepository = require('../repositories/role.repository');
 const UserRepository = require('../repositories/user.repository');
 
@@ -53,6 +57,8 @@ class DataInitializer {
 
   async destroyData() {
     const collections = Object.keys(mongoose.connection.collections);
+
+    console.log(collections);
     for (const collectionName of collections) {
       const collection = mongoose.connection.collections[collectionName];
       await collection.deleteMany({});

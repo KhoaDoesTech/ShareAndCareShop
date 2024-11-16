@@ -1,33 +1,27 @@
 const { model, Schema } = require('mongoose');
+const { AvailableCartStatus, CartStatus } = require('../constants/status');
 
 const DOCUMENT_NAME = 'Cart';
 const COLLECTION_NAME = 'Carts';
 
 const cartSchema = new Schema(
   {
-    cart_user_id: { type: Schema.Types.ObjectId, ref: 'User' },
-    cart_products: { type: Array, require: true, default: [] },
-    cart_products: [
-      {
-        product: { type: Schema.Types.ObjectId, ref: 'Product' },
-        quantity: { type: Number, required: true, default: 1 },
-      },
-    ],
-    /**
-     * {
-     *     productId,
-     *     shopId,
-     *     quantity,
-     *     name,
-     *     price
-     * }
-     */
-    cart_count_product: { type: Number, default: 0 },
-    cart_state: {
+    crt_user_id: { type: Schema.Types.ObjectId, ref: 'User' },
+    crt_items: {
+      type: [
+        {
+          product_id: { type: Schema.Types.ObjectId, ref: 'Product' },
+          variant_id: { type: Schema.Types.ObjectId, ref: 'Variant' },
+          quantity: { type: Number, required: true, default: 1 },
+        },
+      ],
+      default: [],
+    },
+    crt_status: {
       type: String,
       require: true,
-      enum: ['active', 'completed', 'fail', 'pending', 'lock'],
-      default: 'active',
+      enum: AvailableCartStatus,
+      default: CartStatus.ACTIVE,
     },
   },
   {

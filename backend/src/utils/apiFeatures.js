@@ -14,6 +14,11 @@ class APIFeatures {
       (match) => `$${match}`
     );
 
+    // queryStr = queryStr.replace(/"\w+\|.*?"/g, (match) => {
+    //   const values = match.slice(1, -1).split('|');
+    //   return JSON.stringify({ $in: values });
+    // });
+
     this.query.find(JSON.parse(queryStr));
     return this;
   }
