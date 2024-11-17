@@ -34,6 +34,30 @@ const removeLocalFile = (localPath) => {
   });
 };
 
+const removeUndefinedObject = (object) => {
+  Object.keys(object).forEach((key) => {
+    if (object[key] === undefined || object[key] === null) delete object[key];
+  });
+
+  return object;
+};
+
+const updateNestedObjectParser = (obj) => {
+  const final = {};
+  Object.keys(obj).forEach((i) => {
+    if (typeof obj[i] === 'object' && !Array.isArray(obj[i])) {
+      const response = updateNestedObjectParser(obj[i]);
+      Object.keys(obj[i]).forEach((j) => {
+        final[`${i}.${j}`] = response[j];
+      });
+    } else {
+      final[i] = obj[i];
+    }
+  });
+
+  return final;
+};
+
 module.exports = {
   convertToObjectIdMongodb,
   getRandomNumber,
@@ -41,4 +65,6 @@ module.exports = {
   omitFields,
   generateVariantSlug,
   removeLocalFile,
+  removeUndefinedObject,
+  updateNestedObjectParser,
 };

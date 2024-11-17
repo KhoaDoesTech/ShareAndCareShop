@@ -18,7 +18,29 @@ router.post(
   verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.PRODUCT.CREATE),
   asyncHandler(productController.createProduct)
 );
+router.patch(
+  '/',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.PRODUCT.UPDATE),
+  asyncHandler(productController.updateProduct)
+);
+router.get(
+  '/',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.PRODUCT.VIEW),
+  asyncHandler(productController.getAllProducts)
+);
+router.get(
+  '/:productId',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.PRODUCT.VIEW),
+  asyncHandler(productController.getProductDetails)
+);
 
-router.get('/', asyncHandler(productController.getAllProductsByUser));
+router.get('/public', asyncHandler(productController.getAllProductsByUser));
+router.get(
+  '/public/:productId',
+  asyncHandler(productController.getProductDetailsByUser)
+);
 
 module.exports = router;

@@ -22,6 +22,7 @@ const productSchema = new Schema(
     },
     prd_sub_images: { type: Array, default: [] },
     prd_price: { type: Number, required: true },
+    prd_original_price: { type: Number },
     prd_quantity: { type: Number, required: true },
     prd_sold: { type: Number, default: 0 },
     prd_description: { type: String },
@@ -60,6 +61,7 @@ productSchema.index({
   prd_name: 'text',
   prd_description: 'text',
   prd_slug: 'text',
+  prd_attributes: 'text',
 });
 
 // Document middleware: runs before save() and create()

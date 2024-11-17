@@ -31,6 +31,16 @@ const ProductStatus = {
 
 const AvailableProductStatus = Object.values(ProductStatus);
 
+const SortField = {
+  VIEWS: 'prd_views',
+  PRICE: 'prd_price',
+  QUANTITY: 'prd_quantity',
+  SOLD: 'prd_sold',
+  RATING: 'prd_rating',
+  CREATED_AT: 'createdAt',
+};
+
+//
 const AddressType = {
   SHIPPING: 'SHIPPING',
   BILLING: 'BILLING',
@@ -54,11 +64,11 @@ const OrderStatus = {
 const AvailableOrderStatus = Object.values(OrderStatus);
 
 const CartStatus = {
-  ACTIVE: 'ACTIVE',
-  COMPLETED: 'COMPLETED',
-  FAIL: 'FAIL',
-  PENDING: 'PENDING',
   LOCK: 'LOCK',
+  FAIL: 'FAIL',
+  ACTIVE: 'ACTIVE',
+  PENDING: 'PENDING',
+  COMPLETED: 'COMPLETED',
 };
 
 const AvailableCartStatus = Object.values(CartStatus);
@@ -95,4 +105,5 @@ module.exports = {
   AvailablePaymentMethod,
   CouponType,
   AvailableCouponType,
+  SortField,
 };

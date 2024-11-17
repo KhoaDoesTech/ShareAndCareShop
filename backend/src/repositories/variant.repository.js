@@ -7,20 +7,29 @@ class VariantRepository extends BaseRepository {
     this.model = variantModels;
   }
 
+  async getVariantByFilter(filter) {
+    const variants = await this.model.find(filter).lean();
+    return variants.map(this.formatDocument.bind(this));
+  }
+
+  async deleteByProductId(productId) {
+    return await this.model.deleteMany({ prd_id: productId });
+  }
+
   formatDocument(variant) {
     if (!variant) return null;
 
     const formattedVariant = {
       id: variant._id,
-      productId: variant.product_id,
-      tierIndex: variant.variant_tier_idx,
-      isDefault: variant.variant_default,
-      slug: variant.variant_slug,
-      name: variant.variant_name,
-      price: variant.variant_price,
-      quantity: variant.variant_quantity,
-      sold: variant.variant_sold,
-      status: variant.variant_status,
+      productId: variant.prd_id,
+      name: variant.prd_name,
+      slug: variant.var_slug,
+      tierIndex: variant.var_tier_idx,
+      isDefault: variant.var_default,
+      price: variant.var_price,
+      quantity: variant.var_quantity,
+      sold: variant.var_sold,
+      status: variant.var_status,
       createdAt: variant.createdAt,
       updatedAt: variant.updatedAt,
     };

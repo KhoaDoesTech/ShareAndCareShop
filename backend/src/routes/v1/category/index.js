@@ -17,9 +17,6 @@ router.post(
   verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.CATEGORY.CREATE),
   asyncHandler(CategoryController.createCategory)
 );
-
-router.get('/', asyncHandler(CategoryController.getCategoriesByParentId));
-router.get('/all', asyncHandler(CategoryController.getAllCategories));
 router.delete(
   '/',
   authentication,
@@ -32,5 +29,7 @@ router.patch(
   verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.CATEGORY.UPDATE),
   asyncHandler(CategoryController.updateCategory)
 );
+router.get('/', asyncHandler(CategoryController.getCategoriesByParentId));
+router.get('/all', asyncHandler(CategoryController.getAllCategories));
 
 module.exports = router;
