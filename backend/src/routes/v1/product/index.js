@@ -11,6 +11,12 @@ const asyncHandler = require('../../../middlewares/async.middleware');
 const router = express.Router();
 const productController = new ProductController();
 
+router.get('/public', asyncHandler(productController.getAllProductsByUser));
+router.get(
+  '/public/:productId',
+  asyncHandler(productController.getProductDetailsByUser)
+);
+
 // Define the routes
 router.post(
   '/',
@@ -35,12 +41,6 @@ router.get(
   authentication,
   verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.PRODUCT.VIEW),
   asyncHandler(productController.getProductDetails)
-);
-
-router.get('/public', asyncHandler(productController.getAllProductsByUser));
-router.get(
-  '/public/:productId',
-  asyncHandler(productController.getProductDetailsByUser)
 );
 
 module.exports = router;

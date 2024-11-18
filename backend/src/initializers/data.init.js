@@ -6,6 +6,10 @@ const mongoose = require('mongoose');
 const productModel = require('../models/product.model');
 const profileModel = require('../models/profile.model');
 const variantModel = require('../models/variant.model');
+const cartModel = require('../models/cart.model');
+// const orderModel = require('../models/order.model');
+// const roleModel = require('../models/role.model');
+// const userModel = require('../models/user.model');
 
 const RoleRepository = require('../repositories/role.repository');
 const UserRepository = require('../repositories/user.repository');

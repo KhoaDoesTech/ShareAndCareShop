@@ -12,7 +12,7 @@ const { validateToken, getFromHeaders } = require('../helpers/auth.helper');
 
 const authentication = asyncHandler(async (req, res, next) => {
   const userId = getFromHeaders(req, HEADERS.CLIENT_ID);
-
+  console.log(userId);
   const userRepository = new UserRepository();
   const foundUser = await userRepository.getByQuery(
     {

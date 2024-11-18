@@ -15,8 +15,6 @@ class Database {
     mongoose
       .connect(this.connectString, {
         maxPoolSize: 50,
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
       })
       .then(() => logger.info('Connected Mongodb Success'.green))
       .catch((err) => logger.error(`Error Connect::: ${err}`.red));
