@@ -16,6 +16,9 @@ const errorHandler = require('./middlewares/error.middleware');
 const asyncHandler = require('./middlewares/async.middleware');
 const { NotFoundError } = require('./utils/errorResponse');
 const Database = require('./initializers/mongodb.init');
+const JobManager = require('./jobs/jobManager');
+const logger = require('./helpers/logger.helper');
+const cleanTemporaryImages = require('./jobs/cleanTemporaryImages');
 
 class App {
   constructor() {
@@ -26,6 +29,7 @@ class App {
     this.initMiddlewares();
     this.initRoutes();
     this.initErrorHandling();
+    this.initCronJobs();
   }
 
   initConfig() {
@@ -63,12 +67,26 @@ class App {
     this.app.use(errorHandler);
   }
 
+  initCronJobs() {
+    if (process.env.CLEAN_TEMP_IMAGES_JOB === 'true') {
+      JobManager.addJob(cleanTemporaryImages);
+      logger.info('cleanTemporaryImages job added');
+    }
+
+    JobManager.startAll();
+  }
+
+  stopCronJobs() {
+    JobManager.stopAll();
+  }
+
   startServer() {
     const server = this.app.listen(this.port, () => {
       console.log(`Server is running on port ${this.port}`.yellow.bold);
     });
 
     process.on('SIGINT', () => {
+      this.stopCronJobs();
       server.close(() => {
         console.log('Process terminated'.red.bold);
       });

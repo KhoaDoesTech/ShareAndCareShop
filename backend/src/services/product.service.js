@@ -7,6 +7,8 @@ const {
   removeUndefinedObject,
   updateNestedObjectParser,
 } = require('../utils/helpers');
+const UploadService = require('./upload.service');
+
 const VariantService = require('./variant.service');
 
 class ProductService {
@@ -14,6 +16,7 @@ class ProductService {
     this.productRepository = new ProductRepository();
     this.variantService = new VariantService();
     this.categoryRepository = new CategoryRepository();
+    this.uploadService = new UploadService();
   }
 
   async createProduct({
@@ -71,6 +74,8 @@ class ProductService {
     });
 
     if (!newProduct) throw new BadRequestError('Failed to create product');
+
+    this.uploadService.deleteUsedImage(mainImage, updatedSubImages);
 
     await this.variantService.createVariants({
       product: newProduct,
@@ -175,6 +180,8 @@ class ProductService {
       productId,
       parsedUpdateData
     );
+
+    this.uploadService.deleteUsedImage(mainImage, updatedSubImages);
 
     return {
       product: omitFields({

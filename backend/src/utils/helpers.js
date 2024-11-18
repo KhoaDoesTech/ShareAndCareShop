@@ -34,6 +34,14 @@ const removeLocalFile = (localPath) => {
   });
 };
 
+const extractPublicIdFromUrl = (url) => {
+  if (!url) return null;
+  const parts = url.split('/');
+  const publicId = parts.slice(-3).join('/').split('.')[0];
+
+  return publicId;
+};
+
 const removeUndefinedObject = (object) => {
   Object.keys(object).forEach((key) => {
     if (object[key] === undefined || object[key] === null) delete object[key];
@@ -67,4 +75,5 @@ module.exports = {
   removeLocalFile,
   removeUndefinedObject,
   updateNestedObjectParser,
+  extractPublicIdFromUrl,
 };
