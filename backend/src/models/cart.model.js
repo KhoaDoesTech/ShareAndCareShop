@@ -10,9 +10,9 @@ const cartSchema = new Schema(
     crt_items: {
       type: [
         {
-          product_id: { type: Schema.Types.ObjectId, ref: 'Product' },
-          variant_id: { type: Schema.Types.ObjectId, ref: 'Variant' },
-          quantity: { type: Number, required: true, default: 1 },
+          prd_id: { type: Schema.Types.ObjectId, ref: 'Product' },
+          var_id: { type: Schema.Types.ObjectId, ref: 'Variant' },
+          prd_quantity: { type: Number, required: true },
         },
       ],
       default: [],

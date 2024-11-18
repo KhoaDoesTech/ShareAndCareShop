@@ -9,6 +9,7 @@ const {
 } = require('../constants/status');
 const SERVER_CONFIG = require('../configs/server.config');
 const profileModel = require('./profile.model');
+const cartModel = require('./cart.model');
 
 const DOCUMENT_NAME = 'User';
 const COLLECTION_NAME = 'Users';
@@ -49,15 +50,23 @@ const userSchema = new Schema(
 
 userSchema.pre('save', async function (next) {
   if (this.isNew) {
-    const profile = await profileModel.findOne({ user_id: this._id });
+    const profile = await profileModel.findOne({ usr_id: this._id });
+    const cart = await cartModel.findOne({ crt_user_id: this._id });
 
     if (!profile) {
       await profileModel.create({
-        user_id: this._id,
+        usr_id: this._id,
         prof_name: this.usr_name,
+      });
+    }
+
+    if (!cart) {
+      await cartModel.create({
+        crt_user_id: this._id,
       });
     }
   }
   next();
 });
+
 module.exports = model(DOCUMENT_NAME, userSchema);
