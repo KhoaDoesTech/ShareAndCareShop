@@ -268,7 +268,7 @@ class ProductService {
     attributes,
   }) {
     const filter = { prd_status: ProductStatus.PUBLISHED };
-    console.log(filter);
+
     if (search) {
       const keyword = search.trim();
       const regexOptions = { $regex: keyword, $options: 'i' };

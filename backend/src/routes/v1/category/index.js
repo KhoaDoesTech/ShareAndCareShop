@@ -7,10 +7,13 @@ const CategoryController = require('../../../controllers/category.controller');
 const express = require('express');
 const asyncHandler = require('../../../middlewares/async.middleware');
 
-// Initialize the router
+// Unsecured route
 const router = express.Router();
 
-// Define the routes
+router.get('/', asyncHandler(CategoryController.getCategoriesByParentId));
+router.get('/all', asyncHandler(CategoryController.getAllCategories));
+
+// Secured routes
 router.post(
   '/',
   authentication,
@@ -29,7 +32,5 @@ router.patch(
   verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.CATEGORY.UPDATE),
   asyncHandler(CategoryController.updateCategory)
 );
-router.get('/', asyncHandler(CategoryController.getCategoriesByParentId));
-router.get('/all', asyncHandler(CategoryController.getAllCategories));
 
 module.exports = router;

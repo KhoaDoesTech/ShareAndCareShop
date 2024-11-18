@@ -14,4 +14,12 @@ const router = express.Router();
 
 router.post('/', authentication, asyncHandler(CartController.addToCart));
 router.patch('/', authentication, asyncHandler(CartController.updateCartItems));
+router.delete(
+  '/',
+  authentication,
+  asyncHandler(CartController.removeItemFromCart)
+);
+router.delete('/clear', authentication, asyncHandler(CartController.clearCart));
+router.get('/', authentication, asyncHandler(CartController.getCart));
+
 module.exports = router;

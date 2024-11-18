@@ -103,7 +103,10 @@ class AuthService {
 
     const tokens = await this.tokenService.createTokens(updatedUser);
 
-    return tokens;
+    return {
+      tokens,
+      userId: updatedUser.id,
+    };
   }
 
   async resendVerificationEmail({ username, email }) {
@@ -169,7 +172,10 @@ class AuthService {
     }
     const tokens = await this.tokenService.createTokens(user);
 
-    return tokens;
+    return {
+      tokens,
+      userId: user.id,
+    };
   }
 
   async loginUser({ email, password }) {

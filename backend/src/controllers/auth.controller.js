@@ -22,9 +22,9 @@ class AuthController {
 
   verifyEmail = async (req, res, next) => {
     try {
-      const tokens = await this.authService.verifyEmail(req.params);
+      const { tokens, userId } = await this.authService.verifyEmail(req.params);
       res.redirect(
-        `${process.env.CLIENT_SSO_REDIRECT_URL}?refreshToken=${tokens.refreshToken}`
+        `${process.env.CLIENT_SSO_REDIRECT_URL}?userId=${userId}&refreshToken=${tokens.refreshToken}`
       );
     } catch (error) {
       res.redirect(
@@ -41,9 +41,8 @@ class AuthController {
   };
 
   socialLogin = async (req, res, next) => {
-    const tokens = req.user;
     res.redirect(
-      `${process.env.CLIENT_SSO_REDIRECT_URL}?refreshToken=${tokens.refreshToken}`
+      `${process.env.CLIENT_SSO_REDIRECT_URL}?userId=${req.user.userId}&refreshToken=${req.user.tokens.refreshToken}`
     );
   };
 

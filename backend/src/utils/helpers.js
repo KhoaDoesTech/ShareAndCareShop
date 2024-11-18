@@ -66,6 +66,13 @@ const updateNestedObjectParser = (obj) => {
   return final;
 };
 
+const getVariantImagesFromTierIndex = (variants, tierIndex) => {
+  if (!variants || !tierIndex) return [];
+  return tierIndex
+    .map((idx, level) => variants[level]?.var_images?.[idx] || null)
+    .filter(Boolean);
+};
+
 module.exports = {
   convertToObjectIdMongodb,
   getRandomNumber,
@@ -76,4 +83,5 @@ module.exports = {
   removeUndefinedObject,
   updateNestedObjectParser,
   extractPublicIdFromUrl,
+  getVariantImagesFromTierIndex,
 };
