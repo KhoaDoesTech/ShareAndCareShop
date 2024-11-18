@@ -73,6 +73,47 @@ const getVariantImagesFromTierIndex = (variants, tierIndex) => {
     .filter(Boolean);
 };
 
+// const getVariantImageOrDefault = (
+//   prd_variants,
+//   tierIndex,
+//   productMainImage
+// ) => {
+//   console.log(prd_variants, tierIndex, productMainImage);
+//   if (tierIndex && prd_variants?.length) {
+//     for (let i = 0; i < tierIndex.length; i++) {
+//       const variant = prd_variants[i];
+//       const imageIndex = tierIndex[i];
+
+//       if (variant?.var_images?.[imageIndex]) {
+//         return variant.var_images[imageIndex];
+//       }
+//     }
+//   }
+
+//   return productMainImage;
+// };
+
+const getVariantImageOrDefault = (variants, tierIndex, mainImage) => {
+  if (!Array.isArray(variants) || !tierIndex || tierIndex.length === 0)
+    return mainImage;
+
+  let selectedImage = mainImage;
+
+  variants.forEach((variant, index) => {
+    const selectedIndex = tierIndex[index];
+
+    if (
+      selectedIndex !== undefined &&
+      variant.var_images &&
+      variant.var_images[selectedIndex]
+    ) {
+      selectedImage = variant.var_images[selectedIndex];
+    }
+  });
+
+  return selectedImage;
+};
+
 module.exports = {
   convertToObjectIdMongodb,
   getRandomNumber,
@@ -84,4 +125,5 @@ module.exports = {
   updateNestedObjectParser,
   extractPublicIdFromUrl,
   getVariantImagesFromTierIndex,
+  getVariantImageOrDefault,
 };
