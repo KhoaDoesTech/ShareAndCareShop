@@ -23,11 +23,12 @@ const orderSchema = new Schema(
       type: [
         {
           prd_id: { type: Schema.Types.ObjectId, ref: 'Product' },
+          var_id: { type: Schema.Types.ObjectId, ref: 'Variant' },
           prd_name: { type: String, required: true },
+          var_slug: { type: String, required: true },
           prd_price: { type: Number, required: true },
           prd_img: { type: String, required: true },
           prd_quantity: { type: Number, required: true, default: 1 },
-          var_id: { type: Schema.Types.ObjectId, ref: 'Variant' },
         },
       ],
       default: [],

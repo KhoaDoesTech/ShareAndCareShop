@@ -27,33 +27,42 @@ class CartRepository extends BaseRepository {
 
     if (!cart) return null;
 
+    const items = cart.crt_items.map((item) => {
+      const product = item.prd_id;
+
+      const image = getVariantImageOrDefault(
+        product?.prd_variants,
+        item.var_id?.var_tier_idx,
+        product?.prd_main_image
+      );
+
+      const price = item.var_id?.var_price || product?.prd_price;
+      const itemTotalPrice = price * item.prd_quantity;
+      const itemTotalOriginalPrice =
+        product?.prd_original_price * item.prd_quantity;
+
+      return {
+        productId: product?._id || item.prd_id,
+        variantId: item.var_id?._id,
+        productName: product?.prd_name,
+        variantSlug: item.var_id?.var_slug,
+        quantity: item.prd_quantity,
+        price,
+        originalPrice: product?.prd_original_price,
+        itemTotalPrice,
+        itemTotalOriginalPrice,
+        productImage: image,
+        variants: product?.prd_variants.map((variant) => ({
+          name: variant.var_name,
+          options: variant.var_options,
+        })),
+      };
+    });
+
     return {
       id: cart._id,
       userId: cart.crt_user_id,
-      items: cart.crt_items.map((item) => {
-        const product = item.prd_id;
-
-        const image = getVariantImageOrDefault(
-          product?.prd_variants,
-          item.var_id?.var_tier_idx,
-          product?.prd_main_image
-        );
-
-        return {
-          productId: product?._id || item.prd_id,
-          variantId: item.var_id?._id,
-          productName: product?.prd_name,
-          variantSlug: item.var_id?.var_slug,
-          productImage: image,
-          price: item.var_id?.var_price || product?.prd_price,
-          originalPrice: product?.prd_original_price,
-          quantity: item.var_id?.var_quantity || item.prd_quantity,
-          variants: product?.prd_variants.map((variant) => ({
-            name: variant.var_name,
-            options: variant.var_options,
-          })),
-        };
-      }),
+      items: items,
     };
   }
 
