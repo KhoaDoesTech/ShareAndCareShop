@@ -4,15 +4,38 @@ const {
   UnauthorizedError,
   NotFoundError,
   ForbiddenError,
+  BadRequestError,
 } = require('../utils/errorResponse');
 const UserRepository = require('../repositories/user.repository');
 const CONFIG_PERMISSIONS = require('../constants/permissions');
 const { UserStatus } = require('../constants/status');
 const { validateToken, getFromHeaders } = require('../helpers/auth.helper');
+const { parseJwt } = require('../utils/helpers');
+const TokenRepository = require('../repositories/token.repository');
 
 const authentication = asyncHandler(async (req, res, next) => {
-  const userId = getFromHeaders(req, HEADERS.CLIENT_ID);
-  console.log(userId);
+  // Extract required headers
+  const clientId = getFromHeaders(req, HEADERS.CLIENT_ID);
+  const accessToken = req.headers[HEADERS.AUTHORIZATION];
+  const refreshToken = req.headers[HEADERS.REFRESH_TOKEN];
+
+  // Decode the token and validate userId
+  const decodedToken = parseJwt(accessToken || refreshToken);
+  if (!decodedToken.userId) throw new BadRequestError('Invalid request');
+
+  const userId = clientId === decodedToken.userId ? decodedToken.userId : null;
+  if (!userId) throw new BadRequestError('Invalid request');
+
+  // Fetch the token details
+  const tokenRepository = new TokenRepository();
+  const keyStore = await tokenRepository.getToken({
+    userId,
+    deviceToken: decodedToken.deviceToken,
+  });
+
+  if (!keyStore) throw new BadRequestError('Resource not found');
+
+  // Fetch the user details
   const userRepository = new UserRepository();
   const foundUser = await userRepository.getByQuery(
     {
@@ -26,29 +49,24 @@ const authentication = asyncHandler(async (req, res, next) => {
   );
   if (!foundUser) throw new NotFoundError('Not found User');
 
-  if (req.headers[HEADERS.REFRESH_TOKEN]) {
-    const refreshToken = getFromHeaders(req, HEADERS.REFRESH_TOKEN);
+  // Handle refresh token scenario
+  if (refreshToken) {
+    await _handleRefreshToken(refreshToken, keyStore, userId, tokenRepository);
+    await validateToken(refreshToken, keyStore.publicKey, userId);
 
-    if (foundUser.refreshTokensUsed.includes(refreshToken)) {
-      await userRepository.updateById(foundUser.id, {
-        refresh_token: null,
-        public_key: null,
-      });
-
-      throw new ForbiddenError('Something wrong happened! Please relogin');
-    }
-
-    await validateToken(refreshToken, foundUser, userId);
     req.user = foundUser;
-    req.refreshToken = refreshToken;
+    req.keyStore = keyStore;
 
     return next();
   }
 
-  const accessToken = getFromHeaders(req, HEADERS.AUTHORIZATION);
+  // Handle access token scenario
+  if (!accessToken) throw new BadRequestError('Invalid Request');
 
-  await validateToken(accessToken, foundUser, userId);
+  await validateToken(accessToken, keyStore.publicKey, userId);
+
   req.user = foundUser;
+
   next();
 });
 
@@ -67,6 +85,24 @@ const verifyPermission = (permissions) =>
 
     return next();
   });
+
+const _handleRefreshToken = async (
+  refreshToken,
+  keyStore,
+  userId,
+  tokenRepository
+) => {
+  if (keyStore.refreshTokensUsed.includes(refreshToken)) {
+    await tokenRepository.deleteToken({
+      userId,
+      deviceToken: keyStore.deviceToken,
+    });
+
+    throw new ForbiddenError('Something went wrong! Please re-login');
+  }
+
+  await validateToken(refreshToken, keyStore.publicKey, userId, true);
+};
 
 module.exports = {
   authentication,

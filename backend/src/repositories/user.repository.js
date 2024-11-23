@@ -26,15 +26,11 @@ class UserRepository extends BaseRepository {
         : user.usr_role,
       loginType: user.usr_login_type,
       status: user.usr_status,
-      publicKey: user.public_key,
-      refreshToken: user.refresh_token,
-      refreshTokensUsed: user.refresh_tokens_used,
+      failedLoginAttempts: user.failed_login_attempts,
       forgotPasswordToken: user.forgot_password_token,
       forgotPasswordExpiry: user.forgot_password_expiry,
       verificationToken: user.verification_token,
       verificationExpiry: user.verification_expiry,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
     };
 
     return formattedUser;

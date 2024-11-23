@@ -18,13 +18,13 @@ passport.use(
       try {
         const { email, name, picture, sub } = profile._json;
 
-        const user = await authService.handleSocialLogin({
+        const user = {
           avatar: picture,
           email,
           password: sub,
           username: name,
-          logintype: UserLoginType.GOOGLE,
-        });
+          loginType: UserLoginType.GOOGLE,
+        };
 
         return done(null, user);
       } catch (error) {
@@ -49,13 +49,13 @@ passport.use(
         const avatar = profile.photos && profile.photos[0].value;
         const password = profile.id;
 
-        const user = await authService.handleSocialLogin({
+        const user = {
           email,
           avatar,
           password,
           username,
-          logintype: UserLoginType.FACEBOOK,
-        });
+          loginType: UserLoginType.FACEBOOK,
+        };
 
         return done(null, user);
       } catch (error) {

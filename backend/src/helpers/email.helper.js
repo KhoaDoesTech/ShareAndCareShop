@@ -92,6 +92,33 @@ class EmailHelper {
       templateContent: content,
     });
   }
+
+  async sendForgotPasswordEmail(username, email, resetUrl) {
+    const content = {
+      body: {
+        name: username,
+        intro:
+          'You have received this email because a password reset request for your account was received.',
+        action: {
+          instructions:
+            'To reset your password, please click on the following button:',
+          button: {
+            color: '#DC4D2F',
+            text: 'Reset your password',
+            link: resetUrl,
+          },
+        },
+        outro:
+          'If you did not request a password reset, no further action is required on your part.',
+      },
+    };
+
+    await this.sendEmail({
+      to: email,
+      subject: 'Password reset request',
+      templateContent: content,
+    });
+  }
 }
 
 module.exports = EmailHelper;

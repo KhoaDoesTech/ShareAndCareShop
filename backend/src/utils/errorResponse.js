@@ -29,8 +29,8 @@ class UnauthorizedError extends ErrorResponse {
 
 class TokenExpiredError extends ErrorResponse {
   constructor(
-    message = ReasonPhrases.UNAUTHORIZED,
-    statusCode = StatusCodes.UNAUTHORIZED
+    message = RESPONSE_MESSAGES.UNAUTHORIZED.type,
+    statusCode = RESPONSE_MESSAGES.UNAUTHORIZED.status
   ) {
     super(message, statusCode);
     this.metadata = { 'is-token-expired': true };

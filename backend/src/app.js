@@ -7,6 +7,7 @@ const cookieParser = require('cookie-parser');
 const xssClean = require('xss-clean');
 const hpp = require('hpp');
 const cors = require('cors');
+const session = require('express-session');
 
 const passport = require('./helpers/passport.helper');
 const corsOptions = require('./configs/cors.config');
@@ -48,8 +49,15 @@ class App {
     this.app.use(express.json({ limit: '10kb' }));
     this.app.use(express.urlencoded({ extended: true }));
     this.app.use(compression());
-
+    this.app.use(
+      session({
+        secret: process.env.EXPRESS_SESSION_SECRET,
+        resave: false,
+        saveUninitialized: true,
+      })
+    );
     this.app.use(passport.initialize());
+    this.app.use(passport.session());
   }
 
   initRoutes() {

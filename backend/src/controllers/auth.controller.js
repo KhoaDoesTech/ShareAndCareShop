@@ -9,7 +9,6 @@ const {
 class AuthController {
   constructor() {
     this.authService = new AuthService();
-    this.tokenService = new TokenService();
   }
 
   registerUser = async (req, res, next) => {
@@ -41,15 +40,27 @@ class AuthController {
   };
 
   socialLogin = async (req, res, next) => {
+    const { userId, tokens } = await this.authService.socialLogin({
+      ...req.user,
+      deviceToken: req.session.deviceToken,
+      deviceName: req.session.deviceName,
+    });
+
+    console.log(
+      `Redirecting::: ${process.env.CLIENT_SSO_REDIRECT_URL}?userId=${userId}&refreshToken=${tokens.refreshToken}`
+    );
     res.redirect(
-      `${process.env.CLIENT_SSO_REDIRECT_URL}?userId=${req.user.userId}&refreshToken=${req.user.tokens.refreshToken}`
+      `${process.env.CLIENT_SSO_REDIRECT_URL}?userId=${userId}&refreshToken=${tokens.refreshToken}`
     );
   };
 
   logIn = async (req, res, next) => {
     new ActionSuccess({
       message: 'User logged in successfully',
-      metadata: await this.authService.loginUser(req.body),
+      metadata: await this.authService.loginUser({
+        ...req.body,
+        user: req.user,
+      }),
     }).send(res);
   };
 
@@ -60,13 +71,17 @@ class AuthController {
     }).send(res);
   };
 
-  refreshAccessToken = async (req, res, next) => {
-    new ActionSuccess({
-      message: 'Access token refreshed successfully',
-      metadata: await this.tokenService.refreshAccessToken({
-        refreshToken: req.refreshToken,
-        user: req.user,
-      }),
+  forgotPassword = async (req, res, next) => {
+    new NoContentSuccess({
+      message: 'Password reset email sent successfully',
+      metadata: await this.authService.forgotPasswordRequest(req.body),
+    }).send(res);
+  };
+
+  resetPassword = async (req, res, next) => {
+    new NoContentSuccess({
+      message: 'Password reset successfully',
+      metadata: await this.authService.resetForgottenPassword(req.body),
     }).send(res);
   };
 
@@ -81,4 +96,4 @@ class AuthController {
   };
 }
 
-module.exports = AuthController;
+module.exports = new AuthController();

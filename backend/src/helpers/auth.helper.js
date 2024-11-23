@@ -11,24 +11,30 @@ const getFromHeaders = (req, header) => {
   return value;
 };
 
-const validateToken = async (token, user, userId) => {
+const validateToken = async (
+  token,
+  publicKey,
+  userId,
+  isRefreshToken = false
+) => {
   try {
-    const decodedToken = await verifyJWT(token, user.publicKey);
-    if (userId !== decodedToken.id) {
+    const decodedToken = await verifyJWT(token, publicKey);
+    if (userId !== decodedToken.userId) {
       throw new UnauthorizedError(`Invalid token`);
     }
   } catch (error) {
-    handleTokenError(error, type);
+    handleTokenError(error, isRefreshToken);
   }
 };
 
-const handleTokenError = (error, type) => {
+const handleTokenError = (error, isRefreshToken) => {
   if (error.name === 'TokenExpiredError') {
-    throw new TokenExpiredError(
-      `${type.charAt(0).toUpperCase() + type.slice(1)} token has expired`
-    );
+    if (isRefreshToken) {
+      throw new UnauthorizedError(`Refresh token has expired`);
+    }
+    throw new TokenExpiredError(`Access token has expired`);
   } else {
-    throw new UnauthorizedError(`Invalid ${type} token`);
+    throw new UnauthorizedError(`Invalid token`);
   }
 };
 

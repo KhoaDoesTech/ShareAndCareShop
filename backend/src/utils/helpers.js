@@ -15,6 +15,10 @@ const omitFields = ({ fields = [], object = {} }) => {
   return _.omit(object, fields);
 };
 
+const parseJwt = (token) => {
+  return JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+};
+
 const getRandomNumber = (max) => {
   return Math.floor(Math.random() * max);
 };
@@ -126,4 +130,5 @@ module.exports = {
   extractPublicIdFromUrl,
   getVariantImagesFromTierIndex,
   getVariantImageOrDefault,
+  parseJwt,
 };

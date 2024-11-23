@@ -1,7 +1,7 @@
 'use strict';
 
 const express = require('express');
-const validate = require('../../../middlewares/validate.middleware');
+const TokenController = require('../../../controllers/auth.controller');
 const asyncHandler = require('../../../middlewares/async.middleware');
 const {
   authentication,
@@ -9,14 +9,13 @@ const {
 } = require('../../../middlewares/auth.middleware');
 const CONFIG_PERMISSIONS = require('../../../constants/permissions');
 
-const AuthController = require('../../../controllers/auth.controller');
-const {
-  userRegisterValidator,
-  userLoginValidator,
-} = require('../../../validators/auth.validator');
-
 const router = express.Router();
 
-router.post('/');
+// Secured routes
+router.get(
+  '/refresh-token',
+  authentication,
+  asyncHandler(TokenController.refreshAccessToken)
+);
 
 module.exports = router;

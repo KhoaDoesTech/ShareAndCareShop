@@ -10,9 +10,8 @@ const verifyJWT = async (token, keySecret) => {
 const generateTokenPair = async (payload, privateKey) => {
   const accessToken = await JWT.sign(
     {
-      id: payload.id,
-      email: payload.email,
-      permissions: payload.permissions,
+      userId: payload.userId,
+      deviceToken: payload.deviceToken,
     },
     privateKey,
     {
@@ -21,10 +20,14 @@ const generateTokenPair = async (payload, privateKey) => {
     }
   );
 
-  const refreshToken = await JWT.sign({ id: payload.id }, privateKey, {
-    algorithm: 'RS256',
-    expiresIn: SERVER_CONFIG.jwt.refreshExpire,
-  });
+  const refreshToken = await JWT.sign(
+    { userId: payload.userId, deviceToken: payload.deviceToken },
+    privateKey,
+    {
+      algorithm: 'RS256',
+      expiresIn: SERVER_CONFIG.jwt.refreshExpire,
+    }
+  );
 
   return { accessToken, refreshToken };
 };

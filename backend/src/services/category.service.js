@@ -63,7 +63,6 @@ class CategoryService {
         }
       );
 
-      console.log(updatedCategory);
       return pickFields({
         fields: ['name', 'parentId', 'id'],
         object: updatedCategory,

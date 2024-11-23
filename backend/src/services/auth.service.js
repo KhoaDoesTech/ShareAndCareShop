@@ -16,11 +16,13 @@ const {
 const { pickFields, removeLocalFile } = require('../utils/helpers');
 const TokenService = require('./token.service');
 const cloudinary = require('../helpers/cloudinary.helper');
+const TokenRepository = require('../repositories/token.repository');
 
 class AuthService {
   constructor() {
     this.userRepository = new userRepository();
     this.roleRepository = new RoleRepository();
+    this.tokenRepository = new TokenRepository();
     this.EmailHelper = new EmailHelper();
     this.tokenService = new TokenService();
   }
@@ -80,6 +82,33 @@ class AuthService {
     };
   }
 
+  async loginUser({ email, password, deviceToken, deviceName }) {
+    const foundUser = await this.userRepository.getByQuery({
+      usr_email: email,
+    });
+
+    this._checkUserStatus(foundUser);
+
+    const isPasswordValid = await comparePassword(password, foundUser.password);
+
+    if (!isPasswordValid)
+      throw new BadRequestError('Invalid email or password');
+
+    const tokens = await this.tokenService.createTokensForDevice({
+      user: foundUser,
+      deviceToken,
+      deviceName,
+    });
+
+    return {
+      user: pickFields({
+        fields: ['id', 'email', 'name', 'avatar'],
+        object: foundUser,
+      }),
+      tokens,
+    };
+  }
+
   async verifyEmail({ verificationToken }) {
     if (!verificationToken) throw new BadRequestError('Invalid token');
 
@@ -114,13 +143,7 @@ class AuthService {
       usr_email: email,
     });
 
-    if (!foundUser) throw new BadRequestError('User does not exists');
-
-    if (foundUser.status === UserStatus.ACTIVE)
-      throw new BadRequestError('User is already verified');
-
-    if (foundUser.status === UserStatus.BLOCKED)
-      throw new BadRequestError('User is blocked');
+    this._checkUserStatus(foundUser);
 
     const { unHashedToken, hashedToken, tokenExpiry } =
       generateTemporaryToken();
@@ -133,7 +156,7 @@ class AuthService {
     if (!updatedUser)
       throw new InternalServerError('Failed to resend verification email');
 
-    const verificationUrl = `${process.env.BACKEND_URL}/api/v1/users/verify-email/${unHashedToken}`;
+    const verificationUrl = `${process.env.BACKEND_URL}/api/v1/auth/verify-email/${unHashedToken}`;
     await this.EmailHelper.sendVerificationEmail(
       username,
       email,
@@ -146,7 +169,15 @@ class AuthService {
     });
   }
 
-  async handleSocialLogin({ password, avatar, email, username, logintype }) {
+  async socialLogin({
+    password,
+    avatar,
+    email,
+    username,
+    loginType,
+    deviceToken,
+    deviceName,
+  }) {
     let user = await this.userRepository.getByQuery({ usr_email: email });
 
     const basicRole = await this.roleRepository.getByQuery({
@@ -162,7 +193,7 @@ class AuthService {
         usr_password: password,
         usr_name: username,
         usr_role: basicRole.id,
-        usr_login_type: logintype,
+        usr_login_type: loginType,
         usr_status: UserStatus.ACTIVE,
       });
     }
@@ -170,7 +201,12 @@ class AuthService {
     if (user.status === UserStatus.BLOCKED) {
       throw new BadRequestError('User is blocked');
     }
-    const tokens = await this.tokenService.createTokens(user);
+
+    const tokens = await this.tokenService.createTokensForDevice({
+      user,
+      deviceToken,
+      deviceName,
+    });
 
     return {
       tokens,
@@ -178,46 +214,72 @@ class AuthService {
     };
   }
 
-  async loginUser({ email, password }) {
-    const foundUser = await this.userRepository.getByQuery({
-      usr_email: email,
+  async logoutUser(user) {
+    const deleteToken = await this.tokenRepository.deleteToken({
+      userId: user.id,
+      deviceToken: user.deviceToken,
     });
-    if (!foundUser) throw new BadRequestError('Invalid email or password');
+
+    if (!deleteToken) throw new InternalServerError('Failed to logout user');
+  }
+
+  _checkUserStatus(foundUser) {
+    if (!foundUser) throw new BadRequestError('User not found');
 
     if (foundUser.status === UserStatus.PENDING)
       throw new BadRequestError('User has not verified email');
 
     if (foundUser.status === UserStatus.BLOCKED)
       throw new BadRequestError('User is blocked');
-
-    const isPasswordValid = await comparePassword(password, foundUser.password);
-
-    if (!isPasswordValid)
-      throw new BadRequestError('Invalid email or password');
-
-    const tokens = await this.tokenService.createTokens(foundUser);
-
-    return {
-      user: pickFields({
-        fields: ['id', 'email', 'name', 'avatar'],
-        object: foundUser,
-      }),
-      tokens,
-    };
   }
 
-  async logoutUser(user) {
-    const updatedUser = await this.userRepository.updateById(user.id, {
-      refresh_token: null,
-      public_key: null,
+  async forgotPasswordRequest({ email }) {
+    const foundUser = await this.userRepository.getByQuery({
+      usr_email: email,
     });
 
-    if (!updatedUser) throw new InternalServerError('Failed to logout user');
+    this._checkUserStatus(foundUser);
+
+    const { unHashedToken, hashedToken, tokenExpiry } =
+      generateTemporaryToken();
+
+    const updatedUser = await this.userRepository.updateById(foundUser.id, {
+      forgot_password_token: hashedToken,
+      forgot_password_expiry: tokenExpiry,
+    });
+
+    if (!updatedUser)
+      throw new InternalServerError('Failed to request password reset');
+
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${unHashedToken}`;
+
+    await this.EmailHelper.sendForgotPasswordEmail(
+      foundUser.name,
+      email,
+      resetUrl
+    );
   }
 
-  async forgotPasswordRequest({ email }) {}
+  async resetForgottenPassword({ resetToken, newPassword }) {
+    if (!resetToken) throw new BadRequestError('Invalid token');
 
-  async resetPassword({ resetToken, newPassword }) {}
+    const hashedToken = hashToken(resetToken);
+
+    const foundUser = await this.userRepository.getByQuery({
+      forgot_password_token: hashedToken,
+      forgot_password_expiry: { $gte: Date.now() },
+    });
+
+    const passwordHash = await generateHashedPassword(newPassword);
+
+    const updatedUser = await this.userRepository.updateById(foundUser.id, {
+      usr_password: passwordHash,
+      forgot_password_token: null,
+      forgot_password_expiry: null,
+    });
+
+    if (!updatedUser) throw new InternalServerError('Failed to reset password');
+  }
 
   async updateUserAvatar({ file, user }) {
     if (!file) {
@@ -244,7 +306,7 @@ class AuthService {
     } catch (error) {
       throw new InternalServerError('Failed to upload avatar');
     } finally {
-      removeLocalFile(file.path); // Đảm bảo xóa file cục bộ
+      removeLocalFile(file.path);
     }
   }
 }

@@ -19,40 +19,37 @@ const ERROR_CODES = require('../../../constants/error');
 const upload = require('../../../middlewares/multer.middleware');
 
 const router = express.Router();
-const authController = new AuthController();
 
 // Unsecured route
 router.post(
   '/register',
   [userRegisterValidator(), validate],
-  asyncHandler(authController.registerUser)
+  asyncHandler(AuthController.registerUser)
 );
 router.get(
   '/verify-email/:verificationToken',
-  asyncHandler(authController.verifyEmail)
+  asyncHandler(AuthController.verifyEmail)
 );
 router.post(
   '/resend-email-verification',
-  asyncHandler(authController.resendVerificationEmail)
+  asyncHandler(AuthController.resendVerificationEmail)
 );
 router.post(
   '/login',
   [userLoginValidator(), validate],
-  asyncHandler(authController.logIn)
+  asyncHandler(AuthController.logIn)
 );
 
+router.post('/forgot-password', asyncHandler(AuthController.forgotPassword));
+router.post('/reset-password', asyncHandler(AuthController.resetPassword));
+
 // Secured routes
-router.post('/logout', authentication, asyncHandler(authController.logOut));
-router.get(
-  '/refresh-token',
-  authentication,
-  asyncHandler(authController.refreshAccessToken)
-);
+router.post('/logout', authentication, asyncHandler(AuthController.logOut));
 router.patch(
   '/avatar',
   authentication,
   upload.single('avatar'),
-  asyncHandler(authController.updateUserAvatar)
+  asyncHandler(AuthController.updateUserAvatar)
 );
 
 // OAuth routes
@@ -69,18 +66,36 @@ const facebookAuthCallback = passport.authenticate('facebook', {
   failureRedirect: `${process.env.FRONTEND_URL}/error?code=${ERROR_CODES.AUTH.FACEBOOK_LOGIN_FAILED}`,
 });
 
-router.get('/google', googleAuth);
+router.get(
+  '/google',
+  (req, res, next) => {
+    req.session.deviceToken = req.query.deviceToken;
+    req.session.deviceName = req.query.deviceName;
+
+    next();
+  },
+  googleAuth
+);
 router.get(
   '/google/callback',
   googleAuthCallback,
-  asyncHandler(authController.socialLogin)
+  asyncHandler(AuthController.socialLogin)
 );
 
-router.get('/facebook', facebookAuth);
+router.get(
+  '/facebook',
+  (req, res, next) => {
+    req.session.deviceToken = req.query.deviceToken;
+    req.session.deviceName = req.query.deviceName;
+
+    next();
+  },
+  facebookAuth
+);
 router.get(
   '/facebook/callback',
   facebookAuthCallback,
-  asyncHandler(authController.socialLogin)
+  asyncHandler(AuthController.socialLogin)
 );
 
 module.exports = router;
