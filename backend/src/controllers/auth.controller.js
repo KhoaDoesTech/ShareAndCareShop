@@ -64,6 +64,12 @@ class AuthController {
     }).send(res);
   };
 
+  panelLogin = async (req, res, next) => {
+    new ActionSuccess({
+      message: 'Access to admin panel granted',
+    }).send(res);
+  };
+
   logOut = async (req, res, next) => {
     new NoContentSuccess({
       message: 'User logged out successfully',

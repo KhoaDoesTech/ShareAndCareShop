@@ -39,6 +39,12 @@ router.post(
   [userLoginValidator(), validate],
   asyncHandler(AuthController.logIn)
 );
+router.get(
+  '/panel',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.PAGE.PANEL),
+  asyncHandler(AuthController.panelLogin)
+);
 
 router.post('/forgot-password', asyncHandler(AuthController.forgotPassword));
 router.post('/reset-password', asyncHandler(AuthController.resetPassword));
