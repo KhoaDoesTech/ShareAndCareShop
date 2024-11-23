@@ -40,7 +40,7 @@ router.post(
   asyncHandler(AuthController.logIn)
 );
 router.get(
-  '/panel',
+  '/admin-panel',
   authentication,
   verifyPermission(CONFIG_PERMISSIONS.PAGE.PANEL),
   asyncHandler(AuthController.panelLogin)
