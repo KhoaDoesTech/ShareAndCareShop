@@ -46,12 +46,21 @@ class AuthController {
       deviceName: req.session.deviceName,
     });
 
-    console.log(
-      `Redirecting::: ${process.env.CLIENT_SSO_REDIRECT_URL}?userId=${userId}&refreshToken=${tokens.refreshToken}`
-    );
-    res.redirect(
-      `${process.env.CLIENT_SSO_REDIRECT_URL}?userId=${userId}&refreshToken=${tokens.refreshToken}`
-    );
+    if (req.session.isPanel) {
+      console.log(
+        `Redirecting::: ${process.env.PANEL_SSO_REDIRECT_URL}?userId=${userId}&refreshToken=${tokens.refreshToken}`
+      );
+      res.redirect(
+        `${process.env.PANEL_SSO_REDIRECT_URL}?userId=${userId}&refreshToken=${tokens.refreshToken}`
+      );
+    } else {
+      console.log(
+        `Redirecting::: ${process.env.CLIENT_SSO_REDIRECT_URL}?userId=${userId}&refreshToken=${tokens.refreshToken}`
+      );
+      res.redirect(
+        `${process.env.CLIENT_SSO_REDIRECT_URL}?userId=${userId}&refreshToken=${tokens.refreshToken}`
+      );
+    }
   };
 
   logIn = async (req, res, next) => {

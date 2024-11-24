@@ -15,10 +15,17 @@ const {
 } = require('../../../middlewares/auth.middleware');
 const CONFIG_PERMISSIONS = require('../../../constants/permissions');
 const ERROR_CODES = require('../../../constants/error');
-
 const upload = require('../../../middlewares/multer.middleware');
-
 const router = express.Router();
+
+// Middleware for setting sessio
+const setSessionData = (req, res, next) => {
+  req.session.deviceToken = req.query.deviceToken;
+  req.session.deviceName = req.query.deviceName;
+  req.session.isPanel = req.query.isPanel;
+
+  next();
+};
 
 // Unsecured route
 router.post(
@@ -58,7 +65,7 @@ router.patch(
   asyncHandler(AuthController.updateUserAvatar)
 );
 
-// OAuth routes
+// OAuth configurations
 const googleAuth = passport.authenticate('google', {
   scope: ['profile', 'email'],
 });
@@ -72,32 +79,16 @@ const facebookAuthCallback = passport.authenticate('facebook', {
   failureRedirect: `${process.env.FRONTEND_URL}/error?code=${ERROR_CODES.AUTH.FACEBOOK_LOGIN_FAILED}`,
 });
 
-router.get(
-  '/google',
-  (req, res, next) => {
-    req.session.deviceToken = req.query.deviceToken;
-    req.session.deviceName = req.query.deviceName;
-
-    next();
-  },
-  googleAuth
-);
+// Google OAuth routes
+router.get('/google', setSessionData, googleAuth);
 router.get(
   '/google/callback',
   googleAuthCallback,
   asyncHandler(AuthController.socialLogin)
 );
 
-router.get(
-  '/facebook',
-  (req, res, next) => {
-    req.session.deviceToken = req.query.deviceToken;
-    req.session.deviceName = req.query.deviceName;
-
-    next();
-  },
-  facebookAuth
-);
+// Facebook OAuth routes
+router.get('/facebook', setSessionData, facebookAuth);
 router.get(
   '/facebook/callback',
   facebookAuthCallback,
