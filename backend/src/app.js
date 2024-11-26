@@ -8,7 +8,7 @@ const xssClean = require('xss-clean');
 const hpp = require('hpp');
 const cors = require('cors');
 const session = require('express-session');
-
+const requestIp = require('request-ip');
 const passport = require('./helpers/passport.helper');
 const corsOptions = require('./configs/cors.config');
 const limiter = require('./configs/limiter.config');
@@ -20,12 +20,18 @@ const Database = require('./initializers/mongodb.init');
 const JobManager = require('./jobs/jobManager');
 const logger = require('./helpers/logger.helper');
 const cleanTemporaryImages = require('./jobs/cleanTemporaryImages');
-
+const { createServer } = require('http');
+const { Server } = require('socket.io');
+const rateLimit = require('express-rate-limit');
+const compressionOptions = require('./configs/compression.config');
+const helmetOptions = require('./configs/helmet.config');
 class App {
   constructor() {
     this.app = express();
+    this.httpServer = createServer(this.app);
     this.port = process.env.PORT || 3000;
 
+    this.initSocket();
     this.initConfig();
     this.initMiddlewares();
     this.initRoutes();
@@ -40,15 +46,16 @@ class App {
 
   initMiddlewares() {
     this.app.use(morganMiddleware);
-    this.app.use(helmet());
-    this.app.use(limiter);
+    this.app.use(helmet(helmetOptions));
+    this.app.use(requestIp.mw());
+    this.app.use(rateLimit(limiter));
     this.app.use(xssClean());
     this.app.use(hpp());
     this.app.use(cors(corsOptions));
+    this.app.use(express.json({ limit: '16kb' }));
+    this.app.use(express.urlencoded({ extended: true, limit: '16kb' }));
     this.app.use(cookieParser());
-    this.app.use(express.json({ limit: '10kb' }));
-    this.app.use(express.urlencoded({ extended: true }));
-    this.app.use(compression());
+    this.app.use(compression(compressionOptions));
     this.app.use(
       session({
         secret: process.env.EXPRESS_SESSION_SECRET,
@@ -71,6 +78,15 @@ class App {
     );
   }
 
+  initSocket() {
+    const io = new Server(this.httpServer, {
+      pingTimeout: 60000,
+      cors: corsOptions,
+    });
+
+    this.app.set('io', io);
+  }
+
   initErrorHandling() {
     this.app.use(errorHandler);
   }
@@ -89,14 +105,14 @@ class App {
   }
 
   startServer() {
-    const server = this.app.listen(this.port, () => {
-      console.log(`Server is running on port ${this.port}`.yellow.bold);
+    const server = this.httpServer.listen(this.port, () => {
+      logger.info(`⚙️  Server is running on port: ${this.port}`.yellow.bold);
     });
 
     process.on('SIGINT', () => {
       this.stopCronJobs();
       server.close(() => {
-        console.log('Process terminated'.red.bold);
+        logger.info('Process terminated'.red.bold);
       });
     });
   }

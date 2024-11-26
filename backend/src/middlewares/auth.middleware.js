@@ -66,6 +66,7 @@ const authentication = asyncHandler(async (req, res, next) => {
   await validateToken(accessToken, keyStore.publicKey, userId);
 
   req.user = foundUser;
+  req.keyStore = keyStore;
 
   next();
 });

@@ -82,7 +82,10 @@ class AuthController {
   logOut = async (req, res, next) => {
     new NoContentSuccess({
       message: 'User logged out successfully',
-      metadata: await this.authService.logoutUser(req.user),
+      metadata: await this.authService.logoutUser({
+        userId: req.user.id,
+        deviceToken: req.keyStore.deviceToken,
+      }),
     }).send(res);
   };
 

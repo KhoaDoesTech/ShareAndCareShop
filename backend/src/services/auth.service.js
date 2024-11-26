@@ -214,10 +214,10 @@ class AuthService {
     };
   }
 
-  async logoutUser(user) {
+  async logoutUser({ userId, deviceToken }) {
     const deleteToken = await this.tokenRepository.deleteToken({
-      userId: user.id,
-      deviceToken: user.deviceToken,
+      userId: userId,
+      deviceToken: deviceToken,
     });
 
     if (!deleteToken) throw new InternalServerError('Failed to logout user');
@@ -233,7 +233,7 @@ class AuthService {
       throw new BadRequestError('User is blocked');
   }
 
-  async forgotPasswordRequest({ email }) {
+  async forgotPasswordRequest({ email, isPanel }) {
     const foundUser = await this.userRepository.getByQuery({
       usr_email: email,
     });
@@ -251,7 +251,10 @@ class AuthService {
     if (!updatedUser)
       throw new InternalServerError('Failed to request password reset');
 
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${unHashedToken}`;
+    let resetUrl = `${process.env.FRONTEND_URL}/reset-password/${unHashedToken}`;
+    if (isPanel) {
+      resetUrl = `${process.env.ADMIN_PANEL_URL}/reset-password/${unHashedToken}`;
+    }
 
     await this.EmailHelper.sendForgotPasswordEmail(
       foundUser.name,

@@ -3,6 +3,7 @@ const { generateTokenPair } = require('../helpers/jwt.helper');
 const TokenRepository = require('../repositories/token.repository');
 const UserRepository = require('../repositories/user.repository');
 const { UnauthorizedError } = require('../utils/errorResponse');
+const { pickFields } = require('../utils/helpers');
 
 class TokenService {
   constructor() {
@@ -82,6 +83,66 @@ class TokenService {
     await this.tokenRespository.createTokens({ filter, update });
 
     return { tokens };
+  }
+
+  async updateDeviceName({ user, deviceToken, deviceName }) {
+    const filter = {
+        tkn_user: user.id,
+        tkn_device_token: deviceToken,
+      },
+      update = {
+        $set: {
+          tkn_device_name: deviceName,
+        },
+      };
+
+    await this.tokenRespository.createTokens({ filter, update });
+
+    return deviceName;
+  }
+
+  async deleteToken({ user, deviceToken }) {
+    await this.tokenRespository.deleteToken({ userId: user.id, deviceToken });
+  }
+
+  async deleteAllTokens({ user, currentToken }) {
+    const tokens = await this.tokenRespository.getAll({
+      filter: {
+        tkn_user: user.id,
+      },
+    });
+
+    const tokensToDelete = tokens.filter(
+      (token) => token.deviceToken !== currentToken
+    );
+
+    for (const token of tokensToDelete) {
+      await this.tokenRespository.deleteToken({
+        userId: user.id,
+        deviceToken: token.deviceToken,
+      });
+    }
+  }
+
+  async getDeviceTokens({ user, currentToken }) {
+    const tokens = await this.tokenRespository.getAll({
+      filter: {
+        tkn_user: user.id,
+      },
+    });
+
+    return {
+      tokens: tokens.map((token) => {
+        const tokenData = pickFields({
+          fields: ['deviceName', 'deviceToken'],
+          object: token,
+        });
+        if (token.deviceToken === currentToken) {
+          tokenData.isCurrent = true;
+        }
+        return tokenData;
+      }),
+    };
   }
 }
 
