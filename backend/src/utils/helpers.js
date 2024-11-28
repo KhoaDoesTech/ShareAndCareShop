@@ -60,35 +60,6 @@ function generateAllCombinations(variants) {
   return combine(0, []);
 }
 
-const syncVariantsAndSkuList = (newVariants, newSkuList, oldVariants) => {
-  if (!newVariants || !newSkuList)
-    return { updatedVariants: oldVariants, syncedSkuData: [] };
-
-  const variantMapping = createVariantMapping(newVariants);
-  const allCombinations = generateAllCombinations(newVariants);
-
-  const syncedSkuData = allCombinations.map((combination) => {
-    const tierIndex = combination.map((option, idx) => {
-      const variantName = newVariants[idx]?.name;
-      return variantMapping.get(`${variantName}_${option}`) ?? -1;
-    });
-
-    const matchingSku = newSkuList.find(
-      (sku) => JSON.stringify(sku.tierIndex) === JSON.stringify(tierIndex)
-    );
-
-    return {
-      var_tier_idx: tierIndex,
-      var_price: matchingSku?.price || 0,
-      var_quantity: matchingSku?.quantity || 0,
-      var_default: matchingSku?.isDefault || false,
-      var_slug: generateVariantSlug(newVariants, tierIndex),
-    };
-  });
-
-  return { updatedVariants: newVariants, syncedSkuData };
-};
-
 const removeLocalFile = (localPath) => {
   fs.unlink(localPath, (err) => {
     if (err) logger.error('Error while removing local files: ', err);
@@ -136,26 +107,6 @@ const getVariantImagesFromTierIndex = (variants, tierIndex) => {
     .map((idx, level) => variants[level]?.var_images?.[idx] || null)
     .filter(Boolean);
 };
-
-// const getVariantImageOrDefault = (
-//   prd_variants,
-//   tierIndex,
-//   productMainImage
-// ) => {
-//   console.log(prd_variants, tierIndex, productMainImage);
-//   if (tierIndex && prd_variants?.length) {
-//     for (let i = 0; i < tierIndex.length; i++) {
-//       const variant = prd_variants[i];
-//       const imageIndex = tierIndex[i];
-
-//       if (variant?.var_images?.[imageIndex]) {
-//         return variant.var_images[imageIndex];
-//       }
-//     }
-//   }
-
-//   return productMainImage;
-// };
 
 const getVariantImageOrDefault = (variants, tierIndex, mainImage) => {
   if (!Array.isArray(variants) || !tierIndex || tierIndex.length === 0)

@@ -7,6 +7,7 @@ const {
   removeUndefinedObject,
   updateNestedObjectParser,
   pickFields,
+  convertToObjectIdMongodb,
 } = require('../utils/helpers');
 const UploadService = require('./upload.service');
 
@@ -291,7 +292,9 @@ class ProductService {
     }
 
     if (category) {
-      filter.prd_category = { $elemMatch: { id: category } };
+      filter.prd_category = {
+        $elemMatch: { id: convertToObjectIdMongodb(category) },
+      };
     }
 
     if (minPrice || maxPrice) {
@@ -374,7 +377,9 @@ class ProductService {
     }
 
     if (category) {
-      filter.prd_category = { $elemMatch: { id: category } };
+      filter.prd_category = {
+        $elemMatch: { id: convertToObjectIdMongodb(category) },
+      };
     }
 
     if (minPrice || maxPrice) {
