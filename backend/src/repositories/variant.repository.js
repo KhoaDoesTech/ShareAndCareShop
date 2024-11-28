@@ -16,6 +16,12 @@ class VariantRepository extends BaseRepository {
     return await this.model.deleteMany({ prd_id: productId });
   }
 
+  async updateMany(filter, data) {
+    const variants = await this.model.updateMany(filter, data);
+
+    return variants;
+  }
+
   formatDocument(variant) {
     if (!variant) return null;
 

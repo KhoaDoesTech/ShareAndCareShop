@@ -51,6 +51,34 @@ class ProductController {
       metadata: await this.productService.getProductDetails(req.params),
     }).send(res);
   };
+
+  publishProduct = async (req, res, next) => {
+    new ActionSuccess({
+      message: 'Product published successfully',
+      metadata: await this.productService.publishProduct(req.params),
+    }).send(res);
+  };
+
+  unpublishProduct = async (req, res, next) => {
+    new ActionSuccess({
+      message: 'Product unpublished successfully',
+      metadata: await this.productService.unpublishProduct(req.params),
+    }).send(res);
+  };
+
+  updateProductViews = async (req, res, next) => {
+    new NoContentSuccess({
+      message: 'Product views updated successfully',
+      metadata: await this.productService.updateProductUniqueViews(req.body),
+    }).send(res);
+  };
+
+  updateProductQuantity = async (req, res, next) => {
+    new ActionSuccess({
+      message: 'Product quantity updated successfully',
+      metadata: await this.productService.updateProductQuantity(req.body),
+    }).send(res);
+  };
 }
 
 module.exports = ProductController;

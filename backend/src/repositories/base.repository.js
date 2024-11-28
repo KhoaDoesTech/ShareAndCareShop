@@ -48,8 +48,11 @@ class BaseRepository {
     return this.formatDocument(document);
   }
 
-  async getAll({ filter = {}, queryOptions = {} }) {
-    const features = new APIFeatures(this.model.find(filter), queryOptions)
+  async getAll({ filter = {}, queryOptions = {}, populateOptions = null }) {
+    const features = new APIFeatures(
+      this.model.find(filter).populate(populateOptions),
+      queryOptions
+    )
       .filter()
       .limitFields()
       .sort()

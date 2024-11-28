@@ -26,7 +26,7 @@ const profileSchema = new Schema(
   {
     usr_id: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     prof_name: { type: String },
-    prof_phone: { type: String },
+    prof_phone: { type: String, default: '' },
     prof_address: { type: [addressSchema], default: [] },
   },
   {
@@ -34,5 +34,9 @@ const profileSchema = new Schema(
     timestamps: true,
   }
 );
+
+profileSchema.index({
+  prof_phone: 'text',
+});
 
 module.exports = model(DOCUMENT_NAME, profileSchema);

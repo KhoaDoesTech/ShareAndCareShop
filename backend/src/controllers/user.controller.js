@@ -1,25 +1,19 @@
-const UploadService = require('../services/upload.service');
-const { CreateSuccess, NoContentSuccess } = require('../utils/successResponse');
+const UserService = require('../services/user.service');
+const {
+  CreateSuccess,
+  NoContentSuccess,
+  ActionSuccess,
+} = require('../utils/successResponse');
 
 class UserController {
   constructor() {
-    this.uploadService = new UploadService();
+    this.userService = new UserService();
   }
 
-  uploadProductImage = async (req, res, next) => {
-    new CreateSuccess({
-      message: 'Image uploaded successfully',
-      metadata: await this.uploadService.uploadProductImage({
-        file: req.file,
-        temporary: true,
-      }),
-    }).send(res);
-  };
-
-  deleteImageByUrl = async (req, res, next) => {
-    new NoContentSuccess({
-      message: 'Image deleted successfully',
-      metadata: await this.uploadService.deleteImageByUrl(req.body.url),
+  getAllUsers = async (req, res, next) => {
+    new ActionSuccess({
+      message: 'Users retrieved successfully',
+      metadata: await this.userService.getAllUsers(req.query),
     }).send(res);
   };
 }

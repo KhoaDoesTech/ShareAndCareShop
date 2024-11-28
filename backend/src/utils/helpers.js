@@ -29,6 +29,66 @@ const generateVariantSlug = (variants, tierIndex) => {
     .join('/');
 };
 
+// Creates a mapping of variant options to their new indexes based on the updated variants.
+const createVariantMapping = (newVariants, oldVariants) => {
+  const mapping = new Map();
+
+  newVariants.forEach((variant, variantIdx) => {
+    variant.options.forEach((option, optionIdx) => {
+      mapping.set(`${variant.name}_${option}`, optionIdx);
+    });
+  });
+
+  return mapping;
+};
+
+// Generates all possible SKU combinations from the provided variants.
+function generateAllCombinations(variants) {
+  if (!variants || variants.length === 0) return [];
+
+  // Use recursion to calculate all combinations
+  const combine = (index, current) => {
+    if (index === variants.length) {
+      return [current];
+    }
+
+    return variants[index].options.flatMap((option) =>
+      combine(index + 1, [...current, option])
+    );
+  };
+
+  return combine(0, []);
+}
+
+const syncVariantsAndSkuList = (newVariants, newSkuList, oldVariants) => {
+  if (!newVariants || !newSkuList)
+    return { updatedVariants: oldVariants, syncedSkuData: [] };
+
+  const variantMapping = createVariantMapping(newVariants);
+  const allCombinations = generateAllCombinations(newVariants);
+
+  const syncedSkuData = allCombinations.map((combination) => {
+    const tierIndex = combination.map((option, idx) => {
+      const variantName = newVariants[idx]?.name;
+      return variantMapping.get(`${variantName}_${option}`) ?? -1;
+    });
+
+    const matchingSku = newSkuList.find(
+      (sku) => JSON.stringify(sku.tierIndex) === JSON.stringify(tierIndex)
+    );
+
+    return {
+      var_tier_idx: tierIndex,
+      var_price: matchingSku?.price || 0,
+      var_quantity: matchingSku?.quantity || 0,
+      var_default: matchingSku?.isDefault || false,
+      var_slug: generateVariantSlug(newVariants, tierIndex),
+    };
+  });
+
+  return { updatedVariants: newVariants, syncedSkuData };
+};
+
 const removeLocalFile = (localPath) => {
   fs.unlink(localPath, (err) => {
     if (err) logger.error('Error while removing local files: ', err);

@@ -1,4 +1,4 @@
-const { ProductStatus, SortField } = require('../constants/status');
+const { ProductStatus, SortFieldProduct } = require('../constants/status');
 const CategoryRepository = require('../repositories/category.repository');
 const ProductRepository = require('../repositories/product.repository');
 const { BadRequestError } = require('../utils/errorResponse');
@@ -6,6 +6,7 @@ const {
   omitFields,
   removeUndefinedObject,
   updateNestedObjectParser,
+  pickFields,
 } = require('../utils/helpers');
 const UploadService = require('./upload.service');
 
@@ -33,15 +34,7 @@ class ProductService {
     skuList = [],
   }) {
     // Validate category and retrieve data
-    await Promise.all(
-      category.map(async ({ id }) => {
-        const categoryData = await this.categoryRepository.getById(id);
-        if (!categoryData) {
-          throw new BadRequestError(`Category with id ${id} not found`);
-        }
-        return categoryData;
-      })
-    );
+    const updatedCategories = await this._validateCategories(category);
 
     // Calculate total quantity
     const totalQuantity = skuList.length
@@ -62,7 +55,7 @@ class ProductService {
       prd_original_price: originalPrice,
       prd_quantity: totalQuantity,
       prd_description: description,
-      prd_category: category,
+      prd_category: updatedCategories,
       prd_attributes: attributes,
       prd_variants: variants
         ? variants.map((variant) => ({
@@ -77,18 +70,21 @@ class ProductService {
 
     this.uploadService.deleteUsedImage(mainImage, updatedSubImages);
 
-    await this.variantService.createVariants({
+    this.variantService.createVariants({
       product: newProduct,
       variants,
       skuList,
     });
 
-    return omitFields({
-      fields: ['rating', 'views', 'uniqueViews', 'createdAt', 'updatedAt'],
-      object: newProduct,
-    });
+    return {
+      product: omitFields({
+        fields: ['createdAt', 'updatedAt'],
+        object: newProduct,
+      }),
+    };
   }
 
+  // Update product
   async updateProduct({
     productId,
     name,
@@ -104,55 +100,40 @@ class ProductService {
     skuList,
     status,
   }) {
+    // Step 1: Check if product exists
     const foundProduct = await this.productRepository.getById(productId);
-    if (!foundProduct) {
-      throw new BadRequestError('Product not found');
-    }
+    if (!foundProduct) throw new BadRequestError('Product not found');
 
-    // Validate and fetch category if provided
-    let updatedCategories = category || foundProduct.category;
-    if (category) {
-      await Promise.all(
-        category.map(async ({ id }) => {
-          const categoryData = await this.categoryRepository.getById(id);
-          if (!categoryData) {
-            throw new BadRequestError(`Category with ID ${id} not found`);
-          }
-        })
-      );
-    }
+    // Step 2: Validate and fetch categories
+    const updatedCategories = await this._validateCategories(
+      category || foundProduct.prd_category
+    );
 
-    let updatedVariants = foundProduct.variants;
+    // Step 3: Handle variants update
+    let updatedVariants = foundProduct.variants || [];
     if (variants) {
-      updatedVariants = variants.map((variant, idx) => {
-        const existingVariant = foundProduct.variants[idx] || {};
-        return {
-          name: variant.name || existingVariant.var_name,
-          images: variant.images || existingVariant.var_images,
-          options: variant.options || existingVariant.var_options,
-        };
-      });
+      updatedVariants = this.variantService._formatVariants(variants);
     }
-
     if (skuList) {
       await this.variantService.updateVariants({
-        foundProduct,
+        product: foundProduct,
         variants: updatedVariants,
         skuList,
       });
     }
 
-    // Calculate total quantity
+    // Step 4: Calculate total quantity
     const totalQuantity = skuList
       ? skuList.reduce((total, sku) => total + (sku.quantity || 0), 0)
       : quantity || foundProduct.quantity;
 
-    // Update subImages with unique entries
+    // Step 5: Merge subImages with variant images
     const variantImages = updatedVariants.flatMap(({ images }) => images || []);
     const updatedSubImages = Array.from(
       new Set([...(subImages || foundProduct.subImages), ...variantImages])
     );
 
+    // Step 6: Prepare update data
     const updateData = removeUndefinedObject({
       prd_name: name,
       prd_main_image: mainImage,
@@ -163,24 +144,24 @@ class ProductService {
       prd_description: description,
       prd_category: updatedCategories,
       prd_attributes: attributes,
-      prd_variants: variants
-        ? updatedVariants.map((variant) => ({
-            var_name: variant.name,
-            var_images: variant.images,
-            var_options: variant.options,
-          }))
-        : null,
+      prd_variants: updatedVariants.map((variant) => ({
+        var_name: variant.name,
+        var_images: variant.images,
+        var_options: variant.options,
+      })),
       prd_status: status,
     });
 
+    // Step 7: Update product
     const parsedUpdateData = updateNestedObjectParser(updateData);
 
-    // Update product
+    // Step 8: Update product
     const updatedProduct = await this.productRepository.updateById(
       productId,
       parsedUpdateData
     );
 
+    // Step 9: Delete used images
     this.uploadService.deleteUsedImage(mainImage, updatedSubImages);
 
     return {
@@ -191,8 +172,50 @@ class ProductService {
     };
   }
 
+  async _validateCategories(categories) {
+    if (!categories || !categories.length) return [];
+
+    const validCategories = [];
+    await Promise.all(
+      categories.map(async ({ id }) => {
+        const categoryData = await this.categoryRepository.getById(id);
+        if (!categoryData) {
+          throw new BadRequestError(`Category with ID ${id} not found`);
+        }
+        validCategories.push(categoryData);
+      })
+    );
+    return validCategories?.map((category) => ({
+      id: category.id,
+      name: category.name,
+    }));
+  }
+
+  _updateProductViews(productId) {
+    const updatedProduct = this.productRepository.updateById(productId, {
+      $inc: { prd_views: 1 },
+    });
+
+    if (!updatedProduct) {
+      throw new BadRequestError('Product not found');
+    }
+  }
+
+  async updateProductUniqueViews({ productId, deviceId }) {
+    const updatedProduct = await this.productRepository.updateById(productId, {
+      $addToSet: { prd_unique_views: deviceId },
+    });
+
+    if (!updatedProduct) {
+      throw new BadRequestError('Failed to update product views');
+    }
+  }
+
   async getProductDetailsPublic({ productId }) {
-    const foundProduct = await this.productRepository.getById(productId);
+    const foundProduct = await this.productRepository.getByQuery({
+      _id: productId,
+      prd_status: ProductStatus.PUBLISHED,
+    });
 
     if (!foundProduct) {
       throw new BadRequestError('Product not found');
@@ -201,6 +224,8 @@ class ProductService {
     const skuList = await this.variantService.getPublicVariantByProductId(
       productId
     );
+
+    this._updateProductViews(productId);
 
     return {
       product: omitFields({
@@ -218,19 +243,7 @@ class ProductService {
         ],
         object: foundProduct,
       }),
-      skuList: skuList.map((sku) =>
-        omitFields({
-          fields: [
-            'createdAt',
-            'updatedAt',
-            'status',
-            'sold',
-            'name',
-            'productId',
-          ],
-          object: sku,
-        })
-      ),
+      skuList,
     };
   }
 
@@ -248,12 +261,7 @@ class ProductService {
         fields: ['createdAt', 'updatedAt'],
         object: foundProduct,
       }),
-      skuList: skuList.map((sku) =>
-        omitFields({
-          fields: ['createdAt', 'updatedAt', 'name', 'productId'],
-          object: sku,
-        })
-      ),
+      skuList,
     };
   }
 
@@ -263,8 +271,8 @@ class ProductService {
     minPrice,
     maxPrice,
     sort,
-    page,
-    size,
+    page = 1,
+    size = 10,
     attributes,
   }) {
     const filter = { prd_status: ProductStatus.PUBLISHED };
@@ -283,7 +291,7 @@ class ProductService {
     }
 
     if (category) {
-      filter['category.id'] = category;
+      filter.prd_category = { $elemMatch: { id: category } };
     }
 
     if (minPrice || maxPrice) {
@@ -298,7 +306,7 @@ class ProductService {
 
     const mappedSort = sort
       ? `${sort.startsWith('-') ? '-' : ''}${
-          SortField[sort.replace('-', '')] || 'prd_rating'
+          SortFieldProduct[sort.replace('-', '')] || 'prd_rating'
         }`
       : '-prd_rating';
 
@@ -313,23 +321,31 @@ class ProductService {
       queryOptions: query,
     });
 
-    return products.map((product) =>
-      omitFields({
-        fields: [
-          'subImages',
-          'quantity',
-          'category',
-          'attributes',
-          'views',
-          'uniqueViews',
-          'createdAt',
-          'updatedAt',
-          'sold',
-          'status',
-        ],
-        object: product,
-      })
-    );
+    const totalProducts = await this.productRepository.countDocuments(filter);
+    const totalPages = Math.ceil(totalProducts / size);
+
+    return {
+      products: products.map((product) =>
+        omitFields({
+          fields: [
+            'subImages',
+            'quantity',
+            'category',
+            'attributes',
+            'views',
+            'uniqueViews',
+            'createdAt',
+            'updatedAt',
+            'sold',
+            'status',
+          ],
+          object: product,
+        })
+      ),
+      totalPages,
+      totalProducts,
+      currentPage: page,
+    };
   }
 
   async getAllProducts({
@@ -338,8 +354,8 @@ class ProductService {
     minPrice,
     maxPrice,
     sort,
-    page,
-    size,
+    page = 1,
+    size = 10,
     attributes,
   }) {
     const filter = {};
@@ -358,7 +374,7 @@ class ProductService {
     }
 
     if (category) {
-      filter['category.id'] = category;
+      filter.prd_category = { $elemMatch: { id: category } };
     }
 
     if (minPrice || maxPrice) {
@@ -373,7 +389,7 @@ class ProductService {
 
     const mappedSort = sort
       ? `${sort.startsWith('-') ? '-' : ''}${
-          SortField[sort.replace('-', '')] || 'prd_rating'
+          SortFieldProduct[sort.replace('-', '')] || 'prd_rating'
         }`
       : '-prd_rating';
 
@@ -388,19 +404,129 @@ class ProductService {
       queryOptions: query,
     });
 
-    return products.map((product) =>
-      omitFields({
-        fields: [
-          'createdAt',
-          'updatedAt',
-          'subImages',
-          'description',
-          'category',
-          'attributes',
-        ],
-        object: product,
-      })
+    const totalProducts = await this.productRepository.countDocuments(filter);
+    const totalPages = Math.ceil(totalProducts / size);
+
+    return {
+      products: products.map((product) =>
+        omitFields({
+          fields: ['createdAt', 'updatedAt', 'prd_views', 'prd_unique_views'],
+          object: product,
+        })
+      ),
+      totalPages,
+      totalProducts,
+      currentPage: page,
+    };
+  }
+
+  async publishProduct({ productId }) {
+    const foundProduct = await this.productRepository.getById(productId);
+
+    if (!foundProduct) {
+      throw new BadRequestError('Product not found');
+    }
+
+    const updatedProduct = await this.productRepository.updateById(productId, {
+      prd_status: ProductStatus.PUBLISHED,
+    });
+
+    await this.variantService.publicAllVariants(productId);
+
+    return pickFields({
+      fields: ['status', 'updatedAt'],
+      object: updatedProduct,
+    });
+  }
+
+  async unpublishProduct({ productId }) {
+    const foundProduct = await this.productRepository.getById(productId);
+
+    if (!foundProduct) {
+      throw new BadRequestError('Product not found');
+    }
+
+    const updatedProduct = await this.productRepository.updateById(productId, {
+      prd_status: ProductStatus.DISCONTINUED,
+    });
+
+    return pickFields({
+      fields: ['status', 'updatedAt'],
+      object: updatedProduct,
+    });
+  }
+
+  async updateProductQuantity({ id, quantity = null, skuList }) {
+    const foundProduct = await this.productRepository.getById(id);
+    if (!foundProduct) throw new NotFoundError('Product not found');
+
+    // Handle product without variants
+    if (foundProduct.variants && foundProduct.variants.length > 0) {
+      if (!skuList || skuList.length === 0) {
+        throw new BadRequestError(
+          'This product has variants. Please update quantities via skuList.'
+        );
+      }
+      return this._handleProductWithVariants({
+        product: foundProduct,
+        skuList,
+      });
+    }
+
+    if (quantity) {
+      return this._handleProductWithoutVariants({
+        product: foundProduct,
+        quantity,
+      });
+    }
+
+    throw new BadRequestError(
+      'Invalid request: quantity or skuList must be provided'
     );
+  }
+
+  async _handleProductWithoutVariants({ product, quantity }) {
+    const totalQuantity = quantity + product.quantity;
+    const status =
+      totalQuantity === 0
+        ? ProductStatus.OUT_OF_STOCK
+        : ProductStatus.PUBLISHED;
+
+    const updatedProduct = await this.productRepository.updateById(product.id, {
+      prd_quantity: totalQuantity,
+      prd_status: status,
+    });
+
+    return {
+      id: updatedProduct.id,
+      name: updatedProduct.name,
+      quantity: updatedProduct.quantity,
+      status: updatedProduct.status,
+    };
+  }
+
+  async _handleProductWithVariants({ product, skuList }) {
+    await this.variantService.updateVariantQuantities(skuList);
+
+    const totalQuantity =
+      await this.variantService._calculateTotalVariantQuantity(product.id);
+
+    const status =
+      totalQuantity === 0
+        ? ProductStatus.OUT_OF_STOCK
+        : ProductStatus.PUBLISHED;
+
+    const updatedProduct = await this.productRepository.updateById(product.id, {
+      prd_quantity: totalQuantity,
+      prd_status: status,
+    });
+
+    return {
+      id: updatedProduct.id,
+      name: updatedProduct.name,
+      quantity: updatedProduct.quantity,
+      status: updatedProduct.status,
+    };
   }
 }
 

@@ -31,13 +31,19 @@ const ProductStatus = {
 
 const AvailableProductStatus = Object.values(ProductStatus);
 
-const SortField = {
+const SortFieldProduct = {
   VIEWS: 'prd_views',
   PRICE: 'prd_price',
   QUANTITY: 'prd_quantity',
   SOLD: 'prd_sold',
   RATING: 'prd_rating',
   CREATED_AT: 'createdAt',
+};
+
+const SortFieldUser = {
+  CREATED_AT: 'createdAt',
+  EMAIL: 'usr_email',
+  NAME: 'usr_name',
 };
 
 //
@@ -105,5 +111,6 @@ module.exports = {
   AvailablePaymentMethod,
   CouponType,
   AvailableCouponType,
-  SortField,
+  SortFieldProduct,
+  SortFieldUser,
 };

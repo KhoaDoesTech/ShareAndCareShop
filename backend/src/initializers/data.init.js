@@ -7,6 +7,7 @@ const productModel = require('../models/product.model');
 const profileModel = require('../models/profile.model');
 const variantModel = require('../models/variant.model');
 const cartModel = require('../models/cart.model');
+// const categoryModel = require('../models/category.model');
 // const orderModel = require('../models/order.model');
 // const roleModel = require('../models/role.model');
 // const userModel = require('../models/user.model');
@@ -35,7 +36,7 @@ class DataInitializer {
   }
 
   async initializeAdminUser(adminRole) {
-    const hashPassword = await generateHashedPassword('ShareAnCare2024');
+    const hashPassword = await generateHashedPassword('ShareAndCare2024');
 
     const adminUser = await this.userRepository.create({
       usr_email: 'admin@gmail.com',

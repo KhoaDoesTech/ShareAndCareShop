@@ -8,7 +8,7 @@ const SERVER_CONFIG = {
     url: process.env.DB_URL,
   },
   jwt: {
-    accessExpire: '5m',
+    accessExpire: '1d',
     refreshExpire: '10d',
   },
   user: {

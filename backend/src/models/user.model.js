@@ -67,4 +67,9 @@ userSchema.pre('save', async function (next) {
   next();
 });
 
+userSchema.index({
+  usr_name: 'text',
+  usr_email: 'text',
+});
+
 module.exports = model(DOCUMENT_NAME, userSchema);

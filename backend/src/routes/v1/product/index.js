@@ -16,6 +16,10 @@ router.get(
   '/public/:productId',
   asyncHandler(productController.getProductDetailsByUser)
 );
+router.patch(
+  '/update-views',
+  asyncHandler(productController.updateProductViews)
+);
 
 // Define the routes
 router.post(
@@ -41,6 +45,26 @@ router.get(
   authentication,
   verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.PRODUCT.VIEW),
   asyncHandler(productController.getProductDetails)
+);
+
+router.patch(
+  '/publish/:productId',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.PRODUCT.UPDATE),
+  asyncHandler(productController.publishProduct)
+);
+
+router.patch(
+  '/unpublish/:productId',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.PRODUCT.UPDATE),
+  asyncHandler(productController.unpublishProduct)
+);
+router.patch(
+  '/update-quantity',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.PRODUCT.UPDATE),
+  asyncHandler(productController.updateProductQuantity)
 );
 
 module.exports = router;

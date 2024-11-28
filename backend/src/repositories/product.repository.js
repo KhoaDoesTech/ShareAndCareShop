@@ -7,6 +7,14 @@ class ProductRepository extends BaseRepository {
     this.model = productModels;
   }
 
+  async countDocuments(filter) {
+    try {
+      return await this.model.countDocuments(filter);
+    } catch (error) {
+      throw new Error(`Failed to count documents: ${error.message}`);
+    }
+  }
+
   formatDocument(product) {
     if (!product) return null;
 

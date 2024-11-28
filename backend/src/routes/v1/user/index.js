@@ -8,15 +8,14 @@ const {
   verifyPermission,
 } = require('../../../middlewares/auth.middleware');
 const CONFIG_PERMISSIONS = require('../../../constants/permissions');
-
-const AuthController = require('../../../controllers/auth.controller');
-const {
-  userRegisterValidator,
-  userLoginValidator,
-} = require('../../../validators/auth.validator');
-
+const UserController = require('../../../controllers/user.controller');
 const router = express.Router();
 
-router.post('/');
+router.get(
+  '/all',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.SYSTEM.USER.VIEW),
+  asyncHandler(UserController.getAllUsers)
+);
 
 module.exports = router;
