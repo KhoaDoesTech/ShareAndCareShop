@@ -12,27 +12,38 @@ const VariantController = require('../../../controllers/variant.controller');
 const router = express.Router();
 
 router.get(
-  '/:productId',
-  asyncHandler(VariantController.getVariantByProductId)
-);
-router.get(
   '/public/:productId',
   asyncHandler(VariantController.getPublicVariantByProductId)
 );
+
+router.get(
+  '/:productId',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.SKU.VIEW),
+  asyncHandler(VariantController.getVariantByProductId)
+);
 router.patch(
   '/public/:variantId',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.SKU.UPDATE),
   asyncHandler(VariantController.publicVariant)
 );
 router.patch(
   '/unpublic/:variantId',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.SKU.UPDATE),
   asyncHandler(VariantController.unPublicVariant)
 );
 router.patch(
   '/product/public/:productId',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.SKU.UPDATE),
   asyncHandler(VariantController.publicAllVariants)
 );
 router.patch(
   '/product/unpublic/:productId',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.SKU.UPDATE),
   asyncHandler(VariantController.unPublicAllVariants)
 );
 
