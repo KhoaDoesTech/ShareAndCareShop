@@ -328,6 +328,9 @@ class ProductService {
     const totalPages = Math.ceil(totalProducts / size);
 
     return {
+      totalPages,
+      totalProducts,
+      currentPage: page,
       products: products.map((product) =>
         omitFields({
           fields: [
@@ -345,9 +348,6 @@ class ProductService {
           object: product,
         })
       ),
-      totalPages,
-      totalProducts,
-      currentPage: page,
     };
   }
 
@@ -413,15 +413,15 @@ class ProductService {
     const totalPages = Math.ceil(totalProducts / size);
 
     return {
+      totalPages,
+      totalProducts,
+      currentPage: page,
       products: products.map((product) =>
         omitFields({
           fields: ['createdAt', 'updatedAt', 'prd_views', 'prd_unique_views'],
           object: product,
         })
       ),
-      totalPages,
-      totalProducts,
-      currentPage: page,
     };
   }
 
