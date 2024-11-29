@@ -1,4 +1,4 @@
-const orderModels = require('../models/order.models');
+const orderModels = require('../models/order.model');
 const BaseRepository = require('./base.repository');
 
 class OrderRepository extends BaseRepository {

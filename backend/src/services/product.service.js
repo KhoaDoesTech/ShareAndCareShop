@@ -231,10 +231,6 @@ class ProductService {
     return {
       product: omitFields({
         fields: [
-          'subImages',
-          'quantity',
-          'category',
-          'attributes',
           'views',
           'uniqueViews',
           'createdAt',
@@ -418,7 +414,14 @@ class ProductService {
       currentPage: page,
       products: products.map((product) =>
         omitFields({
-          fields: ['createdAt', 'updatedAt', 'prd_views', 'prd_unique_views'],
+          fields: [
+            'subImages',
+            'category',
+            'attributes',
+            'description',
+            'createdAt',
+            'updatedAt',
+          ],
           object: product,
         })
       ),

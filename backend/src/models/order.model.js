@@ -42,6 +42,7 @@ const orderSchema = new Schema(
         shp_ward: { type: String, required: true },
         shp_street: { type: String, required: true },
       },
+      required: true,
     },
     ord_payment_method: {
       type: String,
@@ -55,8 +56,8 @@ const orderSchema = new Schema(
     },
 
     ord_items_price: { type: Number, required: true },
-    ord_discount_price: { type: Number, required: true },
-    ord_shipping_price: { type: Number, required: true },
+    ord_discount_price: { type: Number, required: true, default: 0 },
+    ord_shipping_price: { type: Number, required: true, default: 0 },
     ord_total_price: { type: Number, required: true },
 
     ord_is_paid: { type: Boolean, default: false },

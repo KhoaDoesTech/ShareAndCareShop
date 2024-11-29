@@ -41,10 +41,16 @@ const generateTemporaryToken = () => {
   return { unHashedToken, hashedToken, tokenExpiry };
 };
 
+const generateHmacHash = (data, secretKey) => {
+  const hmac = crypto.createHmac('sha512', secretKey);
+  return hmac.update(new Buffer.from(data, 'utf-8')).digest('hex');
+};
+
 module.exports = {
   generateKeyPair,
   generateHashedPassword,
   comparePassword,
   generateTemporaryToken,
   hashToken,
+  generateHmacHash,
 };
