@@ -15,6 +15,10 @@ class ProductRepository extends BaseRepository {
     }
   }
 
+  async getProductByCategory(categoryIds) {
+    return await this.model.find({ prd_category: { $in: categoryIds } });
+  }
+
   formatDocument(product) {
     if (!product) return null;
 

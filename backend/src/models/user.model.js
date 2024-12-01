@@ -6,9 +6,9 @@ const {
   UserLoginType,
   UserStatus,
   AvailableUserStatus,
+  AddressType,
 } = require('../constants/status');
 const SERVER_CONFIG = require('../configs/server.config');
-const profileModel = require('./profile.model');
 const cartModel = require('./cart.model');
 
 const DOCUMENT_NAME = 'User';
@@ -22,6 +22,7 @@ const userSchema = new Schema(
     },
     usr_name: { type: String, required: true },
     usr_email: { type: String, required: true },
+    usr_phone: { type: String, default: '' },
     usr_password: { type: String },
     usr_role: { type: Schema.Types.ObjectId, ref: 'Role' },
     usr_login_type: {
@@ -48,15 +49,7 @@ const userSchema = new Schema(
 
 userSchema.pre('save', async function (next) {
   if (this.isNew) {
-    const profile = await profileModel.findOne({ usr_id: this._id });
     const cart = await cartModel.findOne({ crt_user_id: this._id });
-
-    if (!profile) {
-      await profileModel.create({
-        usr_id: this._id,
-        prof_name: this.usr_name,
-      });
-    }
 
     if (!cart) {
       await cartModel.create({
@@ -70,6 +63,7 @@ userSchema.pre('save', async function (next) {
 userSchema.index({
   usr_name: 'text',
   usr_email: 'text',
+  usr_phone: 'text',
 });
 
 module.exports = model(DOCUMENT_NAME, userSchema);

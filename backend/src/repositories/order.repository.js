@@ -19,9 +19,9 @@ class OrderRepository extends BaseRepository {
         variantId: item.var_id,
         productName: item.prd_name,
         variantSlug: item.var_slug,
-        productPrice: item.prd_price,
-        productImage: item.prd_img,
-        productQuantity: item.prd_quantity,
+        price: item.prd_price,
+        image: item.prd_img,
+        quantity: item.prd_quantity,
       })),
       shippingAddress: {
         fullname: order.ord_shipping_address.shp_fullname,

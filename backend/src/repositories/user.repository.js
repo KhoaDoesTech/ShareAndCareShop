@@ -17,7 +17,7 @@ class UserRepository extends BaseRepository {
       name: user.usr_name,
       email: user.usr_email,
       password: user.usr_password,
-      phone: user.profile?.prof_phone || null,
+      phone: user.usr_phone,
       role: user.usr_role.rol_name
         ? {
             id: user.usr_role._id,

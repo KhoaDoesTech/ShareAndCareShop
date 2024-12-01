@@ -49,9 +49,7 @@ const SortFieldUser = {
 //
 const AddressType = {
   SHIPPING: 'SHIPPING',
-  BILLING: 'BILLING',
   DEFAULT: 'DEFAULT',
-  NONE: 'NONE',
 };
 
 const AvailableAddressTypes = Object.values(AddressType);

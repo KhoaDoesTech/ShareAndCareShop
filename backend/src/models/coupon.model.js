@@ -16,28 +16,19 @@ const couponSchema = new Schema(
     cpn_type: {
       type: String,
       enum: AvailableCouponType,
-      default: CouponType.AMOUNT,
+      default: CouponType.AMOUNT, // PERCENT
     },
     cpn_value: { type: Number, required: true },
-    cpn_min_order_values: { type: Number, require: true },
+    cpn_min_value: { type: Number, require: true },
     cpn_max_value: { type: Number, require: true },
     cpn_max_uses: { type: Number, require: true },
     cpn_max_uses_per_user: { type: Number, require: true },
-    cpn_applies_to: {
+    cpn_target_type: {
       type: String,
-      require: true,
-      enum: ['All', 'Specific'],
+      enum: ['Order', 'Category', 'Product'],
+      required: true,
     },
-    cpn_product_ids: {
-      type: [Schema.Types.ObjectId],
-      ref: 'Product',
-      default: [],
-    },
-    cpn_category_ids: {
-      type: [Schema.Types.ObjectId],
-      ref: 'Category',
-      default: [],
-    },
+    cpn_target_ids: { type: Array, default: [] },
     cpn_uses_count: { type: Number, default: 0 },
     cpn_users_used: { type: [Schema.Types.ObjectId], ref: 'User', default: [] },
     cpn_is_active: { type: Boolean, default: true },

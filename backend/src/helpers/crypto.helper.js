@@ -46,6 +46,10 @@ const generateHmacHash = (data, secretKey) => {
   return hmac.update(new Buffer.from(data, 'utf-8')).digest('hex');
 };
 
+const generateSessionToken = () => {
+  return crypto.randomUUID();
+};
+
 module.exports = {
   generateKeyPair,
   generateHashedPassword,
@@ -53,4 +57,5 @@ module.exports = {
   generateTemporaryToken,
   hashToken,
   generateHmacHash,
+  generateSessionToken,
 };

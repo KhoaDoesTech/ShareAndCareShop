@@ -1,28 +1,20 @@
 const { SortFieldUser } = require('../constants/status');
-const ProfileRepository = require('../repositories/profile.repository');
 const UserRepository = require('../repositories/user.repository');
 const { pickFields } = require('../utils/helpers');
 
 class UserService {
   constructor() {
     this.userRepository = new UserRepository();
-    this.profileRepository = new ProfileRepository();
   }
 
   async getAllUsers({ search, status, roleId, sort, page, size }) {
     let userFilter = {};
     if (search) {
-      const profilesWithPhone = await this.profileRepository.getAll({
-        filter: { prof_phone: { $regex: search, $options: 'i' } },
-      });
-
-      const profileUserIds = profilesWithPhone.map((profile) => profile.userId);
-
       userFilter = {
         $or: [
           { usr_name: { $regex: search, $options: 'i' } },
+          { usr_phone: { $regex: search, $options: 'i' } },
           { usr_email: { $regex: search, $options: 'i' } },
-          { _id: { $in: profileUserIds } },
         ],
       };
     }
@@ -57,7 +49,6 @@ class UserService {
       queryOptions,
       populateOptions,
     });
-    console.log(users);
 
     return {
       users: users.map((user) =>

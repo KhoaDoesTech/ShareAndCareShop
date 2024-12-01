@@ -8,8 +8,18 @@ const COLLECTION_NAME = 'Deliverys';
 const deliverySchema = new Schema(
   {
     dlv_name: { type: String, required: true, unique: true },
-    dlv_price: { type: Number, required: true },
-    dlv_estimated_time: { type: String },
+    dlv_description: { type: String, required: true },
+    dlv_max_distance: { type: Number, required: true },
+    dlv_base_fee: { type: Number, required: true },
+    dlv_pricing: {
+      type: [
+        {
+          threshold: { type: Number, required: true },
+          fee_per_km: { type: Number, required: true },
+        },
+      ],
+      default: [],
+    },
     dlv_is_active: { type: Boolean, required: true, default: true },
   },
   {
