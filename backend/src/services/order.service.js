@@ -1,13 +1,21 @@
+'use strict';
 const { ProductStatus, OrderStatus } = require('../constants/status');
 const OrderRepository = require('../repositories/order.repository');
 const ProductRepository = require('../repositories/product.repository');
 const VariantRepository = require('../repositories/variant.repository');
 const { BadRequestError, NotFoundError } = require('../utils/errorResponse');
+const AddressService = require('./address.service');
+const CouponService = require('./coupon.service');
+const DeliveryService = require('./delivery.service');
+
 class OrderService {
   constructor() {
     this.orderRepository = new OrderRepository();
     this.productRepository = new ProductRepository();
     this.variantRepository = new VariantRepository();
+    this.addressService = new AddressService();
+    this.deliveryService = new DeliveryService();
+    this.couponService = new CouponService();
   }
 
   async reviewOrder({ items, couponCode, shippingAddress, deliveryMethod }) {}
@@ -86,24 +94,51 @@ class OrderService {
 
   async createOrder({
     userId,
+    couponCode = '',
     shippingAddress,
     items,
     paymentMethod,
-    deliveryMethod,
+    deliveryId,
   }) {
     // Step 1: Validate items and calculate total price
-    const { totalItemsPrice, itemsDetails } = await validateAndCalculateItems({
-      items,
+    const { totalItemsPrice, itemsDetails } =
+      await this.validateAndCalculateItems({
+        items,
+      });
+    const addressData = await this.addressService.getPlaceDetails({
+      street: shippingAddress.street,
+      ward: shippingAddress.ward,
+      district: shippingAddress.district,
+      city: shippingAddress.city,
     });
 
     // Step 2: Calculate order prices
-    const shippingPrice = 50000;
-    const discountPrice = 0;
+    const shippingPrice = await this.deliveryService.calculateDeliveryFee({
+      deliveryId,
+      destinationId: addressData[0].placeId,
+    });
+
+    let discountPrice = 0;
+    if (couponCode) {
+      const { totalDiscount, discountDetails } =
+        await this.couponService.reviewDiscount({
+          items,
+          totalOrder: totalItemsPrice,
+          shippingFee: shippingPrice,
+          couponCode,
+        });
+
+      discountPrice = totalDiscount;
+
+      console.log({ totalDiscount, discountDetails });
+    }
+
     const totalPrice = totalItemsPrice + shippingPrice - discountPrice;
 
     // Step 3: Create order
     const newOrder = this.orderRepository.create({
       ord_user_id: userId,
+      ord_coupon_id: couponCode || null,
       ord_shipping_address: {
         shp_fullname: shippingAddress.fullname,
         shp_phone: shippingAddress.phone,
@@ -126,7 +161,7 @@ class OrderService {
       ord_shipping_price: shippingPrice,
       ord_total_price: totalPrice,
       ord_payment_method: paymentMethod,
-      ord_delivery_method: deliveryMethod,
+      ord_delivery_method: deliveryId,
       ord_status: OrderStatus.PENDING,
     });
 
@@ -142,24 +177,24 @@ class OrderService {
         // Update variant stock and sold count
         await this.variantRepository.updateById(item.variantId, {
           $inc: {
-            var_quantity: -item.productQuantity,
-            var_sold: item.productQuantity,
+            var_quantity: -item.quantity,
+            var_sold: item.quantity,
           },
         });
 
         // Update product sold count for variant's parent product
         await this.productRepository.updateById(item.productId, {
           $inc: {
-            prd_quantity: -item.productQuantity,
-            prd_sold: item.productQuantity,
+            prd_quantity: -item.quantity,
+            prd_sold: item.quantity,
           },
         });
       } else {
         // Update product stock and sold count
         await this.productRepository.updateById(item.productId, {
           $inc: {
-            prd_quantity: -item.productQuantity,
-            prd_sold: item.productQuantity,
+            prd_quantity: -item.quantity,
+            prd_sold: item.quantity,
           },
         });
       }
@@ -172,24 +207,24 @@ class OrderService {
         // Revert variant stock and sold count
         await this.variantRepository.updateById(item.variantId, {
           $inc: {
-            var_quantity: item.productQuantity,
-            var_sold: -item.productQuantity,
+            var_quantity: item.quantity,
+            var_sold: -item.quantity,
           },
         });
 
         // Revert product sold count for variant's parent product
         await this.productRepository.updateById(item.productId, {
           $inc: {
-            prd_quantity: item.productQuantity,
-            prd_sold: -item.productQuantity,
+            prd_quantity: item.quantity,
+            prd_sold: -item.quantity,
           },
         });
       } else {
         // Revert product stock and sold count
         await this.productRepository.updateById(item.productId, {
           $inc: {
-            prd_quantity: item.productQuantity,
-            prd_sold: -item.productQuantity,
+            prd_quantity: item.quantity,
+            prd_sold: -item.quantity,
           },
         });
       }

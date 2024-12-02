@@ -16,7 +16,10 @@ class OrderController {
   createOrder = async (req, res, next) => {
     new CreateSuccess({
       message: 'Order created successfully',
-      metadata: await this.orderService.createOrder(req.body),
+      metadata: await this.orderService.createOrder({
+        ...req.body,
+        userId: req.user.id,
+      }),
     }).send(res);
   };
 }

@@ -14,18 +14,14 @@ const COLLECTION_NAME = 'Orders';
 const orderSchema = new Schema(
   {
     ord_user_id: { type: Schema.Types.ObjectId, ref: 'User' },
-    ord_coupon_id: {
-      type: Schema.Types.ObjectId,
-      ref: 'Coupon',
-      default: null,
-    },
+    ord_coupon_id: { type: String, default: null },
     ord_items: {
       type: [
         {
           prd_id: { type: Schema.Types.ObjectId, ref: 'Product' },
           var_id: { type: Schema.Types.ObjectId, ref: 'Variant' },
-          prd_name: { type: String, required: true },
-          var_slug: { type: String, required: true },
+          prd_name: { type: String },
+          var_slug: { type: String },
           prd_price: { type: Number, required: true },
           prd_img: { type: String, required: true },
           prd_quantity: { type: Number, required: true, default: 1 },

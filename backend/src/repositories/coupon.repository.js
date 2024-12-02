@@ -10,7 +10,9 @@ class CouponRepository extends BaseRepository {
   }
 
   async findByCode(code) {
-    return await this.model.findOne({ cpn_code: code });
+    const foundCoupon = await this.model.findOne({ cpn_code: code });
+
+    return this.formatDocument(foundCoupon);
   }
 
   async incrementUsesCount(couponId) {

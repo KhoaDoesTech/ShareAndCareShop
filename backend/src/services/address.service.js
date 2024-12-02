@@ -41,7 +41,7 @@ class AddressService {
     if (response.data.status !== 'OK') {
       throw new BadRequestError('Goong API returned an error');
     }
-
+    console.log(response.data.predictions[0]);
     return response.data.predictions.map((prediction) => ({
       id: prediction.place_id,
       description: prediction.description,
@@ -66,7 +66,7 @@ class AddressService {
     }
 
     return response.data.results.map((result) => ({
-      id: result.place_id,
+      placeId: result.place_id,
       description: result.formatted_address,
       compound: {
         ward: result.compound.commune,
@@ -130,14 +130,10 @@ class AddressService {
   }
 
   async getPlaceDetails({ street, ward, district, city }) {
-    const encodedAddress = encodeURIComponent(
-      `${street}, ${ward}, ${district}, ${city}`
-    );
-
-    const response = await axios.get('https://rsapi.goong.io/Geocode', {
+    const response = await axios.get('https://rsapi.goong.io/geocode', {
       params: {
         api_key: process.env.GOONG_API_KEY,
-        address: encodedAddress,
+        address: `${street}, ${ward}, ${district}, ${city}`,
       },
     });
 
@@ -146,8 +142,7 @@ class AddressService {
     }
 
     return response.data.results.map((result) => ({
-      id: result.place_id,
-      place_id: result.place_id,
+      placeId: result.place_id,
       coordinates: result.geometry.location,
     }));
   }
@@ -196,7 +191,7 @@ class AddressService {
       usr_id: userId,
       usr_name: name,
       usr_phone: phone,
-      adr_place_id: place.place_id,
+      adr_place_id: place.placeId,
       adr_street: street,
       adr_ward: ward,
       adr_district: district,

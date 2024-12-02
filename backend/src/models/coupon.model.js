@@ -19,13 +19,13 @@ const couponSchema = new Schema(
       default: CouponType.AMOUNT, // PERCENT
     },
     cpn_value: { type: Number, required: true },
-    cpn_min_value: { type: Number, require: true },
-    cpn_max_value: { type: Number, require: true },
-    cpn_max_uses: { type: Number, require: true },
-    cpn_max_uses_per_user: { type: Number, require: true },
+    cpn_min_value: { type: Number, required: true },
+    cpn_max_value: { type: Number, required: true },
+    cpn_max_uses: { type: Number, required: true },
+    cpn_max_uses_per_user: { type: Number, required: true },
     cpn_target_type: {
       type: String,
-      enum: ['Order', 'Category', 'Product'],
+      enum: ['Delivery', 'Order', 'Category', 'Product'],
       required: true,
     },
     cpn_target_ids: { type: Array, default: [] },

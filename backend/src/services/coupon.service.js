@@ -1,3 +1,4 @@
+const { child } = require('winston');
 const CouponRepository = require('../repositories/coupon.repository');
 const ProductRepository = require('../repositories/product.repository');
 const { BadRequestError } = require('../utils/errorResponse');
@@ -62,60 +63,78 @@ class CouponService {
     };
   }
 
-  // async calculateDiscountedPrice({ items, couponCode }) {
-  //   const foundCoupon = await this.couponRepository.findByCode(couponCode);
-  //   _checkCoupon(foundCoupon);
+  async reviewDiscount({ items, totalOrder, shippingFee, couponCode }) {
+    const foundCoupon = await this.couponRepository.findByCode(couponCode);
+    this._checkCoupon(foundCoupon);
 
-  //   let totalDiscount = 0;
-  //   if (foundCoupon.cpn_target_type === 'Order') {
-  //     const totalPrice = items.reduce(
-  //       (acc, item) => acc + item.price * item.quantity,
-  //       0
-  //     );
-  //     totalDiscount = _applyDiscount(totalPrice, foundCoupon);
-  //   } else if (foundCoupon.cpn_target_type === 'Category') {
-  //     const foundProduct = await this.productRepository.getProductByCategory(
-  //       foundCoupon.cpn_target_ids
-  //     );
+    console.log(foundCoupon);
+    const discountDetails = [];
+    let totalDiscount = 0;
 
-  //     const totalPrice = items.reduce((acc, item) => {
-  //       const product = foundProduct.find((p) => p.id === item.productId);
-  //       return acc + product.price * item.quantity;
-  //     }, 0);
+    // Get the appropriate handler for the coupon's target type
+    const TARGET_DISCOUNT_HANDLERS = {
+      Order: async () =>
+        this._applyOrderDiscount(foundCoupon, totalOrder, discountDetails),
+      Delivery: async () =>
+        this._applyDeliveryDiscount(foundCoupon, shippingFee, discountDetails),
+    };
 
-  //     totalDiscount = _applyDiscount(totalPrice, foundCoupon);
-  //   } else if (foundCoupon.cpn_target_type === 'Product') {
-  //     const totalPrice = items.reduce(async (acc, item) => {
-  //       const product = await this.productRepository.getById(item.productId);
-  //       return acc + product.price * item.quantity;
-  //     }, 0);
+    if (TARGET_DISCOUNT_HANDLERS[foundCoupon.targetType]) {
+      totalDiscount = await TARGET_DISCOUNT_HANDLERS[foundCoupon.targetType]();
+    } else {
+      throw new Error(`Unsupported target type: ${foundCoupon.targetType}`);
+    }
 
-  //     totalDiscount = _applyDiscount(totalPrice, foundCoupon);
-  //   }
+    return {
+      totalDiscount,
+      discountDetails,
+    };
+  }
 
-  //   return {
-  //     totalDiscount,
-  //   };
-  // }
+  async _applyDeliveryDiscount(coupon, shippingFee, discountDetails) {
+    const discount = this._applyDiscount(shippingFee, coupon);
+    discountDetails.push({
+      type: 'Delivery',
+      discount,
+      shippingFee,
+    });
+
+    console.log(discount);
+
+    return discount;
+  }
+
+  async _applyOrderDiscount(coupon, totalOrder, discountDetails) {
+    const discount = this._applyDiscount(totalOrder, coupon);
+    discountDetails.push({
+      type: 'Order',
+      discount,
+      totalOrder,
+    });
+
+    console.log(coupon);
+
+    return discount;
+  }
 
   _checkCoupon(foundCoupon) {
     if (!foundCoupon) {
       throw new BadRequestError('Coupon code not found');
     }
 
-    if (!foundCoupon.cpn_is_active) {
+    if (!foundCoupon.isActive) {
       throw new BadRequestError('Coupon code is not active');
     }
 
-    if (new Date(foundCoupon.cpn_start_date) > new Date()) {
+    if (new Date(foundCoupon.startDate) > new Date()) {
       throw new BadRequestError('Coupon code is not yet active');
     }
 
-    if (new Date(foundCoupon.cpn_end_date) < new Date()) {
+    if (new Date(foundCoupon.endDate) < new Date()) {
       throw new BadRequestError('Coupon code has expired');
     }
 
-    if (foundCoupon.cpn_max_uses <= foundCoupon.cpn_uses_count) {
+    if (foundCoupon.maxUses <= foundCoupon.usesCount) {
       throw new BadRequestError('Coupon code has reached its maximum uses');
     }
   }
@@ -132,7 +151,7 @@ class CouponService {
       discount = value;
     } else if (type === 'PERCENT') {
       discount = basePrice * (value / 100);
-      discount = maxValue ? Math.min(discount, maxValue) : discount;
+      discount = Math.min(discount, maxValue);
     }
 
     return discount;
@@ -150,17 +169,16 @@ class CouponService {
       throw new BadRequestError('Missing required fields');
     }
 
-    if (targetType !== 'Order' && (!targetIds || targetIds.length === 0)) {
-      throw new BadRequestError(
-        'Target IDs are required for targetType other than "Order"'
-      );
+    if (
+      (targetType === 'Product' || targetType === 'Category') &&
+      (!targetIds || targetIds.length === 0)
+    ) {
+      throw new BadRequestError('Target IDs are required for targetType');
     }
 
     if (new Date(startDate) >= new Date(endDate)) {
       throw new BadRequestError('Start date must be before end date');
     }
-
-    console.log(new Date(startDate));
 
     if (new Date(endDate) <= new Date()) {
       throw new BadRequestError('End date must be in the future');
