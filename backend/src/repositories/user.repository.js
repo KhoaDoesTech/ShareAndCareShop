@@ -8,6 +8,24 @@ class UserRepository extends BaseRepository {
     this.model = userModels;
   }
 
+  async getAdmin() {
+    const foundAdmin = await this.model.aggregate([
+      {
+        $lookup: {
+          from: 'Roles',
+          localField: 'usr_role',
+          foreignField: '_id',
+          as: 'role',
+        },
+      },
+      {
+        $match: { 'role.rol_name': 'Admin' },
+      },
+    ]);
+
+    return this.formatDocument(foundAdmin[0]);
+  }
+
   formatDocument(user) {
     if (!user) return null;
 

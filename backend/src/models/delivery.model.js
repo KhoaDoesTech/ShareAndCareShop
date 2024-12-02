@@ -3,7 +3,7 @@
 const { model, Schema } = require('mongoose');
 
 const DOCUMENT_NAME = 'Delivery';
-const COLLECTION_NAME = 'Deliverys';
+const COLLECTION_NAME = 'Deliveries';
 
 const deliverySchema = new Schema(
   {

@@ -76,6 +76,59 @@ class AddressService {
     }));
   }
 
+  async calculateDistance(destinationId) {
+    const foundAdmin = await this.userRepository.getAdmin();
+    if (!foundAdmin) throw new BadRequestError('Admin not found');
+
+    const foundOrigin = await this.addressRepository.getByQuery({
+      usr_id: foundAdmin.id,
+      adr_type: AddressType.DEFAULT,
+    });
+    if (!foundOrigin) throw new BadRequestError('Origin not found');
+
+    const foundDestination = await this.getPlaceDetailsById({
+      placeId: destinationId,
+    });
+    if (!foundDestination) throw new BadRequestError('Destination not found');
+
+    const distanceMatrix = await this.getDistanceMatrix({
+      origins: foundOrigin.location,
+      destinations: foundDestination.geometry.location,
+    });
+
+    console.log(distanceMatrix);
+
+    return distanceMatrix;
+  }
+
+  async getDistanceMatrix({ origins, destinations }) {
+    const response = await axios.get('https://rsapi.goong.io/distancematrix', {
+      params: {
+        api_key: process.env.GOONG_API_KEY,
+        origins: `${origins.lat},${origins.lng}`,
+        destinations: `${destinations.lat},${destinations.lng}`,
+        vehicle: 'car',
+      },
+    });
+
+    return response.data.rows[0].elements[0].distance.value / 1000;
+  }
+
+  async getPlaceDetailsById({ placeId }) {
+    const response = await axios.get('https://rsapi.goong.io/place/detail', {
+      params: {
+        api_key: process.env.GOONG_API_KEY,
+        place_id: placeId,
+      },
+    });
+
+    if (response.data.status !== 'OK') {
+      throw new BadRequestError('Goong API returned an error');
+    }
+
+    return response.data.result;
+  }
+
   async getPlaceDetails({ street, ward, district, city }) {
     const encodedAddress = encodeURIComponent(
       `${street}, ${ward}, ${district}, ${city}`
