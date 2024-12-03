@@ -1,9 +1,19 @@
 'use strict';
-const { ProductStatus, OrderStatus } = require('../constants/status');
+const {
+  ProductStatus,
+  OrderStatus,
+  PaymentMethod,
+  SortFieldOrder,
+} = require('../constants/status');
 const OrderRepository = require('../repositories/order.repository');
 const ProductRepository = require('../repositories/product.repository');
 const VariantRepository = require('../repositories/variant.repository');
-const { BadRequestError, NotFoundError } = require('../utils/errorResponse');
+const {
+  BadRequestError,
+  NotFoundError,
+  InternalServerError,
+} = require('../utils/errorResponse');
+const { pickFields, omitFields } = require('../utils/helpers');
 const AddressService = require('./address.service');
 const CouponService = require('./coupon.service');
 const DeliveryService = require('./delivery.service');
@@ -17,8 +27,6 @@ class OrderService {
     this.deliveryService = new DeliveryService();
     this.couponService = new CouponService();
   }
-
-  async reviewOrder({ items, couponCode, shippingAddress, deliveryMethod }) {}
 
   async validateAndCalculateItems({ items }) {
     let totalItemsPrice = 0;
@@ -135,6 +143,11 @@ class OrderService {
 
     const totalPrice = totalItemsPrice + shippingPrice - discountPrice;
 
+    let status = OrderStatus.PENDING;
+    if (paymentMethod !== PaymentMethod.COD) {
+      status = OrderStatus.AWAITING_PAYMENT;
+    }
+
     // Step 3: Create order
     const newOrder = this.orderRepository.create({
       ord_user_id: userId,
@@ -162,7 +175,7 @@ class OrderService {
       ord_total_price: totalPrice,
       ord_payment_method: paymentMethod,
       ord_delivery_method: deliveryId,
-      ord_status: OrderStatus.PENDING,
+      ord_status: status,
     });
 
     // Step 4: Update stock for products and variants
@@ -175,27 +188,41 @@ class OrderService {
     for (const item of items) {
       if (item.variantId) {
         // Update variant stock and sold count
-        await this.variantRepository.updateById(item.variantId, {
-          $inc: {
-            var_quantity: -item.quantity,
-            var_sold: item.quantity,
+        const updatedVariant = await this.variantRepository.updateById(
+          item.variantId,
+          {
+            $inc: {
+              var_quantity: -item.quantity,
+              var_sold: item.quantity,
+            },
           },
-        });
+          { new: true }
+        );
 
-        // Update product sold count for variant's parent product
-        await this.productRepository.updateById(item.productId, {
+        // Check and update variant's stock status
+        if (updatedVariant.quantity <= 0) {
+          await this.variantRepository.updateById(item.variantId, {
+            status: ProductStatus.OUT_OF_STOCK,
+          });
+        }
+      }
+
+      // Update parent product's stock and sold count
+      const updatedProduct = await this.productRepository.updateById(
+        item.productId,
+        {
           $inc: {
             prd_quantity: -item.quantity,
             prd_sold: item.quantity,
           },
-        });
-      } else {
-        // Update product stock and sold count
+        },
+        { new: true }
+      );
+
+      // Check and update product's stock status
+      if (updatedProduct.quantity <= 0) {
         await this.productRepository.updateById(item.productId, {
-          $inc: {
-            prd_quantity: -item.quantity,
-            prd_sold: item.quantity,
-          },
+          status: ProductStatus.OUT_OF_STOCK,
         });
       }
     }
@@ -205,30 +232,418 @@ class OrderService {
     for (const item of items) {
       if (item.variantId) {
         // Revert variant stock and sold count
-        await this.variantRepository.updateById(item.variantId, {
-          $inc: {
-            var_quantity: item.quantity,
-            var_sold: -item.quantity,
+        const updatedVariant = await this.variantRepository.updateById(
+          item.variantId,
+          {
+            $inc: {
+              var_quantity: item.quantity,
+              var_sold: -item.quantity,
+            },
           },
-        });
+          { new: true }
+        );
 
-        // Revert product sold count for variant's parent product
-        await this.productRepository.updateById(item.productId, {
+        // Remove OUT_OF_STOCK status if stock is restored
+        if (updatedVariant.status === ProductStatus.OUT_OF_STOCK) {
+          await this.variantRepository.updateById(item.variantId, {
+            status: ProductStatus.PUBLISHED,
+          });
+        }
+      }
+      // Revert product sold count for variant's parent product
+      const updatedProduct = await this.productRepository.updateById(
+        item.productId,
+        {
           $inc: {
             prd_quantity: item.quantity,
             prd_sold: -item.quantity,
           },
-        });
-      } else {
-        // Revert product stock and sold count
+        },
+        { new: true }
+      );
+      // Remove OUT_OF_STOCK status if stock is restored
+      if (updatedProduct.status === ProductStatus.OUT_OF_STOCK) {
         await this.productRepository.updateById(item.productId, {
-          $inc: {
-            prd_quantity: item.quantity,
-            prd_sold: -item.quantity,
-          },
+          status: ProductStatus.PUBLISHED,
         });
       }
     }
+  }
+
+  async updateOrderStatus(orderId) {
+    const foundOrder = await this.orderRepository.getById(orderId);
+    if (!foundOrder) throw new NotFoundError(`Order ${orderId} not found`);
+
+    // Define next state transitions
+    const NEXT_STATUS = {
+      [OrderStatus.AWAITING_PAYMENT]: () => null,
+      [OrderStatus.PENDING]: () => OrderStatus.PROCESSING,
+      [OrderStatus.PAID]: () => OrderStatus.PROCESSING,
+      [OrderStatus.PROCESSING]: () => OrderStatus.AWAITING_SHIPMENT,
+      [OrderStatus.AWAITING_SHIPMENT]: () => OrderStatus.SHIPPED,
+      [OrderStatus.SHIPPED]: () => {
+        foundOrder.deliveredAt = new Date();
+        foundOrder.isDelivered = true;
+        return OrderStatus.DELIVERED;
+      },
+      [OrderStatus.DELIVERED]: () => {
+        throw new BadRequestError('Order is already delivered');
+      },
+      [OrderStatus.CANCELLED]: () => {
+        throw new BadRequestError('Order is already cancelled');
+      },
+    };
+
+    // Transition to the next status
+    if (NEXT_STATUS[foundOrder.status]) {
+      foundOrder.status = NEXT_STATUS[foundOrder.status]();
+    } else {
+      throw new BadRequestError(
+        `Cannot transition from status: ${foundOrder.status}`
+      );
+    }
+
+    // Check payment handler
+    if (foundOrder.paymentMethod === PaymentMethod.COD) {
+      // COD: Mark as paid if delivered
+      if (foundOrder.status === OrderStatus.DELIVERED) {
+        foundOrder.isPaid = true;
+        foundOrder.paidAt = new Date();
+      }
+    } else {
+      // All other methods require payment to be completed beforehand
+      if (!isPaid) {
+        throw new BadRequestError(
+          'Payment must be completed before proceeding.'
+        );
+      }
+    }
+
+    const updatedOrder = await this.orderRepository.updateById(orderId, {
+      ord_status: foundOrder.status,
+      ord_is_paid: foundOrder.isPaid,
+      ord_paid_at: foundOrder.paidAt,
+      ord_is_delivered: foundOrder.isDelivered,
+      ord_delivered_at: foundOrder.deliveredAt,
+    });
+
+    if (!updatedOrder)
+      throw new InternalServerError('Failed to update order status');
+  }
+
+  async reviewNextStatus(orderId) {
+    const foundOrder = await this.orderRepository.getById(orderId);
+    if (!foundOrder) throw new NotFoundError(`Order ${orderId} not found`);
+
+    const nowStatus = foundOrder.status;
+
+    // Transition to the next status
+    const nextStatus = this._nextStatus(foundOrder.status);
+
+    return {
+      nowStatus,
+      nextStatus,
+      message: nextStatus
+        ? `Order can transition from ${nowStatus} to ${nextStatus}.`
+        : `Order with status ${nowStatus} cannot transition further.`,
+    };
+  }
+
+  _nextStatus(orderStatus) {
+    const NEXT_STATUS = {
+      [OrderStatus.AWAITING_PAYMENT]: null,
+      [OrderStatus.PENDING]: OrderStatus.PROCESSING,
+      [OrderStatus.PAID]: OrderStatus.PROCESSING,
+      [OrderStatus.PROCESSING]: OrderStatus.AWAITING_SHIPMENT,
+      [OrderStatus.AWAITING_SHIPMENT]: OrderStatus.SHIPPED,
+      [OrderStatus.SHIPPED]: OrderStatus.DELIVERED,
+      [OrderStatus.DELIVERED]: null,
+      [OrderStatus.CANCELLED]: null,
+    };
+
+    return NEXT_STATUS[orderStatus];
+  }
+
+  async cancelOrder({ userId, orderId }) {
+    const foundOrder = await this.orderRepository.getByQuery({
+      _id: orderId,
+      ord_user_id: userId,
+    });
+    if (!foundOrder) throw new NotFoundError(`Order ${orderId} not found`);
+
+    if (foundOrder.status === OrderStatus.CANCELLED) {
+      throw new BadRequestError('Order is already cancelled');
+    }
+
+    if (foundOrder.status === OrderStatus.DELIVERED) {
+      throw new BadRequestError('Cannot cancel delivered order');
+    }
+
+    // Reverse stock
+    await this._reverseStock(foundOrder.items);
+
+    // Update order status
+    const updatedOrder = await this.orderRepository.updateById(orderId, {
+      ord_status: OrderStatus.CANCELLED,
+    });
+
+    if (!updatedOrder) throw new InternalServerError('Failed to cancel order');
+
+    return {
+      status: updatedOrder.status,
+    };
+  }
+
+  async returnOrder(orderId) {}
+
+  async getOrderDetailsByUser({ userId, orderId }) {
+    const foundOrder = await this.orderRepository.getByQuery(
+      {
+        _id: orderId,
+        ord_user_id: userId,
+      },
+      {
+        path: 'ord_delivery_method',
+        select: 'dlv_name',
+      }
+    );
+    if (!foundOrder) throw new NotFoundError(`Order ${orderId} not found`);
+
+    return {
+      orders: omitFields({
+        object: foundOrder,
+        fields: [
+          'isPaid',
+          'isDelivered',
+          'paidAt',
+          'deliveredAt',
+          'createdAt',
+          'updatedAt',
+        ],
+      }),
+    };
+  }
+
+  async getOrderDetails(orderId) {
+    const foundOrder = await this.orderRepository.getByQuery(
+      {
+        _id: orderId,
+      },
+      {
+        path: 'ord_delivery_method',
+        select: 'dlv_name',
+      }
+    );
+    if (!foundOrder) throw new NotFoundError(`Order ${orderId} not found`);
+
+    return {
+      orders: omitFields({
+        object: foundOrder,
+        fields: [
+          'isPaid',
+          'isDelivered',
+          'paidAt',
+          'deliveredAt',
+          'createdAt',
+          'updatedAt',
+        ],
+      }),
+    };
+  }
+
+  async getOrdersByUserId({
+    userId,
+    search,
+    status,
+    nextStatus,
+    sort,
+    paymentMethod,
+    page = 1,
+    size = 10,
+  }) {
+    // Initialize the filter object for querying the database
+    const filter = { ord_user_id: userId };
+
+    // Parse and validate pagination parameters
+    page = parseInt(page, 10);
+    size = parseInt(size, 10);
+    if (isNaN(page) || page < 1) page = 1;
+    if (isNaN(size) || size < 1) size = 10;
+
+    // Search by user name or phone in shipping address
+    if (search) {
+      const keyword = search.trim();
+      const regexOptions = { $regex: keyword, $options: 'i' };
+
+      filter.$or = [
+        { 'ord_shipping_address.shp_fullname': regexOptions },
+        { 'ord_shipping_address.shp_phone': regexOptions },
+      ];
+    }
+
+    // Filter by status and payment method
+    if (status) {
+      filter.ord_status = status;
+    }
+
+    if (paymentMethod) {
+      filter.ord_payment_method = paymentMethod;
+    }
+
+    // Sorting configuration
+    const mappedSort = sort
+      ? `${sort.startsWith('-') ? '-' : ''}${
+          SortFieldOrder[sort.replace('-', '')] || 'createdAt'
+        }`
+      : '-createdAt';
+
+    // Fetch orders from the repository
+    const orders = await this.orderRepository.getAllOrder({
+      filter,
+      queryOptions: {
+        sort: mappedSort,
+      },
+      populateOptions: {
+        path: 'ord_delivery_method',
+        select: 'dlv_name',
+      },
+    });
+
+    // Map orders to include `nextStatus` and filter by `nextStatus` if specified
+    const ordersWithNextStatus = orders
+      .map((order) => ({
+        ...order,
+        nextStatus: this._nextStatus(order.status),
+      }))
+      .filter((order) => (nextStatus ? order.nextStatus === nextStatus : true));
+
+    // Paginate the filtered orders
+    const paginatedOrders = ordersWithNextStatus.slice(
+      (page - 1) * size,
+      page * size
+    );
+
+    const totalOrders = ordersWithNextStatus.length;
+    const totalPages = Math.ceil(totalOrders / size);
+
+    return {
+      totalPages,
+      totalOrders,
+      currentPage: page,
+      orders: paginatedOrders.map((order) =>
+        pickFields({
+          fields: [
+            'id',
+            'shippingAddress.fullname',
+            'shippingAddress.phone',
+            'paymentMethod',
+            'deliveryMethod.id',
+            'deliveryMethod.name',
+            'totalPrice',
+            'status',
+            'nextStatus',
+          ],
+          object: order,
+        })
+      ),
+    };
+  }
+
+  async getAllOrders({
+    search,
+    status,
+    nextStatus,
+    sort,
+    paymentMethod,
+    page = 1,
+    size = 10,
+  }) {
+    // Initialize the filter object for querying the database
+    const filter = {};
+
+    // Parse and validate pagination parameters
+    page = parseInt(page, 10);
+    size = parseInt(size, 10);
+    if (isNaN(page) || page < 1) page = 1;
+    if (isNaN(size) || size < 1) size = 10;
+
+    // Search by user name or phone in shipping address
+    if (search) {
+      const keyword = search.trim();
+      const regexOptions = { $regex: keyword, $options: 'i' };
+
+      filter.$or = [
+        { 'ord_shipping_address.shp_fullname': regexOptions },
+        { 'ord_shipping_address.shp_phone': regexOptions },
+      ];
+    }
+
+    // Filter by status and payment method
+    if (status) {
+      filter.ord_status = status;
+    }
+
+    if (paymentMethod) {
+      filter.ord_payment_method = paymentMethod;
+    }
+
+    // Sorting configuration
+    const mappedSort = sort
+      ? `${sort.startsWith('-') ? '-' : ''}${
+          SortFieldOrder[sort.replace('-', '')] || 'createdAt'
+        }`
+      : '-createdAt';
+
+    // Fetch orders from the repository
+    const orders = await this.orderRepository.getAllOrder({
+      filter,
+      queryOptions: {
+        sort: mappedSort,
+      },
+      populateOptions: {
+        path: 'ord_delivery_method',
+        select: 'dlv_name',
+      },
+    });
+
+    // Map orders to include `nextStatus` and filter by `nextStatus` if specified
+    const ordersWithNextStatus = orders
+      .map((order) => ({
+        ...order,
+        nextStatus: this._nextStatus(order.status),
+      }))
+      .filter((order) => (nextStatus ? order.nextStatus === nextStatus : true));
+
+    // Paginate the filtered orders
+    const paginatedOrders = ordersWithNextStatus.slice(
+      (page - 1) * size,
+      page * size
+    );
+
+    const totalOrders = ordersWithNextStatus.length;
+    const totalPages = Math.ceil(totalOrders / size);
+
+    return {
+      totalPages,
+      totalOrders,
+      currentPage: page,
+      orders: paginatedOrders.map((order) =>
+        pickFields({
+          fields: [
+            'id',
+            'shippingAddress.fullname',
+            'shippingAddress.phone',
+            'paymentMethod',
+            'deliveryMethod.id',
+            'deliveryMethod.name',
+            'totalPrice',
+            'status',
+            'nextStatus',
+          ],
+          object: order,
+        })
+      ),
+    };
   }
 }
 

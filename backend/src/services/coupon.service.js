@@ -1,4 +1,3 @@
-const { child } = require('winston');
 const CouponRepository = require('../repositories/coupon.repository');
 const ProductRepository = require('../repositories/product.repository');
 const { BadRequestError } = require('../utils/errorResponse');

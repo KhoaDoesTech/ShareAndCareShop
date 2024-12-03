@@ -24,10 +24,15 @@ class PaymentController {
 
   checkPaymentStatus = async (req, res, next) => {
     const vnp_Params = req.query;
-    new CreateSuccess({
-      message: 'Payment status checked successfully',
-      metadata: await this.paymentService.checkPaymentStatus(vnp_Params),
-    }).send(res);
+
+    try {
+      await this.paymentService.checkPaymentStatus(vnp_Params);
+      res.redirect(`${process.env.FRONTEND_URL}`);
+    } catch (error) {
+      res.redirect(
+        `${process.env.FRONTEND_URL}/error?message=${error.message}`
+      );
+    }
   };
 }
 

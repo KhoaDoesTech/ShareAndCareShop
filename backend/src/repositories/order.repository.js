@@ -1,10 +1,28 @@
 const orderModels = require('../models/order.model');
+const APIFeatures = require('../utils/apiFeatures');
 const BaseRepository = require('./base.repository');
 
 class OrderRepository extends BaseRepository {
   constructor() {
     super(orderModels);
     this.model = orderModels;
+  }
+
+  async getAllOrder({
+    filter = {},
+    queryOptions = {},
+    populateOptions = null,
+  }) {
+    const features = new APIFeatures(
+      this.model.find(filter).populate(populateOptions),
+      queryOptions
+    )
+      .filter()
+      .limitFields()
+      .sort();
+
+    const documents = await features.query;
+    return documents.map(this.formatDocument.bind(this));
   }
 
   formatDocument(order) {
@@ -32,7 +50,12 @@ class OrderRepository extends BaseRepository {
         street: order.ord_shipping_address.shp_street,
       },
       paymentMethod: order.ord_payment_method,
-      deliveryMethod: order.ord_delivery_method,
+      deliveryMethod: order.ord_delivery_method.dlv_name
+        ? {
+            name: order.ord_delivery_method.dlv_name,
+            id: order.ord_delivery_method._id,
+          }
+        : order.ord_delivery_method,
       itemsPrice: order.ord_items_price,
       discountPrice: order.ord_discount_price,
       shippingPrice: order.ord_shipping_price,

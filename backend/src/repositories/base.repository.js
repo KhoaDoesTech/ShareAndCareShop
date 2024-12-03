@@ -62,6 +62,10 @@ class BaseRepository {
     return documents.map(this.formatDocument.bind(this));
   }
 
+  async countDocuments(filter) {
+    return await this.model.countDocuments(filter);
+  }
+
   formatDocument(document) {
     return document;
   }

@@ -4,6 +4,7 @@ const { generateHmacHash } = require('../helpers/crypto.helper');
 const OrderRepository = require('../repositories/order.repository');
 const querystring = require('qs');
 const { BadRequestError } = require('../utils/errorResponse');
+const { OrderStatus } = require('../constants/status');
 class PaymentService {
   constructor() {
     this.orderRepository = new OrderRepository();
@@ -16,10 +17,11 @@ class PaymentService {
   async createVNPayUrl({
     ipAddress,
     orderId,
-    totalPrice,
     language = 'vn',
     bankCode = 'VNBANK',
   }) {
+    const totalPrice = await this._checkOrder(orderId);
+
     const date = new Date();
     const createDate = moment(date).format('YYYYMMDDHHmmss');
     const codeOrder = moment(date).format('DDHHmmss');
@@ -83,6 +85,10 @@ class PaymentService {
 
     const isSuccess = vnp_Params['vnp_TransactionStatus'] === '00';
 
+    if (isSuccess) {
+      await this._markOrderAsPaid(orderId);
+    }
+
     return {
       isSuccess,
       amount,
@@ -93,6 +99,29 @@ class PaymentService {
       cardType,
       transactionNo,
     };
+  }
+
+  async _checkOrder(orderId) {
+    const foundOrder = await this.orderRepository.getById(orderId);
+    if (!foundOrder) throw new NotFoundError(`Order ${orderId} not found`);
+
+    if (foundOrder.isPaid)
+      throw new BadRequestError('Order is already marked as paid');
+
+    return foundOrder.totalPrice;
+  }
+
+  async _markOrderAsPaid(orderId) {
+    await this._checkOrder(orderId);
+
+    const updatedOrder = await this.orderRepository.updateById(orderId, {
+      ord_is_paid: true,
+      ord_paid_at: new Date(),
+      ord_status: OrderStatus.PAID,
+    });
+
+    if (!updatedOrder)
+      throw new InternalServerError('Failed to mark order as paid');
   }
 }
 

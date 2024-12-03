@@ -58,8 +58,8 @@ const orderSchema = new Schema(
 
     ord_is_paid: { type: Boolean, default: false },
     ord_is_delivered: { type: Boolean, default: false },
-    ord_paid_at: { type: Date },
-    ord_delivered_at: { type: Date },
+    ord_paid_at: { type: Date, default: null },
+    ord_delivered_at: { type: Date, default: null },
 
     ord_status: {
       type: String,

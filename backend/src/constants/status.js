@@ -57,6 +57,7 @@ const AvailableAddressTypes = Object.values(AddressType);
 const OrderStatus = {
   PENDING: 'PENDING', // Đơn hàng đã tạo nhưng chưa xác nhận
   AWAITING_PAYMENT: 'AWAITING_PAYMENT', // Chờ thanh toán
+  PAID: 'PAID', // Đã thanh toán
   PROCESSING: 'PROCESSING', // Đang xử lý đơn hàng
   AWAITING_SHIPMENT: 'AWAITING_SHIPMENT', // Chờ vận chuyển
   SHIPPED: 'SHIPPED', // Đã vận chuyển
@@ -66,6 +67,12 @@ const OrderStatus = {
 };
 
 const AvailableOrderStatus = Object.values(OrderStatus);
+
+const SortFieldOrder = {
+  TOTAL_PRICE: 'ord_total_price',
+  CREATED_AT: 'createdAt',
+  UPDATED_AT: 'updatedAt',
+};
 
 const CartStatus = {
   LOCK: 'LOCK',
@@ -111,4 +118,5 @@ module.exports = {
   AvailableCouponType,
   SortFieldProduct,
   SortFieldUser,
+  SortFieldOrder,
 };
