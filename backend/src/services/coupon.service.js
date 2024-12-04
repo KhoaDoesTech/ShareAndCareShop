@@ -66,7 +66,6 @@ class CouponService {
     const foundCoupon = await this.couponRepository.findByCode(couponCode);
     this._checkCoupon(foundCoupon);
 
-    console.log(foundCoupon);
     const discountDetails = [];
     let totalDiscount = 0;
 
@@ -81,7 +80,9 @@ class CouponService {
     if (TARGET_DISCOUNT_HANDLERS[foundCoupon.targetType]) {
       totalDiscount = await TARGET_DISCOUNT_HANDLERS[foundCoupon.targetType]();
     } else {
-      throw new Error(`Unsupported target type: ${foundCoupon.targetType}`);
+      throw new BadRequestError(
+        `Unsupported target type: ${foundCoupon.targetType}`
+      );
     }
 
     return {
@@ -98,8 +99,6 @@ class CouponService {
       shippingFee,
     });
 
-    console.log(discount);
-
     return discount;
   }
 
@@ -110,8 +109,6 @@ class CouponService {
       discount,
       totalOrder,
     });
-
-    console.log(coupon);
 
     return discount;
   }

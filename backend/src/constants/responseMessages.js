@@ -31,6 +31,14 @@ const RESPONSE_MESSAGES = {
     type: 'ALREADY_EXIST',
     status: 409,
   },
+  EMAIL_NOT_VERIFIED: {
+    type: 'EMAIL_NOT_VERIFIED',
+    status: 410,
+  },
+  TOKEN_EXPIRED: {
+    type: 'TOKEN_EXPIRED',
+    status: 411,
+  },
   UNPROCESSABLE_ENTITY: {
     type: 'UNPROCESSABLE_ENTITY',
     status: 422,

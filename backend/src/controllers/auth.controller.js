@@ -21,9 +21,9 @@ class AuthController {
 
   verifyEmail = async (req, res, next) => {
     try {
-      const { tokens, userId } = await this.authService.verifyEmail(req.params);
+      const { email, name } = await this.authService.verifyEmail(req.params);
       res.redirect(
-        `${process.env.CLIENT_SSO_REDIRECT_URL}?userId=${userId}&refreshToken=${tokens.refreshToken}`
+        `${process.env.FRONTEND_URL}/success?message=Email verified successfully&email=${email}&name=${name}`
       );
     } catch (error) {
       res.redirect(

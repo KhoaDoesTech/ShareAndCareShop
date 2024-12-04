@@ -12,6 +12,7 @@ const {
   InternalServerError,
   BadRequestError,
   AlreadyExistError,
+  EmailNotVerifiedError,
 } = require('../utils/errorResponse');
 const { pickFields, removeLocalFile } = require('../utils/helpers');
 const TokenService = require('./token.service');
@@ -67,7 +68,7 @@ class AuthService {
         'Something went wrong while registering the user'
       );
 
-    const verificationUrl = `${process.env.BACKEND_URL}/api/v1/users/verify-email/${unHashedToken}`;
+    const verificationUrl = `${process.env.BACKEND_URL}/api/v1/auth/verify-email/${unHashedToken}`;
 
     await this.EmailHelper.sendVerificationEmail(
       username,
@@ -80,6 +81,71 @@ class AuthService {
         object: newUser,
       }),
     };
+  }
+
+  async verifyEmail({ verificationToken }) {
+    if (!verificationToken) throw new BadRequestError('Invalid token');
+
+    // generate a hash from the token that we are receiving
+    let hashedToken = hashToken(verificationToken);
+
+    const foundUser = await this.userRepository.getByQuery({
+      verification_token: hashedToken,
+      verification_expiry: { $gte: Date.now() },
+    });
+
+    if (!foundUser) throw new BadRequestError('Invalid token or token expired');
+
+    const updatedUser = await this.userRepository.updateById(foundUser.id, {
+      verification_token: null,
+      verification_expiry: null,
+      usr_status: UserStatus.ACTIVE,
+    });
+
+    if (!updatedUser) throw new InternalServerError('Failed to verify email');
+
+    return pickFields({
+      fields: ['id', 'email', 'name'],
+      object: updatedUser,
+    });
+  }
+
+  async resendVerificationEmail({ username, email }) {
+    const foundUser = await this.userRepository.getByQuery({
+      usr_email: email,
+    });
+
+    if (!foundUser) throw new BadRequestError('User not found');
+
+    if (foundUser.status === UserStatus.BLOCKED)
+      throw new BadRequestError('User is blocked');
+
+    if (foundUser.status === UserStatus.ACTIVE)
+      throw new BadRequestError('User is already verified');
+
+    const { unHashedToken, hashedToken, tokenExpiry } =
+      generateTemporaryToken();
+
+    const updatedUser = await this.userRepository.updateById(foundUser.id, {
+      verification_token: hashedToken,
+      verification_expiry: tokenExpiry,
+    });
+
+    if (!updatedUser)
+      throw new InternalServerError('Failed to resend verification email');
+
+    const verificationUrl = `${process.env.BACKEND_URL}/api/v1/auth/verify-email/${unHashedToken}`;
+
+    await this.EmailHelper.sendVerificationEmail(
+      username,
+      email,
+      verificationUrl
+    );
+
+    return pickFields({
+      fields: ['id', 'email'],
+      object: updatedUser,
+    });
   }
 
   async loginUser({ email, password, deviceToken, deviceName }) {
@@ -107,66 +173,6 @@ class AuthService {
       }),
       tokens,
     };
-  }
-
-  async verifyEmail({ verificationToken }) {
-    if (!verificationToken) throw new BadRequestError('Invalid token');
-
-    // generate a hash from the token that we are receiving
-    let hashedToken = hashToken(verificationToken);
-
-    const foundUser = await this.userRepository.getByQuery({
-      verification_token: hashedToken,
-      verification_expiry: { $gte: Date.now() },
-    });
-
-    if (!foundUser) throw new BadRequestError('Invalid token or token expired');
-
-    const updatedUser = await this.userRepository.updateById(foundUser.id, {
-      verification_token: null,
-      verification_expiry: null,
-      usr_status: UserStatus.ACTIVE,
-    });
-
-    if (!updatedUser) throw new InternalServerError('Failed to verify email');
-
-    const tokens = await this.tokenService.createTokens(updatedUser);
-
-    return {
-      tokens,
-      userId: updatedUser.id,
-    };
-  }
-
-  async resendVerificationEmail({ username, email }) {
-    const foundUser = await this.userRepository.getByQuery({
-      usr_email: email,
-    });
-
-    this._checkUserStatus(foundUser);
-
-    const { unHashedToken, hashedToken, tokenExpiry } =
-      generateTemporaryToken();
-
-    const updatedUser = await this.userRepository.updateById(foundUser.id, {
-      verification_token: hashedToken,
-      verification_expiry: tokenExpiry,
-    });
-
-    if (!updatedUser)
-      throw new InternalServerError('Failed to resend verification email');
-
-    const verificationUrl = `${process.env.BACKEND_URL}/api/v1/auth/verify-email/${unHashedToken}`;
-    await this.EmailHelper.sendVerificationEmail(
-      username,
-      email,
-      verificationUrl
-    );
-
-    return pickFields({
-      fields: ['id', 'email'],
-      object: updatedUser,
-    });
   }
 
   async socialLogin({
@@ -226,8 +232,12 @@ class AuthService {
   _checkUserStatus(foundUser) {
     if (!foundUser) throw new BadRequestError('User not found');
 
-    if (foundUser.status === UserStatus.PENDING)
-      throw new BadRequestError('User has not verified email');
+    if (foundUser.status === UserStatus.PENDING) {
+      throw new EmailNotVerifiedError('User has not verified email', {
+        email: foundUser.email,
+        name: foundUser.name,
+      });
+    }
 
     if (foundUser.status === UserStatus.BLOCKED)
       throw new BadRequestError('User is blocked');

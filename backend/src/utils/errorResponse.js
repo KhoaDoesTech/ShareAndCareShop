@@ -27,13 +27,23 @@ class UnauthorizedError extends ErrorResponse {
   }
 }
 
-class TokenExpiredError extends ErrorResponse {
+class EmailNotVerifiedError extends ErrorResponse {
   constructor(
-    message = RESPONSE_MESSAGES.UNAUTHORIZED.type,
-    statusCode = RESPONSE_MESSAGES.UNAUTHORIZED.status
+    message = RESPONSE_MESSAGES.EMAIL_NOT_VERIFIED.type,
+    metadata,
+    statusCode = RESPONSE_MESSAGES.EMAIL_NOT_VERIFIED.status
   ) {
     super(message, statusCode);
-    this.metadata = { 'is-token-expired': true };
+    this.metadata = metadata;
+  }
+}
+
+class TokenExpiredError extends ErrorResponse {
+  constructor(
+    message = RESPONSE_MESSAGES.TOKEN_EXPIRED.type,
+    statusCode = RESPONSE_MESSAGES.TOKEN_EXPIRED.status
+  ) {
+    super(message, statusCode);
   }
 }
 
@@ -94,4 +104,5 @@ module.exports = {
   NotFoundError,
   UnprocessableEntityError,
   TokenExpiredError,
+  EmailNotVerifiedError,
 };

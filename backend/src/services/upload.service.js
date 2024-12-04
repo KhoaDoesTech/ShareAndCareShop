@@ -40,7 +40,7 @@ class UploadService {
     } catch (error) {
       throw new InternalServerError('Failed to upload image');
     } finally {
-      await removeLocalFile(file.path);
+      removeLocalFile(file.path);
     }
   }
 
@@ -60,7 +60,6 @@ class UploadService {
 
       await this.uploadRepository.deleteOne({ upl_public_id: publicId });
     } catch (error) {
-      console.error('Error deleting image:', error);
       throw new InternalServerError('Failed to delete image');
     }
   }
@@ -69,8 +68,6 @@ class UploadService {
     const expiredImages = await this.uploadRepository.getAll({
       filter: { upl_expires_at: { $lt: new Date() } },
     });
-
-    console.log(expiredImages);
 
     if (expiredImages.length) {
       expiredImages.forEach(async (image) => {
@@ -98,10 +95,7 @@ class UploadService {
       for (const publicId of imagesToDelete) {
         await this.uploadRepository.deleteOne({ upl_public_id: publicId });
       }
-
-      console.log('All images deleted successfully');
     } catch (error) {
-      console.error('Error deleting images:', error);
       throw new InternalServerError('Failed to delete images');
     }
   }
