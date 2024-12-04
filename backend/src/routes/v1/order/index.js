@@ -18,6 +18,18 @@ router.patch(
   asyncHandler(OrderController.cancelOrder)
 );
 router.get(
+  '/all',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_ORDER.ORDER.VIEW),
+  asyncHandler(OrderController.getAllOrders)
+);
+router.get(
+  '/all/:orderId',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_ORDER.ORDER.VIEW),
+  asyncHandler(OrderController.getOrderDetails)
+);
+router.get(
   '/',
   authentication,
   asyncHandler(OrderController.getOrdersByUserId)
@@ -29,18 +41,6 @@ router.get(
 );
 router.post('/', authentication, asyncHandler(OrderController.createOrder));
 
-router.get(
-  '/all/:orderId',
-  authentication,
-  verifyPermission(CONFIG_PERMISSIONS.MANAGE_ORDER.ORDER.VIEW),
-  asyncHandler(OrderController.getOrderDetails)
-);
-router.get(
-  '/all',
-  authentication,
-  verifyPermission(CONFIG_PERMISSIONS.MANAGE_ORDER.ORDER.VIEW),
-  asyncHandler(OrderController.getAllOrders)
-);
 router.patch(
   '/next-status/:orderId',
   authentication,

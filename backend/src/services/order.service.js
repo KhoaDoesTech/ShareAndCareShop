@@ -456,7 +456,6 @@ class OrderService {
     userId,
     search,
     status,
-    nextStatus,
     sort,
     paymentMethod,
     page = 1,
@@ -464,12 +463,6 @@ class OrderService {
   }) {
     // Initialize the filter object for querying the database
     const filter = { ord_user_id: userId };
-
-    // Parse and validate pagination parameters
-    page = parseInt(page, 10);
-    size = parseInt(size, 10);
-    if (isNaN(page) || page < 1) page = 1;
-    if (isNaN(size) || size < 1) size = 10;
 
     // Search by user name or phone in shipping address
     if (search) {
@@ -498,40 +491,30 @@ class OrderService {
         }`
       : '-createdAt';
 
+    const queryOptions = {
+      sort: mappedSort,
+      page: parseInt(page, 10),
+      size: parseInt(size, 10),
+    };
+
     // Fetch orders from the repository
     const orders = await this.orderRepository.getAllOrder({
       filter,
-      queryOptions: {
-        sort: mappedSort,
-      },
+      queryOptions,
       populateOptions: {
         path: 'ord_delivery_method',
         select: 'dlv_name',
       },
     });
 
-    // Map orders to include `nextStatus` and filter by `nextStatus` if specified
-    const ordersWithNextStatus = orders
-      .map((order) => ({
-        ...order,
-        nextStatus: this._nextStatus(order.status),
-      }))
-      .filter((order) => (nextStatus ? order.nextStatus === nextStatus : true));
-
-    // Paginate the filtered orders
-    const paginatedOrders = ordersWithNextStatus.slice(
-      (page - 1) * size,
-      page * size
-    );
-
-    const totalOrders = ordersWithNextStatus.length;
+    const totalOrders = await this.orderRepository.countDocuments(filter);
     const totalPages = Math.ceil(totalOrders / size);
 
     return {
       totalPages,
       totalOrders,
       currentPage: page,
-      orders: paginatedOrders.map((order) =>
+      orders: orders.map((order) =>
         pickFields({
           fields: [
             'id',
@@ -542,7 +525,6 @@ class OrderService {
             'deliveryMethod.name',
             'totalPrice',
             'status',
-            'nextStatus',
           ],
           object: order,
         })
