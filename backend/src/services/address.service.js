@@ -43,7 +43,7 @@ class AddressService {
     }
     console.log(response.data.predictions[0]);
     return response.data.predictions.map((prediction) => ({
-      id: prediction.place_id,
+      placeId: prediction.place_id,
       description: prediction.description,
       compound: {
         ward: prediction.compound.commune,
@@ -95,8 +95,6 @@ class AddressService {
       origins: foundOrigin.location,
       destinations: foundDestination.geometry.location,
     });
-
-    console.log(distanceMatrix);
 
     return distanceMatrix;
   }
@@ -204,7 +202,7 @@ class AddressService {
     });
 
     return omitFields({
-      fields: ['placeId', 'createdAt', 'updatedAt'],
+      fields: ['userId','createdAt', 'updatedAt'],
       object: newAddress,
     });
   }
@@ -216,7 +214,7 @@ class AddressService {
     });
 
     return omitFields({
-      fields: ['placeId', 'createdAt', 'updatedAt'],
+      fields: ['userId', 'createdAt', 'updatedAt'],
       object: address,
     });
   }
@@ -236,7 +234,7 @@ class AddressService {
 
     return addresses.map((address) =>
       omitFields({
-        fields: ['placeId', 'createdAt', 'updatedAt'],
+        fields: ['userId', 'createdAt', 'updatedAt'],
         object: address,
       })
     );
