@@ -18,8 +18,8 @@ router.post(
   asyncHandler(DeliveryController.createDelivery)
 );
 
-router.get('/fee', asyncHandler(DeliveryController.calculateDeliveryFee));
 router.get('/', asyncHandler(DeliveryController.getDeliveryFees));
+router.get('/fee', asyncHandler(DeliveryController.calculateDeliveryFee));
 
 router.get(
   '/all',
