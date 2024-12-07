@@ -7,7 +7,6 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "cross-env NODE_ENV=development nodemon --env-file=.env.development --no-deprecation ./src/server.js",
     "start": "cross-env NODE_ENV=production node ./src/server.js",
-    "build": "npm run clean && npm run compile",
     "data:import": "node --env-file=.env.development ./src/seeder.js",
     "data:destroy": "node --env-file=.env.development ./src/seeder.js --destroy"
   },

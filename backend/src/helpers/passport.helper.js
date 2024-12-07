@@ -2,10 +2,7 @@ const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const FacebookStrategy = require('passport-facebook').Strategy;
 
-const AuthService = require('../services/auth.service');
 const { UserLoginType } = require('../constants/status');
-
-const authService = new AuthService();
 
 passport.use(
   new GoogleStrategy(
