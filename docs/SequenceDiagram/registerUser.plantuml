@@ -5,14 +5,14 @@ skinparam componentFontSize 18
 skinparam sequenceFontSize 16
 skinparam noteFontSize 14
 
-actor User as User #368078
+actor User as User #40BFBF
 boundary "Trang Đăng Ký" as FE #ffc327
 control Router as Router #ff9045
 control "AuthController" as Controller #ff9045
 control "AuthService" as Service #ff9045
 entity UserRepository as UserRepo #40bbb1
 entity RoleRepository as RoleRepo #40bbb1
-database MongoDB as DB #00ED64
+database MongoDB as DB #4CAF50
 participant EmailService as EmailService #ff9045
 
 User -> FE: Nhập Email, Password, Name
@@ -21,10 +21,10 @@ activate FE
 FE -> Router: POST /register
 activate Router
 
-Router -> Controller: registerUser(email,\npassword, name)
+Router -> Controller: registerUser(email, password, name)
 activate Controller
 
-Controller -> Service: registerUser(email,\npassword, name)
+Controller -> Service: registerUser(email, password, name)
 activate Service
 
 Service -> UserRepo: getByQuery(email)
@@ -39,24 +39,26 @@ deactivate DB
 UserRepo -> Service: foundUser
 deactivate UserRepo
 
-alt#Gold #Pink User được tìm thấy 
+alt#Gold #Pink  User được tìm thấy
     opt#Gold  User chưa xác thực email
-        Service --> Controller
-        Controller --> Router
-        Router --> FE: User has not verified email\nStatus: 401
-        FE --> User: Error: User has not verified email
+        Service -> Controller: User has not verified email
+        Controller -> Router: 401 Unauthorized
+        Router -> FE: 401 Unauthorized
+        FE -> User: Error: User has not verified email
     end
-    opt#Gold User bị chặn
-        Service --> Controller
-        Controller --> Router
-        Router --> FE: User is blocked email\nStatus: 401
-        FE --> User: Error: User is blocked
+
+    opt#Gold  User bị chặn
+        Service -> Controller: User is blocked
+        Controller -> Router: 401 Unauthorized
+        Router -> FE: 401 Unauthorized
+        FE -> User: Error: User is blocked
     end
-    Service --> Controller
-    Controller --> Router
-    Router --> FE: User already exists\nStatus: 409
-    FE --> User: Error: 'User already exists'
-else #LightBlue  User không được tìm thấy
+
+    Service -> Controller: User already exists
+    Controller -> Router: 409 Conflict
+    Router -> FE: 409 Conflict
+    FE -> User: Error: User already exists
+else #LightBlue User không được tìm thấy
     Service -> Service: generateTemporaryToken()
     Service -> Service: generateHashedPassword(password)
 
@@ -66,13 +68,13 @@ else #LightBlue  User không được tìm thấy
     RoleRepo -> DB: Tìm basic role
     activate DB
 
-    DB -> RoleRepo: Trả về kết quả 
+    DB -> RoleRepo: Trả về kết quả
     deactivate DB
 
     RoleRepo -> Service: basicRole
     deactivate RoleRepo
 
-    Service -> UserRepo: create(email, hashedPassword, \n name, temporaryToken, Role.BASIC)
+    Service -> UserRepo: create(email, hashedPassword, \nname, temporaryToken, basicRole)
     activate UserRepo
 
     UserRepo -> DB: Tạo User mới
@@ -81,27 +83,22 @@ else #LightBlue  User không được tìm thấy
     DB -> UserRepo: Trả về kết quả
     deactivate DB
 
-    UserRepo --> Service
+    UserRepo -> Service: User created
     deactivate UserRepo
 
-    activate Service
     Service -> EmailService: sendVerificationEmail(email, temporaryToken)
 
+    Service -> Controller: User created
     deactivate Service
 
-    Controller <-- Service
-    deactivate Service
-
-    Controller --> Router
+    Controller -> Router: 201 Created
     deactivate Controller
 
-    Router --> FE: User created\n Status: 201
+    Router -> FE: 201 Created
     deactivate Router
 
-    FE --> User: Success: User created
+    FE -> User: Success: User created
     deactivate FE
 end
-
-
 
 @enduml
