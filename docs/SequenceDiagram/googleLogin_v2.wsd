@@ -1,7 +1,7 @@
 @startuml
 
 skinparam defaultFontSize 40        
-skinparam SequenceMessageAlign center 
+skinparam SequenceMessageAlign center
 
 actor User as User #40BFBF
 boundary "HomePage" as HomePage #ffc327
@@ -55,6 +55,7 @@ else #LightBlue Người dùng đăng nhập
     deactivate OAuthPage
 
     Router -> Passport: Success
+    deactivate Router
     activate Passport #ff9045
 
     Passport -> AuthController: socialLogin()
@@ -88,6 +89,33 @@ else #LightBlue Người dùng đăng nhập
 
         RoleRepository -> AuthService: return result
         deactivate RoleRepository
+        
+        alt#Gold #Pink Role không được tìm thấy
+            AuthService -> AuthController: Role not found
+            AuthController -> Router: Role not found
+            activate Router #ff9045
+
+            Router -> LoginPage: Role not found
+            deactivate Router
+            activate LoginPage #ffc327
+
+            LoginPage -> User: Role not found
+            deactivate LoginPage
+
+        else #LightBlue
+            alt#Gold #Pink User không được cấp quyền
+                AuthService -> AuthController: User is blocked
+                AuthController -> Router: User is blocked
+                activate Router #ff9045
+
+                Router -> LoginPage: User is blocked
+                deactivate Router
+                activate LoginPage #ffc327
+                
+                LoginPage -> User: User is blocked
+                deactivate LoginPage
+            end
+        end
 
     else #LightBlue
         AuthService -> UserRepository: createNewUser(query)
@@ -126,6 +154,7 @@ else #LightBlue Người dùng đăng nhập
 
     AuthController -> Router: handleRedirect()
     deactivate AuthController
+    activate Router #ff9045
 
     Router -> HomePage: redirect to Home
     deactivate Router
