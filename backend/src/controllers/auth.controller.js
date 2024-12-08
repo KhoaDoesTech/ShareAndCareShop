@@ -48,17 +48,17 @@ class AuthController {
 
     if (req.session.isPanel) {
       console.log(
-        `Redirecting::: ${process.env.PANEL_SSO_REDIRECT_URL}?userId=${userId}&refreshToken=${tokens.refreshToken}`
+        `Redirecting::: ${process.env.ADMIN_PANEL_URL}/?userId=${userId}&refreshToken=${tokens.refreshToken}`
       );
       res.redirect(
-        `${process.env.PANEL_SSO_REDIRECT_URL}?userId=${userId}&refreshToken=${tokens.refreshToken}`
+        `${process.env.ADMIN_PANEL_URL}/?userId=${userId}&refreshToken=${tokens.refreshToken}`
       );
     } else {
       console.log(
-        `Redirecting::: ${process.env.CLIENT_SSO_REDIRECT_URL}?userId=${userId}&refreshToken=${tokens.refreshToken}`
+        `Redirecting::: ${process.env.FRONTEND_URL}/?userId=${userId}&refreshToken=${tokens.refreshToken}`
       );
       res.redirect(
-        `${process.env.CLIENT_SSO_REDIRECT_URL}?userId=${userId}&refreshToken=${tokens.refreshToken}`
+        `${process.env.FRONTEND_URL}/?userId=${userId}&refreshToken=${tokens.refreshToken}`
       );
     }
   };

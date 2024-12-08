@@ -2,7 +2,7 @@ const SERVER_CONFIG = {
   env: process.env.NODE_ENV,
   app: {
     port: process.env.PORT || 3000,
-    url: process.env.BACKEND_LINK || 'http://localhost:3000/',
+    url: process.env.BACKEND_URL || 'http://localhost:3000',
   },
   db: {
     url: process.env.DB_URL,
@@ -15,8 +15,8 @@ const SERVER_CONFIG = {
     temporaryTokenExpiry: 20 * 60 * 1000, // 20 minutes
   },
   img: {
-    product: 'https://via.placeholder.com/200x200.png',
-    avatar: 'https://via.placeholder.com/200x200.png',
+    product: 'https://via.placeholder.com/900x1200.png',
+    avatar: 'https://via.placeholder.com/400x400.png',
   },
 };
 

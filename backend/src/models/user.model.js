@@ -6,7 +6,6 @@ const {
   UserLoginType,
   UserStatus,
   AvailableUserStatus,
-  AddressType,
 } = require('../constants/status');
 const SERVER_CONFIG = require('../configs/server.config');
 const cartModel = require('./cart.model');
