@@ -1,0 +1,149 @@
+@startuml
+skinparam defaultFontSize 18
+skinparam actorFontSize 20
+skinparam componentFontSize 18
+skinparam sequenceFontSize 16
+skinparam noteFontSize 14
+
+actor User as User #40BFBF
+boundary "HomePage" as HomePage #ffc327
+boundary "LoginPage" as LoginPage #ffc327
+boundary "OAuthPage" as OAuthPage #ffc327
+control Router as Router #ff9045
+control Passport as Passport #ff9045
+control AuthController as AuthController #ff9045
+entity AuthService as AuthService #40bbb1
+entity TokenService as TokenService #40bbb1
+entity UserRepository as UserRepository #40bbb1
+entity RoleRepository as RoleRepository #40bbb1
+entity TokenRepository as TokenRepository #40bbb1
+database MongoDB as DB #4CAF50
+
+activate User
+User -> HomePage: click Login
+activate HomePage
+
+HomePage -> LoginPage: redirect
+activate LoginPage
+
+LoginPage -> Router: GET /google
+activate Router
+
+Router -> Passport: authenticate()
+activate Passport
+
+Passport -> Router: Xác thực thành công
+
+Router -> LoginPage: Xác thực thành công
+
+LoginPage -> OAuthPage: redirect
+activate OAuthPage
+
+OAuthPage -> Router: GET /google/callback
+
+Router -> Passport: authenticate()
+
+Passport -> AuthController: socialLogin(req.body)
+activate AuthController
+deactivate Passport
+
+AuthController -> AuthService: socialLogin()
+activate AuthService
+
+AuthService -> UserRepository: getByQuery(usr_email)
+activate UserRepository
+
+UserRepository -> DB: findOne(query)
+activate DB
+
+DB -> UserRepository: return result
+UserRepository -> AuthService: return result
+
+alt#Gold #Pink User được tìm thấy
+    alt#Gold User không được cấp quyền
+        AuthService -> AuthController: User is blocked
+        AuthController -> Router: User is blocked
+        Router -> LoginPage: User is blocked
+        LoginPage -> User: User is blocked
+    else
+        AuthService -> RoleRepository: getByQuery(rol_name)
+        activate RoleRepository
+
+        RoleRepository -> DB: findOne(query)
+        DB -> RoleRepository: return result
+        RoleRepository -> AuthService: return result
+        deactivate RoleRepository
+
+        alt#Gold Role không được tìm thấy
+            AuthService -> AuthController: Role not found
+            AuthController -> Router: Role not found
+            Router -> LoginPage: Role not found
+            LoginPage -> User: Role not found
+            deactivate LoginPage
+        else
+            AuthService -> TokenService: createTokensForDevice()
+            activate TokenService
+
+            TokenService -> TokenService: generateKeyPair()
+            TokenService -> TokenService: generateTokenPair(query)
+            TokenService -> TokenRepository: getToken(query)
+            activate TokenRepository
+
+            TokenRepository -> DB: findOne(query)
+            DB -> TokenRepository: return result
+            TokenRepository -> TokenService: return result
+            TokenService -> TokenRepository: createTokens(query)
+            TokenRepository -> DB: findOneAndUpdate(query)
+            DB -> TokenRepository: return result
+            TokenRepository -> TokenService: return result
+            TokenService -> AuthService: return result
+            AuthService -> AuthController: return result
+            AuthController -> Router: return result
+            Router -> OAuthPage: return result
+            OAuthPage -> HomePage: redirect
+            HomePage -> User: Login successful!
+        end
+    end
+
+else #LightBlue User không được tìm thấy
+    AuthService -> UserRepository: create(query)
+    UserRepository -> DB: create(query)
+    DB -> UserRepository: return result
+    UserRepository -> AuthService: return result
+    deactivate UserRepository
+
+    AuthService -> TokenService: createTokensForDevice()
+    TokenService -> TokenService: generateKeyPair()
+    TokenService -> TokenService: generateTokenPair(query)
+    TokenService -> TokenRepository: getToken(query)
+    TokenRepository -> DB: findOne(query)
+    DB -> TokenRepository: return result
+    TokenRepository -> TokenService: return result
+    TokenService -> TokenRepository: createTokens(query)
+    TokenRepository -> DB: findOneAndUpdate(query)
+    DB -> TokenRepository: return result
+    deactivate DB
+
+    TokenRepository -> TokenService: return result
+    deactivate TokenRepository
+
+    TokenService -> AuthService: return result
+    deactivate TokenService
+
+    AuthService -> AuthController: return result
+    deactivate AuthService
+
+    AuthController -> Router: return result
+    deactivate AuthController
+
+    Router -> OAuthPage: return result
+    deactivate Router
+
+    OAuthPage -> HomePage: redirect
+    deactivate OAuthPage
+
+    HomePage -> User: Login successful!
+    deactivate HomePage
+end
+
+@enduml
