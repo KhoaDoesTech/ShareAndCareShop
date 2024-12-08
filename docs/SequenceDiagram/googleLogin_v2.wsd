@@ -1,0 +1,138 @@
+@startuml
+
+skinparam defaultFontSize 40        
+skinparam SequenceMessageAlign center 
+
+actor User as User #40BFBF
+boundary "HomePage" as HomePage #ffc327
+boundary "LoginPage" as LoginPage #ffc327
+boundary "Google Login" as OAuthPage #ffc327
+control Router as Router #ff9045
+control Passport as Passport #ff9045
+control AuthController as AuthController #ff9045
+entity AuthService as AuthService #ff9045
+entity TokenService as TokenService #ff9045
+entity UserRepository as UserRepository #40bbb1
+entity RoleRepository as RoleRepository #40bbb1
+entity TokenRepository as TokenRepository #40bbb1
+database MongoDB as DB #4CAF50
+
+activate User #40BFBF
+User -> HomePage: click Login
+activate HomePage #ffc327
+
+HomePage -> LoginPage: redirect
+deactivate HomePage
+activate LoginPage #ffc327
+
+LoginPage -> Router: GET /google
+deactivate LoginPage
+activate Router #ff9045
+
+Router -> Passport: authenticate('google')
+activate Passport #ff9045
+
+Passport -> OAuthPage: redirect to Google Login
+deactivate Passport
+activate OAuthPage #ffc327
+
+OAuthPage -> User: Display Google Login Page
+alt#Gold #Pink Người dùng không đăng nhập
+    User -> OAuthPage: Cancel Login
+    OAuthPage -> Router: GET /callback
+    Router -> Passport: Fail
+    activate Passport #ff9045
+
+    Passport -> HomePage: Redirect to Home
+    deactivate Passport
+    activate HomePage #ffc327
+
+    HomePage -> User: Display Error Message
+    deactivate HomePage
+else #LightBlue Người dùng đăng nhập
+    User -> OAuthPage: Login with Google
+    OAuthPage -> Router: GET /callback
+    deactivate OAuthPage
+
+    Router -> Passport: Success
+    activate Passport #ff9045
+
+    Passport -> AuthController: socialLogin()
+    deactivate Passport
+    activate AuthController #ff9045
+
+    AuthController -> AuthService: socialLogin()
+    activate AuthService #ff9045
+
+    AuthService -> UserRepository: getByQuery(usr_email)
+    activate UserRepository #40bbb1
+
+    UserRepository -> DB: findOne(query)
+    activate DB #4CAF50
+
+    DB -> UserRepository: return result
+    deactivate DB
+    
+    UserRepository -> AuthService: return result
+    deactivate UserRepository
+
+    alt#Gold #Pink User đã có tài khoản
+        AuthService -> RoleRepository: getByQuery(rol_name)
+        activate RoleRepository #40bbb1
+
+        RoleRepository -> DB: findOne(query)
+        activate DB #4CAF50
+
+        DB -> RoleRepository: return result
+        deactivate DB
+
+        RoleRepository -> AuthService: return result
+        deactivate RoleRepository
+
+    else #LightBlue
+        AuthService -> UserRepository: createNewUser(query)
+        activate UserRepository #40bbb1
+
+        UserRepository -> DB: create(query)
+        activate DB #4CAF50
+
+        DB -> UserRepository: return result
+        deactivate DB
+
+        UserRepository -> AuthService: return result
+        deactivate UserRepository
+    end
+
+    AuthService -> TokenService: createTokensForDevice()
+    activate TokenService #ff9045
+
+    TokenService -> TokenRepository: manageToken(query)
+    activate TokenRepository #40bbb1
+
+    TokenRepository -> DB: update(query)
+    activate DB #4CAF50
+
+    DB -> TokenRepository: return result
+    deactivate DB
+
+    TokenRepository -> TokenService: return result
+    deactivate TokenRepository
+    
+    TokenService -> AuthService: return tokens
+    deactivate TokenService
+
+    AuthService -> AuthController: return result
+    deactivate AuthService
+
+    AuthController -> Router: handleRedirect()
+    deactivate AuthController
+
+    Router -> HomePage: redirect to Home
+    deactivate Router
+
+    activate HomePage #ffc327
+    HomePage -> User: Login Successful!
+    deactivate HomePage
+end
+
+@enduml

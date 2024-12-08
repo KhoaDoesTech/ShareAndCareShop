@@ -1,9 +1,7 @@
 @startuml
-skinparam defaultFontSize 18
-skinparam actorFontSize 20
-skinparam componentFontSize 18
-skinparam sequenceFontSize 16
-skinparam noteFontSize 14
+                      
+skinparam defaultFontSize 40        
+skinparam SequenceMessageAlign center 
 
 actor User as User #40BFBF
 boundary "Trang Đăng Ký" as FE #ffc327
@@ -16,19 +14,19 @@ database MongoDB as DB #4CAF50
 participant EmailService as EmailService #ff9045
 
 User -> FE: Nhập Email, Password, Name
-activate FE
+activate FE #ffc327
 
 FE -> Router: POST /register
-activate Router
+activate Router #ff9045
 
 Router -> Controller: registerUser(email, password, name)
-activate Controller
+activate Controller #ff9045
 
 Controller -> Service: registerUser(email, password, name)
-activate Service
+activate Service #ff9045
 
 Service -> UserRepo: getByQuery(email)
-activate UserRepo
+activate UserRepo #40bbb1
 
 UserRepo -> DB: Tìm User bằng email
 activate DB
@@ -63,7 +61,7 @@ else #LightBlue User không được tìm thấy
     Service -> Service: generateHashedPassword(password)
 
     Service -> RoleRepo: getByQuery(UserRoles.BASIC)
-    activate RoleRepo
+    activate RoleRepo #40bbb1
 
     RoleRepo -> DB: Tìm basic role
     activate DB
@@ -75,7 +73,7 @@ else #LightBlue User không được tìm thấy
     deactivate RoleRepo
 
     Service -> UserRepo: create(email, hashedPassword, \nname, temporaryToken, basicRole)
-    activate UserRepo
+    activate UserRepo #40bbb1
 
     UserRepo -> DB: Tạo User mới
     activate DB

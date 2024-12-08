@@ -1,9 +1,7 @@
 @startuml
-skinparam defaultFontSize 18
-skinparam actorFontSize 20
-skinparam componentFontSize 18
-skinparam sequenceFontSize 16
-skinparam noteFontSize 14
+
+skinparam defaultFontSize 40        
+skinparam SequenceMessageAlign center 
 
 actor User as User #40BFBF
 boundary "HomePage" as HomePage #ffc327
