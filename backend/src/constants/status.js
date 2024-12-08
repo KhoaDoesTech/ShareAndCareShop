@@ -20,6 +20,12 @@ const UserRoles = {
   BASIC: 'Basic',
 };
 
+const SortFieldRole = {
+  CREATED_AT: 'createdAt',
+  UPDATED_AT: 'updatedAt',
+  NAME: 'rol_name',
+};
+
 //
 const ProductStatus = {
   DRAFT: 'DRAFT',
@@ -119,4 +125,5 @@ module.exports = {
   SortFieldProduct,
   SortFieldUser,
   SortFieldOrder,
+  SortFieldRole,
 };

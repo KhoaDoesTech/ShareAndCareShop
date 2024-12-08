@@ -29,37 +29,6 @@ const generateVariantSlug = (variants, tierIndex) => {
     .join('/');
 };
 
-// Creates a mapping of variant options to their new indexes based on the updated variants.
-const createVariantMapping = (newVariants, oldVariants) => {
-  const mapping = new Map();
-
-  newVariants.forEach((variant, variantIdx) => {
-    variant.options.forEach((option, optionIdx) => {
-      mapping.set(`${variant.name}_${option}`, optionIdx);
-    });
-  });
-
-  return mapping;
-};
-
-// Generates all possible SKU combinations from the provided variants.
-function generateAllCombinations(variants) {
-  if (!variants || variants.length === 0) return [];
-
-  // Use recursion to calculate all combinations
-  const combine = (index, current) => {
-    if (index === variants.length) {
-      return [current];
-    }
-
-    return variants[index].options.flatMap((option) =>
-      combine(index + 1, [...current, option])
-    );
-  };
-
-  return combine(0, []);
-}
-
 const removeLocalFile = (localPath) => {
   fs.unlink(localPath, (err) => {
     if (err) logger.error('Error while removing local files: ', err);

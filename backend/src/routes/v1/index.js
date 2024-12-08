@@ -16,5 +16,6 @@ router.use('/api/v1/address', require('./address'));
 router.use('/api/v1/order', require('./order'));
 router.use('/api/v1/coupon', require('./coupon'));
 router.use('/api/v1/delivery', require('./delivery'));
+router.use('/api/v1/role', require('./role'));
 
 module.exports = router;
