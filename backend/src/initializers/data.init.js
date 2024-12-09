@@ -8,13 +8,17 @@ const {
 const { generateHashedPassword } = require('../helpers/crypto.helper');
 const mongoose = require('mongoose');
 
-// const productModel = require('../models/product.model');
-// const variantModel = require('../models/variant.model');
+const productModel = require('../models/product.model');
+const variantModel = require('../models/variant.model');
 const cartModel = require('../models/cart.model');
-// const categoryModel = require('../models/category.model');
-// const orderModel = require('../models/order.model');
-// const roleModel = require('../models/role.model');
-// const userModel = require('../models/user.model');
+const categoryModel = require('../models/category.model');
+const orderModel = require('../models/order.model');
+const roleModel = require('../models/role.model');
+const userModel = require('../models/user.model');
+const addressModel = require('../models/address.model');
+const couponModel = require('../models/coupon.model');
+const deliveryModel = require('../models/delivery.model');
+const tokenModel = require('../models/token.model');
 
 const RoleRepository = require('../repositories/role.repository');
 const UserRepository = require('../repositories/user.repository');
@@ -46,8 +50,8 @@ class DataInitializer {
 
     // Step 1: Create the admin user
     const adminUser = await this.userRepository.create({
-      usr_email: 'admin@gmail.com',
-      usr_name: 'admin',
+      usr_email: 'shareandcaret@gmail.com',
+      usr_name: 'Share And Care Admin',
       usr_phone: '0812056724',
       usr_password: hashPassword,
       usr_role: adminRole.id,

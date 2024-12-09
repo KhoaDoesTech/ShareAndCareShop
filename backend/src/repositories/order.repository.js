@@ -1,3 +1,4 @@
+const { OrderStatus } = require('../constants/status');
 const orderModels = require('../models/order.model');
 const APIFeatures = require('../utils/apiFeatures');
 const BaseRepository = require('./base.repository');
@@ -23,6 +24,27 @@ class OrderRepository extends BaseRepository {
 
     const documents = await features.query;
     return documents.map(this.formatDocument.bind(this));
+  }
+
+  async totalProductsSold() {
+    const result = await this.model.aggregate([
+      {
+        $match: {
+          ord_status: OrderStatus.DELIVERED,
+        },
+      },
+      { $unwind: '$ord_items' },
+      {
+        $group: {
+          _id: null,
+          totalQuantitySold: { $sum: '$ord_items.prd_quantity' },
+        },
+      },
+    ]);
+
+    const totalQuantity = result.length ? result[0].totalQuantitySold : 0;
+
+    return totalQuantity;
   }
 
   formatDocument(order) {
