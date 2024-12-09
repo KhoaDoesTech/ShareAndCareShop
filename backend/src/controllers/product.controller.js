@@ -79,6 +79,13 @@ class ProductController {
       metadata: await this.productService.updateProductQuantity(req.body),
     }).send(res);
   };
+
+  deleteProduct = async (req, res, next) => {
+    new ActionSuccess({
+      message: 'Product deleted successfully',
+      metadata: await this.productService.deleteProduct(req.params),
+    }).send(res);
+  };
 }
 
 module.exports = ProductController;

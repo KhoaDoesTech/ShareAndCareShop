@@ -67,4 +67,11 @@ router.patch(
   asyncHandler(productController.updateProductQuantity)
 );
 
+router.delete(
+  '/:productId',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.PRODUCT.DELETE),
+  asyncHandler(productController.deleteProduct)
+);
+
 module.exports = router;

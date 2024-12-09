@@ -202,6 +202,21 @@ class ProductService {
     }
   }
 
+  async deleteProduct({ productId }) {
+    const deletedProduct = await this.productRepository.deleteById(productId);
+
+    if (!deletedProduct) {
+      throw new BadRequestError('Product not found');
+    }
+
+    await this.variantService.deleteVariants(productId);
+
+    // this.uploadService.deleteUsedImage(
+    //   deletedProduct.mainImage,
+    //   deletedProduct.subImages
+    // );
+  }
+
   async updateProductUniqueViews({ productId, deviceId }) {
     const updatedProduct = await this.productRepository.updateById(productId, {
       $addToSet: { prd_unique_views: deviceId },
@@ -273,6 +288,8 @@ class ProductService {
     attributes,
   }) {
     const filter = { prd_status: ProductStatus.PUBLISHED };
+    const formatPage = parseInt(page);
+    const formatSize = parseInt(size);
 
     if (search) {
       const keyword = search.trim();
@@ -311,8 +328,8 @@ class ProductService {
 
     const query = {
       sort: mappedSort,
-      page: parseInt(page),
-      size: parseInt(size),
+      page: formatPage,
+      size: formatSize,
     };
 
     const products = await this.productRepository.getAll({
@@ -326,7 +343,7 @@ class ProductService {
     return {
       totalPages,
       totalProducts,
-      currentPage: page,
+      currentPage: formatPage,
       products: products.map((product) =>
         omitFields({
           fields: [
@@ -358,6 +375,8 @@ class ProductService {
     attributes,
   }) {
     const filter = {};
+    const formatPage = parseInt(page);
+    const formatSize = parseInt(size);
 
     if (search) {
       const keyword = search.trim();
@@ -390,14 +409,14 @@ class ProductService {
 
     const mappedSort = sort
       ? `${sort.startsWith('-') ? '-' : ''}${
-          SortFieldProduct[sort.replace('-', '')] || 'prd_rating'
+          SortFieldProduct[sort.replace('-', '')] || 'createdAt'
         }`
-      : '-prd_rating';
+      : '-createdAt';
 
     const query = {
       sort: mappedSort,
-      page: parseInt(page),
-      size: parseInt(size),
+      page: formatPage,
+      size: formatSize,
     };
 
     const products = await this.productRepository.getAll({
@@ -411,7 +430,7 @@ class ProductService {
     return {
       totalPages,
       totalProducts,
-      currentPage: page,
+      currentPage: formatPage,
       products: products.map((product) =>
         omitFields({
           fields: [

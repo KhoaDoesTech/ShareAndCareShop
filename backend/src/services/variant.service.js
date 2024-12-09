@@ -45,6 +45,14 @@ class VariantService {
     await this.variantRepository.create(convertSkuList);
   }
 
+  async deleteVariants(productId) {
+    const deletedVariants = await this.variantRepository.deleteByProductId(
+      productId
+    );
+
+    return deletedVariants;
+  }
+
   async updateVariants({ product, variants, skuList }) {
     const formattedVariants = this._formatVariants(variants);
 
