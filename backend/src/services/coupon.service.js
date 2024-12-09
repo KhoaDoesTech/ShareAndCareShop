@@ -62,6 +62,19 @@ class CouponService {
     };
   }
 
+  // TODO: Implement the updateCoupon method
+  // async getAllCoupons() {
+  //   const coupons = await this.couponRepository.findAll();
+  //   return {
+  //     coupons: coupons.map((coupon) =>
+  //       omitFields({
+  //         fields: ['id', 'usesCount', 'usersUsed', 'createdAt', 'updatedAt'],
+  //         object: coupon,
+  //       })
+  //     ),
+  //   };
+  // }
+
   async reviewDiscount({ items, totalOrder, shippingFee, couponCode }) {
     const foundCoupon = await this.couponRepository.findByCode(couponCode);
     this._checkCoupon(foundCoupon);

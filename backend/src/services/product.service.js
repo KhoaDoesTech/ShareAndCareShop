@@ -322,9 +322,9 @@ class ProductService {
 
     const mappedSort = sort
       ? `${sort.startsWith('-') ? '-' : ''}${
-          SortFieldProduct[sort.replace('-', '')] || 'prd_rating'
+          SortFieldProduct[sort.replace('-', '')] || 'createdAt'
         }`
-      : '-prd_rating';
+      : '-createdAt';
 
     const query = {
       sort: mappedSort,
