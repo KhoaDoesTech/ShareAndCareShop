@@ -30,7 +30,7 @@ const couponSchema = new Schema(
     },
     cpn_target_ids: { type: Array, default: [] },
     cpn_uses_count: { type: Number, default: 0 },
-    cpn_users_used: { type: [Schema.Types.ObjectId], ref: 'User', default: [] },
+    cpn_users_used: { type: Array, default: [] },
     cpn_is_active: { type: Boolean, default: true },
   },
   {

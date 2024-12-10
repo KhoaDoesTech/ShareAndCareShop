@@ -53,7 +53,7 @@ class OrderRepository extends BaseRepository {
     return {
       id: order._id,
       userId: order.ord_user_id,
-      couponId: order.ord_coupon_id,
+      couponCode: order.ord_coupon_code,
       items: order.ord_items.map((item) => ({
         productId: item.prd_id,
         variantId: item.var_id,
@@ -62,6 +62,7 @@ class OrderRepository extends BaseRepository {
         price: item.prd_price,
         image: item.prd_img,
         quantity: item.prd_quantity,
+        discount: item.prd_discount,
       })),
       shippingAddress: {
         fullname: order.ord_shipping_address.shp_fullname,
@@ -79,8 +80,10 @@ class OrderRepository extends BaseRepository {
           }
         : order.ord_delivery_method,
       itemsPrice: order.ord_items_price,
-      discountPrice: order.ord_discount_price,
+      itemsDiscount: order.ord_items_discount,
       shippingPrice: order.ord_shipping_price,
+      shippingDiscount: order.ord_shipping_discount,
+      discountPrice: order.ord_discount_price,
       totalPrice: order.ord_total_price,
       isPaid: order.ord_is_paid,
       isDelivered: order.ord_is_delivered,

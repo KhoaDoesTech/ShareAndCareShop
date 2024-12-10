@@ -13,7 +13,10 @@ class OrderController {
   reviewOrder = async (req, res, next) => {
     new ActionSuccess({
       message: 'Order reviewed successfully',
-      metadata: await this.orderService.validateAndCalculateItems(req.body),
+      metadata: await this.orderService.reviewOrder({
+        ...req.body,
+        userId: req.user.id,
+      }),
     }).send(res);
   };
 

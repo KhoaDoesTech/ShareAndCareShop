@@ -18,4 +18,17 @@ router.post(
   asyncHandler(CouponController.createCoupon)
 );
 
+router.get(
+  '/review',
+  authentication,
+  asyncHandler(CouponController.reviewDiscount)
+);
+
+router.get(
+  '/all',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.COUPON.VIEW),
+  asyncHandler(CouponController.getAllCoupons)
+);
+
 module.exports = router;

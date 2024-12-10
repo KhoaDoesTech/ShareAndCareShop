@@ -13,7 +13,11 @@ const {
   NotFoundError,
   InternalServerError,
 } = require('../utils/errorResponse');
-const { pickFields, omitFields } = require('../utils/helpers');
+const {
+  pickFields,
+  omitFields,
+  convertToObjectIdMongodb,
+} = require('../utils/helpers');
 const AddressService = require('./address.service');
 const CouponService = require('./coupon.service');
 const DeliveryService = require('./delivery.service');
@@ -66,7 +70,11 @@ class OrderService {
 
       if (availableQuantity < item.quantity) {
         throw new BadRequestError(
-          `Product ${item.productId} does not have enough stock. Available: ${availableQuantity}, Requested: ${item.quantity}`
+          `Product ${item.productId} ${
+            item.variantId ? `Variant ${item.variantId}` : ''
+          } does not have enough stock. Available: ${availableQuantity}, Requested: ${
+            item.quantity
+          }`
         );
       }
 
@@ -91,13 +99,97 @@ class OrderService {
         variantId: foundVariant?.id || null,
         productName: foundProduct.name,
         variantSlug: foundVariant?.slug || '',
-        price: price,
         image: foundProduct.mainImage,
+        price: price,
         quantity: item.quantity,
+        total: price * item.quantity,
       });
     }
 
     return { totalItemsPrice, itemsDetails };
+  }
+
+  async reviewOrder({
+    userId,
+    shippingAddress,
+    items,
+    couponCode = '',
+    deliveryId,
+  }) {
+    let shippingPrice = 0;
+    let shippingDiscount = 0;
+    let orderDiscount = 0;
+    let discount = 0;
+
+    // Step 1: Validate shipping address and get place details
+    if (shippingAddress && deliveryId) {
+      const addressData = await this.addressService.getPlaceDetails({
+        street: shippingAddress.street,
+        ward: shippingAddress.ward,
+        district: shippingAddress.district,
+        city: shippingAddress.city,
+      });
+
+      // Step 2: Calculate order prices
+      shippingPrice = await this.deliveryService.calculateDeliveryFee({
+        deliveryId,
+        destinationId: addressData[0].placeId,
+      });
+    }
+
+    // Step 3: Calculate total item price and details
+    const { totalItemsPrice, itemsDetails } =
+      await this.validateAndCalculateItems({ items });
+
+    // Step 4: Initialize discounts
+    if (couponCode) {
+      const discountResult = await this.couponService.reviewDiscount({
+        userId,
+        items,
+        totalOrder: totalItemsPrice,
+        shippingFee: shippingPrice,
+        couponCode,
+      });
+
+      // Extract discounts
+      discount = discountResult.totalDiscount;
+
+      shippingDiscount =
+        discountResult.discountDetails.find((d) => d.type === 'Delivery')
+          ?.discount || 0;
+      orderDiscount =
+        discountResult.discountDetails.find((d) => d.type === 'Order')
+          ?.discount || 0;
+
+      discountResult.discountDetails.forEach((discountDetail) => {
+        const itemIndex = itemsDetails.findIndex(
+          (item) =>
+            item.productId.toString() === discountDetail.productId.toString() &&
+            ((item.variantId && item.variantId.toString()) ===
+              discountDetail.variantId ||
+              (item.variantId === null && discountDetail.variantId === null))
+        );
+
+        console.log(discountDetail.discount);
+
+        if (itemIndex !== -1) {
+          itemsDetails[itemIndex].discount = discountDetail.discount;
+        }
+      });
+    }
+
+    // Step 5: Calculate total price
+    const totalPrice = totalItemsPrice + shippingPrice - discount;
+
+    return {
+      totalItemsPrice,
+      shippingPrice,
+      shippingDiscount,
+      orderDiscount,
+      discount,
+      totalPrice,
+      itemsDetails,
+    };
   }
 
   async createOrder({
@@ -109,39 +201,21 @@ class OrderService {
     deliveryId,
   }) {
     // Step 1: Validate items and calculate total price
-    const { totalItemsPrice, itemsDetails } =
-      await this.validateAndCalculateItems({
-        items,
-      });
-    const addressData = await this.addressService.getPlaceDetails({
-      street: shippingAddress.street,
-      ward: shippingAddress.ward,
-      district: shippingAddress.district,
-      city: shippingAddress.city,
-    });
-
-    // Step 2: Calculate order prices
-    const shippingPrice = await this.deliveryService.calculateDeliveryFee({
+    const {
+      totalItemsPrice,
+      shippingPrice,
+      shippingDiscount,
+      orderDiscount,
+      discount,
+      totalPrice,
+      itemsDetails,
+    } = await this.reviewOrder({
+      userId,
+      shippingAddress,
+      items,
+      couponCode,
       deliveryId,
-      destinationId: addressData[0].placeId,
     });
-
-    let discountPrice = 0;
-    if (couponCode) {
-      const { totalDiscount, discountDetails } =
-        await this.couponService.reviewDiscount({
-          items,
-          totalOrder: totalItemsPrice,
-          shippingFee: shippingPrice,
-          couponCode,
-        });
-
-      discountPrice = totalDiscount;
-
-      console.log({ totalDiscount, discountDetails });
-    }
-
-    const totalPrice = totalItemsPrice + shippingPrice - discountPrice;
 
     let status = OrderStatus.PENDING;
     if (paymentMethod !== PaymentMethod.COD) {
@@ -151,7 +225,7 @@ class OrderService {
     // Step 3: Create order
     const newOrder = this.orderRepository.create({
       ord_user_id: userId,
-      ord_coupon_id: couponCode || null,
+      ord_coupon_code: couponCode || null,
       ord_shipping_address: {
         shp_fullname: shippingAddress.fullname,
         shp_phone: shippingAddress.phone,
@@ -168,15 +242,23 @@ class OrderService {
         prd_id: item.productId,
         var_id: item.variantId,
         prd_img: item.image,
+        prd_discount: item.discount || 0,
       })),
       ord_items_price: totalItemsPrice,
-      ord_discount_price: discountPrice,
+      ord_items_discount: orderDiscount,
+
       ord_shipping_price: shippingPrice,
+      ord_shipping_discount: shippingDiscount,
+
+      ord_discount_price: discount,
       ord_total_price: totalPrice,
+
       ord_payment_method: paymentMethod,
       ord_delivery_method: deliveryId,
       ord_status: status,
     });
+
+    this.couponService.useCoupon(couponCode, userId);
 
     // Step 4: Update stock for products and variants
     await this._updateStock(itemsDetails);
@@ -378,6 +460,8 @@ class OrderService {
     if (foundOrder.status === OrderStatus.DELIVERED) {
       throw new BadRequestError('Cannot cancel delivered order');
     }
+
+    this.couponService.revokeCouponUsage(foundOrder.couponCode, userId);
 
     // Reverse stock
     await this._reverseStock(foundOrder.items);

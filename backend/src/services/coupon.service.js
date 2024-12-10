@@ -1,12 +1,18 @@
 const CouponRepository = require('../repositories/coupon.repository');
 const ProductRepository = require('../repositories/product.repository');
+const VariantRepository = require('../repositories/variant.repository');
 const { BadRequestError } = require('../utils/errorResponse');
-const { pickFields, omitFields } = require('../utils/helpers');
+const {
+  pickFields,
+  omitFields,
+  convertToObjectIdMongodb,
+} = require('../utils/helpers');
 
 class CouponService {
   constructor() {
     this.couponRepository = new CouponRepository();
     this.productRepository = new ProductRepository();
+    this.variantRepository = new VariantRepository();
   }
 
   async createCoupon({
@@ -62,22 +68,62 @@ class CouponService {
     };
   }
 
-  // TODO: Implement the updateCoupon method
-  // async getAllCoupons() {
-  //   const coupons = await this.couponRepository.findAll();
-  //   return {
-  //     coupons: coupons.map((coupon) =>
-  //       omitFields({
-  //         fields: ['id', 'usesCount', 'usersUsed', 'createdAt', 'updatedAt'],
-  //         object: coupon,
-  //       })
-  //     ),
-  //   };
-  // }
-
-  async reviewDiscount({ items, totalOrder, shippingFee, couponCode }) {
+  async useCoupon(couponCode, userId) {
     const foundCoupon = await this.couponRepository.findByCode(couponCode);
-    this._checkCoupon(foundCoupon);
+
+    if (!foundCoupon) {
+      throw new BadRequestError('Coupon not found');
+    }
+
+    const userUsageIndex = foundCoupon.usersUsed.findIndex(
+      (user) => user.userId.toString() === userId.toString()
+    );
+
+    if (userUsageIndex !== -1) {
+      foundCoupon.usersUsed[userUsageIndex].usageCount += 1;
+    } else {
+      foundCoupon.usersUsed.push({
+        userId: userId,
+        usageCount: 1,
+      });
+    }
+
+    await this.couponRepository.updateById(foundCoupon.id, {
+      $inc: { cpn_uses_count: 1 },
+      cpn_users_used: foundCoupon.usersUsed,
+    });
+  }
+
+  async revokeCouponUsage(couponCode, userId) {
+    console.log(couponCode);
+    const foundCoupon = await this.couponRepository.findByCode(couponCode);
+
+    if (!foundCoupon) {
+      throw new BadRequestError('Coupon not found');
+    }
+
+    const userUsageIndex = foundCoupon.usersUsed.findIndex(
+      (user) => user.userId.toString() === userId.toString()
+    );
+
+    if (userUsageIndex === -1) {
+      throw new BadRequestError('User has not used this coupon yet');
+    }
+
+    foundCoupon.usersUsed[userUsageIndex].usageCount -= 1;
+    if (foundCoupon.usersUsed[userUsageIndex].usageCount <= 0) {
+      foundCoupon.usersUsed.splice(userUsageIndex, 1);
+    }
+
+    await this.couponRepository.updateById(foundCoupon.id, {
+      $inc: { cpn_uses_count: -1 },
+      cpn_users_used: foundCoupon.usersUsed,
+    });
+  }
+
+  async reviewDiscount({ userId, items, totalOrder, shippingFee, couponCode }) {
+    const foundCoupon = await this.couponRepository.findByCode(couponCode);
+    this._checkCoupon(foundCoupon, userId);
 
     const discountDetails = [];
     let totalDiscount = 0;
@@ -88,6 +134,10 @@ class CouponService {
         this._applyOrderDiscount(foundCoupon, totalOrder, discountDetails),
       Delivery: async () =>
         this._applyDeliveryDiscount(foundCoupon, shippingFee, discountDetails),
+      Category: async () =>
+        this._applyCategoryDiscount(foundCoupon, items, discountDetails),
+      Product: async () =>
+        this._applyProductDiscount(foundCoupon, items, discountDetails),
     };
 
     if (TARGET_DISCOUNT_HANDLERS[foundCoupon.targetType]) {
@@ -102,6 +152,126 @@ class CouponService {
       totalDiscount,
       discountDetails,
     };
+  }
+
+  // TODO: Implement the updateCoupon method
+  async getAllCoupons({ page = 1, size = 10 }) {
+    const filter = {};
+    const formatPage = parseInt(page);
+    const formatSize = parseInt(size);
+
+    const query = {
+      // sort: mappedSort,
+      page: formatPage,
+      size: formatSize,
+    };
+
+    const coupons = await this.couponRepository.getAll({
+      filter,
+      queryOptions: query,
+    });
+
+    const totalCoupons = await this.productRepository.countDocuments(filter);
+    const totalPages = Math.ceil(totalCoupons / size);
+
+    return {
+      totalCoupons,
+      totalPages,
+      currentPage: page,
+      coupons: coupons.map((coupon) =>
+        pickFields({
+          fields: [
+            'id',
+            'name',
+            'code',
+            'startDate',
+            'endDate',
+            'type',
+            'value',
+            'targetType',
+            'isActive',
+          ],
+          object: coupon,
+        })
+      ),
+    };
+  }
+
+  async _applyCategoryDiscount(coupon, items, discountDetails) {
+    let totalDiscount = 0;
+
+    for (const item of items) {
+      const product = await this.productRepository.getById(item.productId);
+      if (!product) {
+        throw new BadRequestError('Product not found');
+      }
+
+      const isEligible = product.category.some((cat) =>
+        coupon.targetIds.includes(cat.id.toString())
+      );
+
+      if (isEligible) {
+        const price = item.variantId
+          ? (await this.variantRepository.getById(item.variantId))?.price
+          : product.price;
+
+        if (!price) {
+          throw new BadRequestError('Price not found for product or variant');
+        }
+
+        const total = price * item.quantity;
+        const discount = this._applyDiscount(total, coupon);
+        totalDiscount += discount;
+
+        discountDetails.push({
+          productId: product.id,
+          variantId: item.variantId || null,
+          quantity: item.quantity,
+          total,
+          discount,
+        });
+      }
+    }
+
+    return totalDiscount;
+  }
+
+  async _applyProductDiscount(coupon, items, discountDetails) {
+    let totalDiscount = 0;
+
+    for (const item of items) {
+      const product = await this.productRepository.getById(item.productId);
+      if (!product) {
+        throw new BadRequestError('Product not found');
+      }
+
+      if (coupon.targetIds.includes(product.id)) {
+        // Lấy giá của variant nếu có
+        const price = item.variantId
+          ? (await this.variantRepository.getById(item.variantId))?.price
+          : product.price;
+
+        if (!price) {
+          throw new BadRequestError('Price not found for product or variant');
+        }
+
+        // Tính tổng giá trị và giảm giá
+        const total = price * item.quantity;
+        const discount = this._applyDiscount(total, coupon);
+        totalDiscount += discount;
+
+        // Lưu chi tiết
+        discountDetails.push({
+          productId: product.id,
+          variantId: item.variantId || null,
+          quantity: item.quantity,
+          total,
+          discount,
+        });
+      }
+    }
+
+    return totalDiscount;
   }
 
   async _applyDeliveryDiscount(coupon, shippingFee, discountDetails) {
@@ -126,7 +296,7 @@ class CouponService {
     return discount;
   }
 
-  _checkCoupon(foundCoupon) {
+  _checkCoupon(foundCoupon, userId) {
     if (!foundCoupon) {
       throw new BadRequestError('Coupon code not found');
     }
@@ -145,6 +315,18 @@ class CouponService {
 
     if (foundCoupon.maxUses <= foundCoupon.usesCount) {
       throw new BadRequestError('Coupon code has reached its maximum uses');
+    }
+
+    const maxUser = foundCoupon.maxUsesPerUser;
+
+    if (maxUser > 0) {
+      const usersUsedDiscount = foundCoupon.usersUsed.find(
+        (user) => user.userId.toString() === userId.toString()
+      );
+
+      if (usersUsedDiscount.usageCount >= maxUser) {
+        throw new BadRequestError(`Discount just used ${maxUser}`);
+      }
     }
   }
 

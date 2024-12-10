@@ -14,7 +14,7 @@ const COLLECTION_NAME = 'Orders';
 const orderSchema = new Schema(
   {
     ord_user_id: { type: Schema.Types.ObjectId, ref: 'User' },
-    ord_coupon_id: { type: String, default: null },
+    ord_coupon_code: { type: String, default: null },
     ord_items: {
       type: [
         {
@@ -25,6 +25,7 @@ const orderSchema = new Schema(
           prd_price: { type: Number, required: true },
           prd_img: { type: String, required: true },
           prd_quantity: { type: Number, required: true, default: 1 },
+          prd_discount: { type: Number, required: true, default: 0 },
         },
       ],
       default: [],
@@ -52,8 +53,12 @@ const orderSchema = new Schema(
     },
 
     ord_items_price: { type: Number, required: true },
-    ord_discount_price: { type: Number, required: true, default: 0 },
+    ord_items_discount: { type: Number, required: true, default: 0 },
+
     ord_shipping_price: { type: Number, required: true, default: 0 },
+    ord_shipping_discount: { type: Number, required: true, default: 0 },
+
+    ord_discount_price: { type: Number, required: true, default: 0 },
     ord_total_price: { type: Number, required: true },
 
     ord_is_paid: { type: Boolean, default: false },

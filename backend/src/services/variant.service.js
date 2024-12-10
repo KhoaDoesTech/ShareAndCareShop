@@ -200,7 +200,6 @@ class VariantService {
       prd_id: productId,
     });
 
-    console.log(variants);
     return variants.reduce((total, variant) => total + variant.quantity, 0);
   }
 }

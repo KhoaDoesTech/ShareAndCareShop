@@ -11,7 +11,12 @@ const CONFIG_PERMISSIONS = require('../../../constants/permissions');
 
 const router = express.Router();
 
-router.get('/review-order', asyncHandler(OrderController.reviewOrder));
+router.get(
+  '/review-order',
+  authentication,
+  asyncHandler(OrderController.reviewOrder)
+);
+
 router.patch(
   '/cancel/:orderId',
   authentication,
