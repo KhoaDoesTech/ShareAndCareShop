@@ -267,7 +267,9 @@ class OrderService {
         ord_status: status,
       });
 
-      this.couponService.useCoupon(couponCode, userId);
+      if (couponCode) {
+        this.couponService.useCoupon(couponCode, userId);
+      }
 
       // Step 4: Update stock for products and variants
       await this._updateStock(itemsDetails);
