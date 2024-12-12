@@ -79,6 +79,8 @@ class CouponService {
       (user) => user.userId.toString() === userId.toString()
     );
 
+    console.log(userUsageIndex);
+
     if (userUsageIndex !== -1) {
       foundCoupon.usersUsed[userUsageIndex].usageCount += 1;
     } else {
@@ -324,7 +326,7 @@ class CouponService {
         (user) => user.userId.toString() === userId.toString()
       );
 
-      if (usersUsedDiscount.usageCount >= maxUser) {
+      if (usersUsedDiscount?.usageCount >= maxUser) {
         throw new BadRequestError(`Discount just used ${maxUser}`);
       }
     }

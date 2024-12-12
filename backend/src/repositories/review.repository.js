@@ -17,6 +17,13 @@ class ReviewRepository extends BaseRepository {
       star: review.rvw_star,
       userId: review.rvw_user_id,
       productId: review.rvw_product_id,
+      reply: review.rvw_reply
+        ? {
+            content: review.rvw_reply.rep_content,
+            user: review.rvw_reply.rep_user,
+            createdAt: review.rvw_reply.createdAt,
+          }
+        : null,
       createdAt: review.createdAt,
       updatedAt: review.updatedAt,
     };

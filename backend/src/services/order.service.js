@@ -200,70 +200,74 @@ class OrderService {
     paymentMethod,
     deliveryId,
   }) {
-    // Step 1: Validate items and calculate total price
-    const {
-      totalItemsPrice,
-      shippingPrice,
-      shippingDiscount,
-      orderDiscount,
-      discount,
-      totalPrice,
-      itemsDetails,
-    } = await this.reviewOrder({
-      userId,
-      shippingAddress,
-      items,
-      couponCode,
-      deliveryId,
-    });
+    try {
+      // Step 1: Validate items and calculate total price
+      const {
+        totalItemsPrice,
+        shippingPrice,
+        shippingDiscount,
+        orderDiscount,
+        discount,
+        totalPrice,
+        itemsDetails,
+      } = await this.reviewOrder({
+        userId,
+        shippingAddress,
+        items,
+        couponCode,
+        deliveryId,
+      });
 
-    let status = OrderStatus.PENDING;
-    if (paymentMethod !== PaymentMethod.COD) {
-      status = OrderStatus.AWAITING_PAYMENT;
+      let status = OrderStatus.PENDING;
+      if (paymentMethod !== PaymentMethod.COD) {
+        status = OrderStatus.AWAITING_PAYMENT;
+      }
+
+      // Step 3: Create order
+      const newOrder = this.orderRepository.create({
+        ord_user_id: userId,
+        ord_coupon_code: couponCode || null,
+        ord_shipping_address: {
+          shp_fullname: shippingAddress.fullname,
+          shp_phone: shippingAddress.phone,
+          shp_city: shippingAddress.city,
+          shp_district: shippingAddress.district,
+          shp_ward: shippingAddress.ward,
+          shp_street: shippingAddress.street,
+        },
+        ord_items: itemsDetails.map((item) => ({
+          prd_name: item.productName,
+          var_slug: item.variantSlug,
+          prd_quantity: item.quantity,
+          prd_price: item.price,
+          prd_id: item.productId,
+          var_id: item.variantId,
+          prd_img: item.image,
+          prd_discount: item.discount || 0,
+        })),
+        ord_items_price: totalItemsPrice,
+        ord_items_discount: orderDiscount,
+
+        ord_shipping_price: shippingPrice,
+        ord_shipping_discount: shippingDiscount,
+
+        ord_discount_price: discount,
+        ord_total_price: totalPrice,
+
+        ord_payment_method: paymentMethod,
+        ord_delivery_method: deliveryId,
+        ord_status: status,
+      });
+
+      this.couponService.useCoupon(couponCode, userId);
+
+      // Step 4: Update stock for products and variants
+      await this._updateStock(itemsDetails);
+
+      return newOrder;
+    } catch (error) {
+      throw new BadRequestError(error.message);
     }
-
-    // Step 3: Create order
-    const newOrder = this.orderRepository.create({
-      ord_user_id: userId,
-      ord_coupon_code: couponCode || null,
-      ord_shipping_address: {
-        shp_fullname: shippingAddress.fullname,
-        shp_phone: shippingAddress.phone,
-        shp_city: shippingAddress.city,
-        shp_district: shippingAddress.district,
-        shp_ward: shippingAddress.ward,
-        shp_street: shippingAddress.street,
-      },
-      ord_items: itemsDetails.map((item) => ({
-        prd_name: item.productName,
-        var_slug: item.variantSlug,
-        prd_quantity: item.quantity,
-        prd_price: item.price,
-        prd_id: item.productId,
-        var_id: item.variantId,
-        prd_img: item.image,
-        prd_discount: item.discount || 0,
-      })),
-      ord_items_price: totalItemsPrice,
-      ord_items_discount: orderDiscount,
-
-      ord_shipping_price: shippingPrice,
-      ord_shipping_discount: shippingDiscount,
-
-      ord_discount_price: discount,
-      ord_total_price: totalPrice,
-
-      ord_payment_method: paymentMethod,
-      ord_delivery_method: deliveryId,
-      ord_status: status,
-    });
-
-    this.couponService.useCoupon(couponCode, userId);
-
-    // Step 4: Update stock for products and variants
-    await this._updateStock(itemsDetails);
-
-    return newOrder;
   }
 
   async _updateStock(items) {
