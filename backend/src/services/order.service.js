@@ -162,13 +162,21 @@ class OrderService {
           ?.discount || 0;
 
       discountResult.discountDetails.forEach((discountDetail) => {
-        const itemIndex = itemsDetails.findIndex(
-          (item) =>
-            item.productId.toString() === discountDetail.productId.toString() &&
-            ((item.variantId && item.variantId.toString()) ===
-              discountDetail.variantId ||
-              (item.variantId === null && discountDetail.variantId === null))
-        );
+        const itemIndex = itemsDetails.findIndex((item) => {
+          const productIdMatch =
+            item.productId && discountDetail.productId
+              ? item.productId.toString() ===
+                discountDetail.productId.toString()
+              : false;
+
+          const variantIdMatch =
+            item.variantId && discountDetail.variantId
+              ? item.variantId.toString() ===
+                discountDetail.variantId.toString()
+              : item.variantId === null && discountDetail.variantId === null;
+
+          return productIdMatch && variantIdMatch;
+        });
 
         console.log(discountDetail.discount);
 
