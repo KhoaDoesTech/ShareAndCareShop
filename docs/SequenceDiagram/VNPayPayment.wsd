@@ -1,0 +1,151 @@
+@startuml
+
+skinparam defaultFontSize 40        
+skinparam SequenceMessageAlign center
+
+actor User as User #40BFBF
+boundary "OrderPage" as OrderPage #ffc327
+boundary "OrderDetailPage" as OrderDetailPage #ffc327
+boundary "VNPayPage" as VNPayPage #ffc327
+boundary "HomePage" as HomePage #ffc327
+control Router as Router #ff9045
+control PaymentController as PaymentController #ff9045
+entity PaymentService as PaymentService #ff9045
+entity OrderRepository as OrderRepository #40bbb1
+database MongoDB as DB #4CAF50
+
+activate User #40BFBF
+User -> OrderDetailPage: click Order Payment
+activate OrderDetailPage #ffc327
+
+OrderDetailPage -> Router: POST /vnpay/create_payment_url
+deactivate OrderDetailPage
+activate Router #ff9045
+
+Router -> PaymentController: createVNPayUrl()
+deactivate Router
+activate PaymentController #ff9045
+
+PaymentController -> PaymentService: createVNPayUrl()
+activate PaymentService #ff9045
+
+PaymentService -> PaymentService: _checkOrder(orderId)
+PaymentService -> OrderRepository: getById(orderId)
+activate OrderRepository #40bbb1
+
+OrderRepository -> DB: findById(orderId)
+activate DB #4CAF50
+
+DB -> OrderRepository: return foundOrder
+deactivate DB
+
+OrderRepository -> PaymentService: return foundOrder
+deactivate OrderRepository
+
+alt#Gold #Pink Không tìm thấy đơn hàng
+    PaymentService -> PaymentController: Order ${orderId} not found
+    deactivate PaymentService
+
+    PaymentController -> Router: Order ${orderId} not found
+    deactivate PaymentController
+    activate Router #ff9045
+
+    Router -> OrderDetailPage: Order ${orderId} not found
+    deactivate Router
+    activate OrderDetailPage #ffc327
+
+    OrderDetailPage -> User: Order ${orderId} not found
+    deactivate OrderDetailPage
+else #LightBlue
+    alt#Gold #Pink Đơn hàng đã được thanh toán
+        PaymentService -> PaymentController: Order is already marked as paid
+        deactivate PaymentService
+
+        PaymentController -> Router: Order is already marked as paid
+        deactivate PaymentController
+        activate Router #ff9045
+
+        Router -> OrderDetailPage: Order is already marked as paid
+        deactivate Router
+        activate OrderDetailPage #ffc327
+
+        OrderDetailPage -> User: Order is already marked as paid
+        deactivate OrderDetailPage
+    else #LightBlue
+        PaymentService -> PaymentService: sortObject()
+        PaymentService -> PaymentService: generateHmacHash()
+        PaymentService -> PaymentController: return paymentUrl
+        deactivate PaymentService
+
+        PaymentController -> Router: return paymentUrl
+        deactivate PaymentController
+        activate Router #ff9045
+
+        Router -> OrderDetailPage: return paymentUrl
+        deactivate Router
+        activate OrderDetailPage #ffc327
+
+        OrderDetailPage -> VNPayPage: redirect to VNPage
+        deactivate OrderDetailPage
+        activate VNPayPage #ffc327
+
+        VNPayPage -> Router: GET /vnpay/callback
+        deactivate VNPayPage
+        activate Router #ff9045
+
+        Router -> PaymentController: checkPaymentStatus()
+        deactivate Router
+        activate PaymentController #ff9045
+
+        PaymentController -> PaymentService: checkPaymentStatus()
+        activate PaymentService #ff9045
+
+        PaymentService -> PaymentService: sortObject()
+        PaymentService -> PaymentService: generateHmacHash()
+        PaymentService -> PaymentService: _markOrderAsPaid()
+
+        PaymentService -> PaymentService: _checkOrder(orderId)
+        PaymentService -> OrderRepository: updateById(orderId)
+        activate OrderRepository #40bbb1
+
+        OrderRepository -> DB: findByIdAndUpdate(orderId)
+        activate DB #4CAF50
+
+        DB -> OrderRepository: return updatedOrder
+        deactivate DB
+
+        OrderRepository -> PaymentService: return updatedOrder
+        deactivate OrderRepository
+
+        alt#Gold #Pink Không thể xác nhận thanh toán
+            PaymentService -> PaymentController: Failed to mark order as paid
+            deactivate PaymentService
+
+            PaymentController -> Router: Failed to mark order as paid
+            deactivate PaymentController
+
+            Router -> VNPayPage: Failed to mark order as paid
+            deactivate Router
+            activate VNPayPage #ffc327
+
+            VNPayPage -> User: Failed to mark order as paid
+            deactivate VNPayPage
+        else #LightBlue
+            PaymentService -> PaymentController: return result
+            deactivate PaymentService
+
+            PaymentController -> Router: handleRedirect()
+            deactivate PaymentController
+            activate Router #ff9045
+
+            Router -> HomePage: redirect to Home
+            deactivate Router
+
+            activate HomePage #ffc327
+            HomePage -> User: Order Payment Successful!
+            deactivate HomePage
+        end
+    end
+end
+
+@enduml
