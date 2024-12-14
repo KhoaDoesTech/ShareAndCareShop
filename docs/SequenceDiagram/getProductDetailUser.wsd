@@ -1,0 +1,104 @@
+@startuml
+
+skinparam defaultFontSize 40        
+skinparam SequenceMessageAlign center
+
+actor User as User #40BFBF
+boundary "HomePage" as HomePage #ffc327
+boundary "ProductPage" as ProductPage #ffc327
+boundary "ProductDetailPage" as PDPage #ffc327
+control Router as Router #ff9045
+control ProductController as ProductController #ff9045
+entity ProductService as ProductService #ff9045
+entity VariantService as VariantService #ff9045
+entity ProductRepository as ProductRepository #40bbb1
+entity VariantRepository as VariantRepository #40bbb1
+database MongoDB as DB #4CAF50
+
+activate User #40BFBF
+
+alt#Gold Chọn sản phẩm từ trang chủ
+    User -> HomePage: click ProductCard
+    activate HomePage #ffc327
+
+    HomePage -> PDPage: redirect
+    deactivate HomePage
+else Chọn sản phẩm từ trang Shop
+    User -> ProductPage: click ProductCard
+    activate ProductPage #ffc327
+
+    ProductPage -> PDPage: redirect
+    deactivate ProductPage
+end
+activate PDPage #ffc327
+
+PDPage -> Router: GET /public/:productId
+deactivate PDPage
+activate Router #ff9045
+
+Router -> ProductController: getProductDetailsByUser()
+deactivate Router
+activate ProductController #ff9045
+
+ProductController -> ProductService: getProductDetailsPublic()
+activate ProductService #ff9045
+
+ProductService -> ProductRepository: getByQuery()
+activate ProductRepository #40bbb1
+
+ProductRepository -> DB: findOne()
+activate DB #4CAF50
+
+DB -> ProductRepository: return foundProduct
+deactivate DB
+
+alt#Gold #Pink Không tìm thấy sản phẩm
+    ProductRepository -> ProductService: Product not found
+    ProductService -> ProductController: Product not found
+    ProductController -> Router: Product not found
+    activate Router #ff9045
+
+    Router -> PDPage: Product not found
+    deactivate Router
+    activate PDPage #ffc327
+
+    PDPage -> User: Product not found
+    deactivate PDPage
+else #LightBlue
+    ProductRepository -> ProductService: return result
+    deactivate ProductRepository
+
+    ProductService -> VariantService: getPublicVariantByProductId()
+    activate VariantService #ff9045
+
+    VariantService -> VariantRepository: getVariantByFilter()
+    activate VariantRepository #40bbb1
+
+    VariantRepository -> DB: find()
+    activate DB #4CAF50
+
+    DB -> VariantRepository: return skuList
+    deactivate DB
+
+    VariantRepository -> VariantService: return skuList
+    deactivate VariantRepository
+
+    VariantService -> ProductService: return skuList
+    deactivate VariantService
+
+    ProductService -> ProductService: _updateProductViews()
+    ProductService -> ProductController: return product
+    deactivate ProductService
+    
+    ProductController -> Router: return product
+    activate Router #ff9045
+
+    Router -> PDPage: return product
+    deactivate Router
+    activate PDPage #ffc327
+
+    PDPage -> User: return product
+    deactivate PDPage
+end
+
+@enduml
