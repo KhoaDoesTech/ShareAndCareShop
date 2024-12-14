@@ -1,0 +1,74 @@
+@startuml
+
+skinparam defaultFontSize 40        
+skinparam SequenceMessageAlign center
+
+actor User as User #40BFBF
+boundary "HomePage" as HomePage #ffc327
+boundary "LoginPage" as LoginPage #ffc327
+control Router as Router #ff9045
+control AuthController as AuthController #ff9045
+entity AuthService as AuthService #ff9045
+entity TokenRepository as TokenRepository #40bbb1
+database MongoDB as DB #4CAF50
+
+activate User #40BFBF
+User -> HomePage: click Logout
+activate HomePage #ffc327
+
+HomePage -> Router: POST /logout
+deactivate HomePage
+activate Router #ff9045
+
+Router -> AuthController: logOut()
+deactivate Router
+activate AuthController #ff9045
+
+AuthController -> AuthService: logoutUser()
+activate AuthService #ff9045
+
+AuthController -> TokenRepository: deleteToken()
+activate TokenRepository #40bbb1
+
+TokenRepository -> DB: findOneAndDelete()
+activate DB #4CAF50
+
+DB -> TokenRepository: return result
+deactivate DB
+
+alt#Gold #Pink Không thể xóa token
+    TokenRepository -> AuthService: Failed to logout user
+    AuthService -> AuthController: Failed to logout user
+    AuthController -> Router: Failed to logout user
+    activate Router #ff9045
+
+    Router -> HomePage: Failed to logout user
+    deactivate Router
+    activate HomePage #ffc327
+
+    HomePage -> User: Failed to logout user
+    deactivate HomePage
+else #LightBlue
+    TokenRepository -> AuthService: return result
+    deactivate TokenRepository
+
+    AuthService -> AuthController: return result
+    deactivate AuthService
+
+    AuthController -> Router: return result
+    deactivate AuthController
+    activate Router #ff9045
+
+    Router -> HomePage: return result
+    deactivate Router
+    activate HomePage #ffc327
+
+    HomePage -> User: Logout successful!
+end
+
+HomePage -> LoginPage: redirect
+deactivate HomePage
+activate LoginPage #ffc327
+
+@enduml
+
