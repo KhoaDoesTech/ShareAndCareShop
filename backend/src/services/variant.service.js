@@ -38,6 +38,7 @@ class VariantService {
       var_slug: generateVariantSlug(variants, sku.tierIndex),
       var_price: sku.price,
       var_quantity: sku.quantity,
+      var_sold: sku.sold,
     }));
 
     await this.variantRepository.deleteByProductId(product.id);

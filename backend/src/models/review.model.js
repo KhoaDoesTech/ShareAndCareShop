@@ -7,7 +7,7 @@ const COLLECTION_NAME = 'Reviews';
 
 const reviewSchema = new Schema(
   {
-    rvw_content: { type: String, required: true, unique: true },
+    rvw_content: { type: String, required: true },
     rvw_star: { type: Number, required: true, min: 1, max: 5 },
     rvw_user_id: { type: Schema.Types.ObjectId, ref: 'User' },
     rvw_product_id: { type: Schema.Types.ObjectId, ref: 'Product' },

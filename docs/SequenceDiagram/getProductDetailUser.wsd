@@ -17,13 +17,13 @@ database MongoDB as DB #4CAF50
 
 activate User #40BFBF
 
-alt#Gold Chọn sản phẩm từ trang chủ
+alt#Gold #Pink Chọn sản phẩm từ trang chủ
     User -> HomePage: click ProductCard
     activate HomePage #ffc327
 
     HomePage -> PDPage: redirect
     deactivate HomePage
-else Chọn sản phẩm từ trang Shop
+else #LightBlue Chọn sản phẩm từ trang Shop
     User -> ProductPage: click ProductCard
     activate ProductPage #ffc327
 

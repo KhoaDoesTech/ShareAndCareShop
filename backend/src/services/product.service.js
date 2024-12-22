@@ -115,7 +115,7 @@ class ProductService {
     if (variants) {
       updatedVariants = this.variantService._formatVariants(variants);
     }
-    if (skuList) {
+    if (skuList.length) {
       await this.variantService.updateVariants({
         product: foundProduct,
         variants: updatedVariants,
@@ -124,9 +124,11 @@ class ProductService {
     }
 
     // Step 4: Calculate total quantity
-    const totalQuantity = skuList
+    const totalQuantity = skuList.length
       ? skuList.reduce((total, sku) => total + (sku.quantity || 0), 0)
       : quantity || foundProduct.quantity;
+
+    console.log(totalQuantity);
 
     // Step 5: Merge subImages with variant images
     const variantImages = updatedVariants.flatMap(({ images }) => images || []);
