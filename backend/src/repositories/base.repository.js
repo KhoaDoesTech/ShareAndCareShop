@@ -21,8 +21,12 @@ class BaseRepository {
     return this.formatDocument(document);
   }
 
-  async getById(id) {
-    const document = await this.model.findById(id);
+  async getById(id, populateOptions = null) {
+    let documentQuery = this.model.findById(id);
+    if (populateOptions) {
+      documentQuery = documentQuery.populate(populateOptions);
+    }
+    const document = await documentQuery.lean();
 
     return this.formatDocument(document);
   }

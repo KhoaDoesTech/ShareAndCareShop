@@ -11,6 +11,10 @@ class UploadRepository extends BaseRepository {
     return this.model.deleteOne(query);
   }
 
+  async deleteMany(query) {
+    return this.model.deleteMany(query);
+  }
+
   formatDocument(upload) {
     if (!upload) return null;
     return {

@@ -11,6 +11,13 @@ const CONFIG_PERMISSIONS = require('../../../constants/permissions');
 const VariantController = require('../../../controllers/variant.controller');
 const router = express.Router();
 
+router.post(
+  '/',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.SKU.CREATE),
+  asyncHandler(VariantController.createVariants)
+);
+
 router.get(
   '/public/:productId',
   asyncHandler(VariantController.getPublicVariantByProductId)

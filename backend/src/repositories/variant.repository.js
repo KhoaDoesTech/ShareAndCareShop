@@ -36,6 +36,8 @@ class VariantRepository extends BaseRepository {
       quantity: variant.var_quantity,
       sold: variant.var_sold,
       status: variant.var_status,
+      createdBy: variant.createdBy,
+      updatedBy: variant.updatedBy,
       createdAt: variant.createdAt,
       updatedAt: variant.updatedAt,
     };
