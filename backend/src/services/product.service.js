@@ -1,6 +1,10 @@
+'use strict';
 const { ProductStatus, SortFieldProduct } = require('../constants/status');
+const AttributeRepository = require('../repositories/attribute.repository');
+const AttributeValueRepository = require('../repositories/attributeValue.repository');
 const CategoryRepository = require('../repositories/category.repository');
 const ProductRepository = require('../repositories/product.repository');
+const VariantRepository = require('../repositories/variant.repository');
 const { BadRequestError } = require('../utils/errorResponse');
 const {
   omitFields,
@@ -8,39 +12,57 @@ const {
   updateNestedObjectParser,
   pickFields,
   convertToObjectIdMongodb,
+  generateVariantSlug,
+  listResponse,
 } = require('../utils/helpers');
 const UploadService = require('./upload.service');
-
-const VariantService = require('./variant.service');
 
 class ProductService {
   constructor() {
     this.productRepository = new ProductRepository();
-    this.variantService = new VariantService();
+    this.variantRepository = new VariantRepository();
     this.categoryRepository = new CategoryRepository();
+    this.attributeRepository = new AttributeRepository();
+    this.attributeValueRepository = new AttributeValueRepository();
     this.uploadService = new UploadService();
   }
 
   async createProduct({
+    userId,
     name,
+    video,
+    returnDays,
+    description,
     mainImage,
     subImages = [],
-    price,
     originalPrice,
-    quantity,
-    description,
+    discountType,
+    discountValue,
+    discountStart,
+    discountEnd,
     category = [],
     attributes = [],
     variants = [],
     skuList = [],
   }) {
+    // Generate productId
+    const productId = `PRD_${Math.floor(Date.now() / 1000)}`;
+
     // Validate category and retrieve data
     const updatedCategories = await this._validateCategories(category);
+    console.log(attributes);
+    const updatedAttributes = await this._validateAttributes(attributes);
 
-    // Calculate total quantity
-    const totalQuantity = skuList.length
-      ? skuList.reduce((total, { quantity }) => total + quantity, 0)
-      : quantity;
+    // Calculate minPrice and maxPrice from skuList
+    let minPrice, maxPrice;
+    if (skuList.length) {
+      const prices = skuList.map((sku) => sku.price);
+      minPrice = Math.min(...prices);
+      maxPrice = Math.max(...prices);
+    } else {
+      minPrice = originalPrice;
+      maxPrice = originalPrice;
+    }
 
     // Merge subImages with variant images
     const variantImages = variants.flatMap(({ images = [] }) => images);
@@ -48,16 +70,26 @@ class ProductService {
       new Set([...subImages, ...variantImages])
     );
 
+    const qrCodeUrl = await this.uploadService.uploadQRCode({
+      text: `${process.env.FRONTEND_URL}/product/${productId}`,
+    });
+
     const newProduct = await this.productRepository.create({
+      prd_code: productId,
       prd_name: name,
       prd_main_image: mainImage,
       prd_sub_images: updatedSubImages,
-      prd_price: price,
-      prd_original_price: originalPrice,
-      prd_quantity: totalQuantity,
+      prd_qr_code: qrCodeUrl,
+      prd_original_price: variants.length ? undefined : originalPrice,
+      prd_min_price: minPrice,
+      prd_max_price: maxPrice,
+      prd_discount_type: discountType,
+      prd_discount_value: discountValue,
+      prd_discount_start: discountStart,
+      prd_discount_end: discountEnd,
       prd_description: description,
       prd_category: updatedCategories,
-      prd_attributes: attributes,
+      prd_attributes: updatedAttributes,
       prd_variants: variants
         ? variants.map((variant) => ({
             var_name: variant.name,
@@ -65,24 +97,34 @@ class ProductService {
             var_options: variant.options,
           }))
         : [],
+      prd_video: video,
+      return_days: returnDays,
+      createdBy: userId,
+      updatedBy: userId,
     });
 
     if (!newProduct) throw new BadRequestError('Failed to create product');
 
-    this.uploadService.deleteUsedImage(mainImage, updatedSubImages);
+    const convertSkuList = skuList.map((sku, index) => ({
+      prd_id: newProduct.id,
+      prd_name: newProduct.name,
+      var_tier_idx: sku.tierIndex,
+      var_default: sku.isDefault,
+      var_slug: generateVariantSlug(variants, sku.tierIndex),
+      var_price: sku.price,
+      createdBy: userId,
+      updatedBy: userId,
+    }));
 
-    this.variantService.createVariants({
-      product: newProduct,
-      variants,
-      skuList,
+    const variant = await this.variantRepository.create(convertSkuList);
+    if (!variant) throw new BadRequestError('Failed to create variant');
+
+    this.uploadService.deleteUsedImages([mainImage, ...subImages, qrCodeUrl]);
+
+    return pickFields({
+      fields: ['code'],
+      object: newProduct,
     });
-
-    return {
-      product: omitFields({
-        fields: ['createdAt', 'updatedAt'],
-        object: newProduct,
-      }),
-    };
   }
 
   // Update product
@@ -180,7 +222,7 @@ class ProductService {
 
     const validCategories = [];
     await Promise.all(
-      categories.map(async ({ id }) => {
+      categories.map(async (id) => {
         const categoryData = await this.categoryRepository.getById(id);
         if (!categoryData) {
           throw new BadRequestError(`Category with ID ${id} not found`);
@@ -188,10 +230,68 @@ class ProductService {
         validCategories.push(categoryData);
       })
     );
-    return validCategories?.map((category) => ({
+
+    return validCategories.map((category) => ({
       id: category.id,
       name: category.name,
     }));
+  }
+
+  async _validateAttributes(attributes) {
+    if (!Array.isArray(attributes) || attributes.length === 0) {
+      throw new BadRequestError('Attributes must be a non-empty array.');
+    }
+
+    const attributeIds = attributes.map((attr) => attr.id);
+
+    const attributeList = await this.attributeRepository.getAll({
+      filter: { _id: { $in: attributeIds } },
+    });
+
+    const attributeMap = new Map(
+      attributeList.map((attr) => [attr.id.toString(), attr])
+    );
+
+    const missingAttributes = attributeIds.filter(
+      (id) => !attributeMap.has(id)
+    );
+    if (missingAttributes.length) {
+      throw new BadRequestError(
+        `Attributes not found: ${missingAttributes.join(', ')}`
+      );
+    }
+
+    return attributes.map((attr) => {
+      const attribute = attributeMap.get(attr.id);
+
+      if (!Array.isArray(attr.values) || attr.values.length === 0) {
+        throw new BadRequestError(
+          `Values for attribute ${attr.id} must be a non-empty array.`
+        );
+      }
+
+      const validValuesSet = new Set(
+        attribute.values.map((v) => v.valueId.toString())
+      );
+
+      const validatedValues = attr.values.filter((val) =>
+        validValuesSet.has(val)
+      );
+      const invalidValues = attr.values.filter(
+        (val) => !validValuesSet.has(val)
+      );
+
+      if (invalidValues.length) {
+        throw new BadRequestError(
+          `Invalid values for attribute ${attr.id}: ${invalidValues.join(', ')}`
+        );
+      }
+
+      return {
+        id: attribute.id,
+        values: validatedValues.map((val) => ({ id: val })),
+      };
+    });
   }
 
   _updateProductViews(productId) {
@@ -279,6 +379,93 @@ class ProductService {
     };
   }
 
+  // async getAllProductsPublic({
+  //   search,
+  //   category,
+  //   minPrice,
+  //   maxPrice,
+  //   sort,
+  //   page = 1,
+  //   size = 10,
+  //   attributes,
+  // }) {
+  //   const filter = { prd_status: ProductStatus.PUBLISHED };
+  //   const formatPage = parseInt(page);
+  //   const formatSize = parseInt(size);
+
+  //   if (search) {
+  //     const keyword = search.trim();
+  //     const regexOptions = { $regex: keyword, $options: 'i' };
+
+  //     filter.$or =
+  //       keyword.length === 1
+  //         ? [
+  //             { prd_name: { $regex: `^${keyword}`, $options: 'i' } },
+  //             { prd_description: regexOptions },
+  //           ]
+  //         : [{ prd_name: regexOptions }, { prd_description: regexOptions }];
+  //   }
+
+  //   if (category) {
+  //     filter.prd_category = {
+  //       $elemMatch: { id: convertToObjectIdMongodb(category) },
+  //     };
+  //   }
+
+  //   if (minPrice || maxPrice) {
+  //     filter.prd_price = {};
+  //     if (minPrice) filter.prd_price.$gte = parseFloat(minPrice);
+  //     if (maxPrice) filter.prd_price.$lte = parseFloat(maxPrice);
+  //   }
+
+  //   if (attributes && attributes.length) {
+  //     filter.prd_attributes = { $in: attributes };
+  //   }
+
+  //   const mappedSort = sort
+  //     ? `${sort.startsWith('-') ? '-' : ''}${
+  //         SortFieldProduct[sort.replace('-', '')] || 'createdAt'
+  //       }`
+  //     : '-createdAt';
+
+  //   const query = {
+  //     sort: mappedSort,
+  //     page: formatPage,
+  //     size: formatSize,
+  //   };
+
+  //   const products = await this.productRepository.getAll({
+  //     filter: filter,
+  //     queryOptions: query,
+  //   });
+
+  //   const totalProducts = await this.productRepository.countDocuments(filter);
+  //   const totalPages = Math.ceil(totalProducts / size);
+
+  //   return {
+  //     totalPages,
+  //     totalProducts,
+  //     currentPage: formatPage,
+  //     products: products.map((product) =>
+  //       omitFields({
+  //         fields: [
+  //           'subImages',
+  //           'quantity',
+  //           'category',
+  //           'attributes',
+  //           'views',
+  //           'uniqueViews',
+  //           'createdAt',
+  //           'updatedAt',
+  //           'sold',
+  //           'status',
+  //         ],
+  //         object: product,
+  //       })
+  //     ),
+  //   };
+  // }
+
   async getAllProductsPublic({
     search,
     category,
@@ -293,6 +480,7 @@ class ProductService {
     const formatPage = parseInt(page);
     const formatSize = parseInt(size);
 
+    // Search filter
     if (search) {
       const keyword = search.trim();
       const regexOptions = { $regex: keyword, $options: 'i' };
@@ -306,12 +494,14 @@ class ProductService {
           : [{ prd_name: regexOptions }, { prd_description: regexOptions }];
     }
 
+    // Category filter
     if (category) {
       filter.prd_category = {
         $elemMatch: { id: convertToObjectIdMongodb(category) },
       };
     }
 
+    // Price filter
     if (minPrice || maxPrice) {
       filter.prd_price = {};
       if (minPrice) filter.prd_price.$gte = parseFloat(minPrice);
@@ -319,9 +509,31 @@ class ProductService {
     }
 
     if (attributes && attributes.length) {
-      filter.prd_attributes = { $in: attributes };
+      let parsedAttributes;
+      try {
+        parsedAttributes = JSON.parse(attributes);
+      } catch (error) {
+        parsedAttributes = attributes;
+      }
+      console.log(parsedAttributes);
+
+      filter['$or'] = parsedAttributes.map((attr) => ({
+        prd_attributes: {
+          $elemMatch: {
+            id: convertToObjectIdMongodb(attr.id),
+            values: {
+              $elemMatch: {
+                id: {
+                  $in: attr.values.map((val) => convertToObjectIdMongodb(val)),
+                },
+              },
+            },
+          },
+        },
+      }));
     }
 
+    // Sort
     const mappedSort = sort
       ? `${sort.startsWith('-') ? '-' : ''}${
           SortFieldProduct[sort.replace('-', '')] || 'createdAt'
@@ -334,36 +546,104 @@ class ProductService {
       size: formatSize,
     };
 
+    // Fetch products
     const products = await this.productRepository.getAll({
       filter: filter,
       queryOptions: query,
     });
 
     const totalProducts = await this.productRepository.countDocuments(filter);
-    const totalPages = Math.ceil(totalProducts / size);
+
+    return listResponse({
+      items: products.map((product) => {
+        const priceInfo = this._calculateProductPrice(product);
+        console.log(product);
+        return {
+          ...pickFields({
+            fields: ['code', 'name', 'slug', 'mainImage', 'variants'],
+            object: product,
+          }),
+          price: priceInfo.price,
+          discountedPrice: priceInfo.discountedPrice,
+          hasDiscount: priceInfo.hasDiscount,
+        };
+      }),
+      total: totalProducts,
+      page: formatPage,
+      size: formatSize,
+    });
+  }
+
+  _calculateProductPrice(product) {
+    const {
+      originalPrice,
+      minPrice,
+      maxPrice,
+      discountType,
+      discountValue,
+      discountStart,
+      discountEnd,
+      variants,
+    } = product;
+
+    const hasVariants = variants && variants.length > 0;
+
+    let price;
+    if (hasVariants) {
+      if (minPrice === maxPrice) {
+        price = minPrice;
+      } else {
+        price = { min: minPrice, max: maxPrice };
+      }
+    } else {
+      price = originalPrice;
+    }
+
+    const now = new Date();
+    const isDiscountActive =
+      discountStart &&
+      discountEnd &&
+      now >= new Date(discountStart) &&
+      now <= new Date(discountEnd);
+
+    let discountedPrice = null;
+    if (isDiscountActive && discountValue > 0) {
+      if (typeof price === 'object') {
+        discountedPrice = {
+          min: this._calculateDiscountedValue(
+            price.min,
+            discountType,
+            discountValue
+          ),
+          max: this._calculateDiscountedValue(
+            price.max,
+            discountType,
+            discountValue
+          ),
+        };
+      } else {
+        discountedPrice = this._calculateDiscountedValue(
+          price,
+          discountType,
+          discountValue
+        );
+      }
+    }
 
     return {
-      totalPages,
-      totalProducts,
-      currentPage: formatPage,
-      products: products.map((product) =>
-        omitFields({
-          fields: [
-            'subImages',
-            'quantity',
-            'category',
-            'attributes',
-            'views',
-            'uniqueViews',
-            'createdAt',
-            'updatedAt',
-            'sold',
-            'status',
-          ],
-          object: product,
-        })
-      ),
+      price,
+      discountedPrice,
+      hasDiscount: isDiscountActive && discountValue > 0,
     };
+  }
+
+  _calculateDiscountedValue(price, discountType, discountValue) {
+    if (discountType === 'AMOUNT') {
+      return price - discountValue;
+    } else if (discountType === 'PERCENT') {
+      return price * (1 - discountValue / 100);
+    }
+    return price;
   }
 
   async getAllProducts({

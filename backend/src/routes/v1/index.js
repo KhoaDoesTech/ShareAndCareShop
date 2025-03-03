@@ -19,5 +19,7 @@ router.use('/api/v1/delivery', require('./delivery'));
 router.use('/api/v1/role', require('./role'));
 router.use('/api/v1/statistics', require('./statistics'));
 router.use('/api/v1/review', require('./review'));
+// router.use('/api/v1/comment', require('./comment'));
+router.use('/api/v1/attributes', require('./attributes'));
 
 module.exports = router;

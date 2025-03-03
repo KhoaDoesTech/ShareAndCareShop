@@ -6,6 +6,7 @@ const {
   InternalServerError,
   BadRequestError,
 } = require('../utils/errorResponse');
+const QRCode = require('qrcode');
 
 class UploadService {
   constructor() {
@@ -44,6 +45,41 @@ class UploadService {
     }
   }
 
+  async uploadQRCode({ text, temporary = true }) {
+    if (!text) {
+      throw new Error('Please provide valid text for QR code');
+    }
+
+    const uniqueFileName = `${uuidv4()}`;
+    const tempPath = `./temp_qr_${uniqueFileName}.png`;
+
+    try {
+      await QRCode.toFile(tempPath, text, { width: 1000, height: 1000 });
+
+      const result = await cloudinary.uploader.upload(tempPath, {
+        public_id: uniqueFileName,
+        folder: `shareandcare/qrcodes`,
+        transformation: [
+          { width: 1000, height: 1000, crop: 'fill' },
+          { quality: 'auto:good', fetch_format: 'auto' },
+        ],
+      });
+
+      if (temporary) {
+        await this.uploadRepository.create({
+          upl_public_id: result.public_id,
+          upl_url: result.secure_url,
+        });
+      }
+
+      return result.secure_url;
+    } catch (error) {
+      throw new Error('Failed to upload QR code');
+    } finally {
+      removeLocalFile(tempPath);
+    }
+  }
+
   async deleteImageByUrl(url) {
     try {
       const publicId = extractPublicIdFromUrl(url);
@@ -76,25 +112,19 @@ class UploadService {
     }
   }
 
-  async deleteUsedImage(mainImage, subImages) {
+  async deleteUsedImages(imageUrls = []) {
     try {
-      const imagesToDelete = [];
+      if (!Array.isArray(imageUrls) || imageUrls.length === 0) return;
 
-      if (mainImage) {
-        const mainImagePublicId = extractPublicIdFromUrl(mainImage);
-        if (mainImagePublicId) imagesToDelete.push(mainImagePublicId);
-      }
+      const imagesToDelete = imageUrls
+        .map(extractPublicIdFromUrl)
+        .filter(Boolean);
 
-      if (subImages && Array.isArray(subImages)) {
-        subImages.forEach((subImage) => {
-          const subImagePublicId = extractPublicIdFromUrl(subImage);
-          if (subImagePublicId) imagesToDelete.push(subImagePublicId);
-        });
-      }
+      if (imagesToDelete.length === 0) return;
 
-      for (const publicId of imagesToDelete) {
-        await this.uploadRepository.deleteOne({ upl_public_id: publicId });
-      }
+      await this.uploadRepository.deleteMany({
+        upl_public_id: { $in: imagesToDelete },
+      });
     } catch (error) {
       throw new InternalServerError('Failed to delete images');
     }

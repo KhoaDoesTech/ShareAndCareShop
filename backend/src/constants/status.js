@@ -80,6 +80,11 @@ const SortFieldOrder = {
   UPDATED_AT: 'updatedAt',
 };
 
+const SortFieldAttribute = {
+  CREATED_AT: 'createdAt',
+  UPDATED_AT: 'updatedAt',
+};
+
 const CartStatus = {
   LOCK: 'LOCK',
   FAIL: 'FAIL',
@@ -104,6 +109,21 @@ const CouponType = {
 
 const AvailableCouponType = Object.values(CouponType);
 
+const Action = {
+  CREATE: 'CREATE',
+  UPDATE: 'UPDATE',
+  DELETE: 'DELETE',
+};
+
+const AvailableActions = Object.values(Action);
+
+const AttributeType = {
+  TEXT: 'TEXT',
+  COLOR: 'COLOR',
+};
+
+const AvailableAttributeTypes = Object.values(AttributeType);
+
 module.exports = {
   UserLoginType,
   AvailableSocialLogins,
@@ -126,4 +146,9 @@ module.exports = {
   SortFieldUser,
   SortFieldOrder,
   SortFieldRole,
+  Action,
+  AvailableActions,
+  AttributeType,
+  AvailableAttributeTypes,
+  SortFieldAttribute,
 };

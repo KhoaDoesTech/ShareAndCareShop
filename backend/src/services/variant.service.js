@@ -1,4 +1,5 @@
 const { ProductStatus } = require('../constants/status');
+const ProductRepository = require('../repositories/product.repository');
 const VariantRepository = require('../repositories/variant.repository');
 const { BadRequestError } = require('../utils/errorResponse');
 const {
@@ -10,23 +11,28 @@ const {
 class VariantService {
   constructor() {
     this.variantRepository = new VariantRepository();
+    this.productRepository = new ProductRepository();
   }
 
-  async createVariants({ product, variants, skuList }) {
+  async createVariants({ productKey, skuList }) {
+    const foundProduct = await this.productRepository.getProduct(productKey);
+    if (!foundProduct) {
+      throw new BadRequestError(`Product with ID: ${productKey} not found`);
+    }
+
     const convertSkuList = skuList.map((sku, index) => ({
-      prd_id: product.id,
-      prd_name: product.name,
+      prd_id: foundProduct.id,
+      prd_name: foundProduct.name,
       var_tier_idx: sku.tierIndex,
       var_default: sku.isDefault,
-      var_slug: generateVariantSlug(variants, sku.tierIndex),
+      var_slug: sku.slug,
       var_price: sku.price,
-      var_quantity: sku.quantity,
     }));
 
     const variant = await this.variantRepository.create(convertSkuList);
     if (!variant) throw new BadRequestError('Failed to create variant');
 
-    return variant;
+    return foundProduct.code;
   }
 
   async updateOrCreateVariants(product, variants, skuList) {

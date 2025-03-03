@@ -114,6 +114,20 @@ const sortObject = (obj) => {
   return sorted;
 };
 
+const listResponse = ({ items, total, page, size }) => {
+  const totalPages = Math.ceil(total / size);
+  const hasMore = page < totalPages;
+
+  return {
+    total,
+    totalPages,
+    page,
+    size,
+    hasMore,
+    items,
+  };
+};
+
 module.exports = {
   convertToObjectIdMongodb,
   getRandomNumber,
@@ -128,4 +142,5 @@ module.exports = {
   getVariantImageOrDefault,
   parseJwt,
   sortObject,
+  listResponse,
 };

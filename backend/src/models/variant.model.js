@@ -21,6 +21,8 @@ const variantSchema = new Schema(
       enum: ProductStatus,
       default: ProductStatus.DRAFT,
     },
+    createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    updatedBy: { type: Schema.Types.ObjectId, ref: 'User' },
   },
   {
     collection: COLLECTION_NAME,
