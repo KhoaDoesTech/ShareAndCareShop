@@ -28,7 +28,7 @@ class ProductRepository extends BaseRepository {
     if (mongoose.Types.ObjectId.isValid(identifier)) {
       query = { _id: identifier };
     } else {
-      query = { $or: [{ prd_id: identifier }, { prd_slug: identifier }] };
+      query = { $or: [{ prd_code: identifier }, { prd_slug: identifier }] };
     }
 
     return this.formatDocument(await this.model.findOne(query));
@@ -47,7 +47,6 @@ class ProductRepository extends BaseRepository {
       mainImage: product.prd_main_image,
       subImages: product.prd_sub_images,
       qrCode: product.prd_qr_code,
-      price: product.prd_price,
       originalPrice: product.prd_original_price,
       minPrice: product.prd_min_price,
       maxPrice: product.prd_max_price,

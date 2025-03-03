@@ -1,7 +1,6 @@
 'use strict';
 
 const { model, Schema } = require('mongoose');
-const ProductHistory = require('./productHistory.model');
 const slugify = require('slugify');
 const SERVER_CONFIG = require('../configs/server.config');
 const {
@@ -154,42 +153,6 @@ productSchema.pre('save', async function (next) {
 
   next();
 });
-
-productSchema.post('save', async function (doc) {
-  await _saveProductHistory(doc, 'CREATE');
-});
-
-productSchema.post('findOneAndUpdate', async function (doc) {
-  if (doc) await _saveProductHistory(doc, 'UPDATE');
-});
-
-productSchema.post('findOneAndDelete', async function (doc) {
-  if (doc) await _saveProductHistory(doc, 'DELETE');
-});
-
-async function _saveProductHistory(doc, operation) {
-  if (!doc) return;
-
-  await ProductHistory.create({
-    prd_id: doc._id,
-    prd_code: doc.prd_code,
-    prd_version: Date.now(),
-    prd_action: operation,
-    prd_changed_by: doc.updatedBy,
-
-    prd_name: doc.prd_name,
-    prd_slug: doc.prd_slug,
-    prd_main_image: doc.prd_main_image,
-    prd_sub_images: doc.prd_sub_images,
-    prd_qr_code: doc.prd_qr_code,
-    prd_video: doc.prd_video,
-    prd_description: doc.prd_description,
-    prd_category: doc.prd_category,
-    prd_attributes: doc.prd_attributes,
-    prd_variants: doc.prd_variants,
-    return_days: doc.return_days,
-  });
-}
 
 //Export the model
 module.exports = model(DOCUMENT_NAME, productSchema);

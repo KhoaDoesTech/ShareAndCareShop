@@ -76,7 +76,7 @@ class AttributeService {
     if (!attribute) {
       throw new NotFoundError('Attribute not found');
     }
-    console.log(attribute);
+
     // Get existing attribute values
     const existingValueSet = new Set(attribute.values.map((v) => v.value));
 

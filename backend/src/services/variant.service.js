@@ -17,7 +17,7 @@ class VariantService {
   async createVariants({ productKey, skuList }) {
     const foundProduct = await this.productRepository.getProduct(productKey);
     if (!foundProduct) {
-      throw new BadRequestError(`Product with ID: ${productId} not found`);
+      throw new BadRequestError(`Product with ID: ${productKey} not found`);
     }
 
     const convertSkuList = skuList.map((sku, index) => ({
@@ -32,7 +32,7 @@ class VariantService {
     const variant = await this.variantRepository.create(convertSkuList);
     if (!variant) throw new BadRequestError('Failed to create variant');
 
-    return foundProduct.productId;
+    return foundProduct.code;
   }
 
   async updateOrCreateVariants(product, variants, skuList) {

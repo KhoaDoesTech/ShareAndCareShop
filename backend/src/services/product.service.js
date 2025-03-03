@@ -13,6 +13,7 @@ const {
   pickFields,
   convertToObjectIdMongodb,
   generateVariantSlug,
+  listResponse,
 } = require('../utils/helpers');
 const UploadService = require('./upload.service');
 
@@ -378,6 +379,93 @@ class ProductService {
     };
   }
 
+  // async getAllProductsPublic({
+  //   search,
+  //   category,
+  //   minPrice,
+  //   maxPrice,
+  //   sort,
+  //   page = 1,
+  //   size = 10,
+  //   attributes,
+  // }) {
+  //   const filter = { prd_status: ProductStatus.PUBLISHED };
+  //   const formatPage = parseInt(page);
+  //   const formatSize = parseInt(size);
+
+  //   if (search) {
+  //     const keyword = search.trim();
+  //     const regexOptions = { $regex: keyword, $options: 'i' };
+
+  //     filter.$or =
+  //       keyword.length === 1
+  //         ? [
+  //             { prd_name: { $regex: `^${keyword}`, $options: 'i' } },
+  //             { prd_description: regexOptions },
+  //           ]
+  //         : [{ prd_name: regexOptions }, { prd_description: regexOptions }];
+  //   }
+
+  //   if (category) {
+  //     filter.prd_category = {
+  //       $elemMatch: { id: convertToObjectIdMongodb(category) },
+  //     };
+  //   }
+
+  //   if (minPrice || maxPrice) {
+  //     filter.prd_price = {};
+  //     if (minPrice) filter.prd_price.$gte = parseFloat(minPrice);
+  //     if (maxPrice) filter.prd_price.$lte = parseFloat(maxPrice);
+  //   }
+
+  //   if (attributes && attributes.length) {
+  //     filter.prd_attributes = { $in: attributes };
+  //   }
+
+  //   const mappedSort = sort
+  //     ? `${sort.startsWith('-') ? '-' : ''}${
+  //         SortFieldProduct[sort.replace('-', '')] || 'createdAt'
+  //       }`
+  //     : '-createdAt';
+
+  //   const query = {
+  //     sort: mappedSort,
+  //     page: formatPage,
+  //     size: formatSize,
+  //   };
+
+  //   const products = await this.productRepository.getAll({
+  //     filter: filter,
+  //     queryOptions: query,
+  //   });
+
+  //   const totalProducts = await this.productRepository.countDocuments(filter);
+  //   const totalPages = Math.ceil(totalProducts / size);
+
+  //   return {
+  //     totalPages,
+  //     totalProducts,
+  //     currentPage: formatPage,
+  //     products: products.map((product) =>
+  //       omitFields({
+  //         fields: [
+  //           'subImages',
+  //           'quantity',
+  //           'category',
+  //           'attributes',
+  //           'views',
+  //           'uniqueViews',
+  //           'createdAt',
+  //           'updatedAt',
+  //           'sold',
+  //           'status',
+  //         ],
+  //         object: product,
+  //       })
+  //     ),
+  //   };
+  // }
+
   async getAllProductsPublic({
     search,
     category,
@@ -392,6 +480,7 @@ class ProductService {
     const formatPage = parseInt(page);
     const formatSize = parseInt(size);
 
+    // Search filter
     if (search) {
       const keyword = search.trim();
       const regexOptions = { $regex: keyword, $options: 'i' };
@@ -405,12 +494,14 @@ class ProductService {
           : [{ prd_name: regexOptions }, { prd_description: regexOptions }];
     }
 
+    // Category filter
     if (category) {
       filter.prd_category = {
         $elemMatch: { id: convertToObjectIdMongodb(category) },
       };
     }
 
+    // Price filter
     if (minPrice || maxPrice) {
       filter.prd_price = {};
       if (minPrice) filter.prd_price.$gte = parseFloat(minPrice);
@@ -418,9 +509,31 @@ class ProductService {
     }
 
     if (attributes && attributes.length) {
-      filter.prd_attributes = { $in: attributes };
+      let parsedAttributes;
+      try {
+        parsedAttributes = JSON.parse(attributes);
+      } catch (error) {
+        parsedAttributes = attributes;
+      }
+      console.log(parsedAttributes);
+
+      filter['$or'] = parsedAttributes.map((attr) => ({
+        prd_attributes: {
+          $elemMatch: {
+            id: convertToObjectIdMongodb(attr.id),
+            values: {
+              $elemMatch: {
+                id: {
+                  $in: attr.values.map((val) => convertToObjectIdMongodb(val)),
+                },
+              },
+            },
+          },
+        },
+      }));
     }
 
+    // Sort
     const mappedSort = sort
       ? `${sort.startsWith('-') ? '-' : ''}${
           SortFieldProduct[sort.replace('-', '')] || 'createdAt'
@@ -433,36 +546,104 @@ class ProductService {
       size: formatSize,
     };
 
+    // Fetch products
     const products = await this.productRepository.getAll({
       filter: filter,
       queryOptions: query,
     });
 
     const totalProducts = await this.productRepository.countDocuments(filter);
-    const totalPages = Math.ceil(totalProducts / size);
+
+    return listResponse({
+      items: products.map((product) => {
+        const priceInfo = this._calculateProductPrice(product);
+        console.log(product);
+        return {
+          ...pickFields({
+            fields: ['code', 'name', 'slug', 'mainImage', 'variants'],
+            object: product,
+          }),
+          price: priceInfo.price,
+          discountedPrice: priceInfo.discountedPrice,
+          hasDiscount: priceInfo.hasDiscount,
+        };
+      }),
+      total: totalProducts,
+      page: formatPage,
+      size: formatSize,
+    });
+  }
+
+  _calculateProductPrice(product) {
+    const {
+      originalPrice,
+      minPrice,
+      maxPrice,
+      discountType,
+      discountValue,
+      discountStart,
+      discountEnd,
+      variants,
+    } = product;
+
+    const hasVariants = variants && variants.length > 0;
+
+    let price;
+    if (hasVariants) {
+      if (minPrice === maxPrice) {
+        price = minPrice;
+      } else {
+        price = { min: minPrice, max: maxPrice };
+      }
+    } else {
+      price = originalPrice;
+    }
+
+    const now = new Date();
+    const isDiscountActive =
+      discountStart &&
+      discountEnd &&
+      now >= new Date(discountStart) &&
+      now <= new Date(discountEnd);
+
+    let discountedPrice = null;
+    if (isDiscountActive && discountValue > 0) {
+      if (typeof price === 'object') {
+        discountedPrice = {
+          min: this._calculateDiscountedValue(
+            price.min,
+            discountType,
+            discountValue
+          ),
+          max: this._calculateDiscountedValue(
+            price.max,
+            discountType,
+            discountValue
+          ),
+        };
+      } else {
+        discountedPrice = this._calculateDiscountedValue(
+          price,
+          discountType,
+          discountValue
+        );
+      }
+    }
 
     return {
-      totalPages,
-      totalProducts,
-      currentPage: formatPage,
-      products: products.map((product) =>
-        omitFields({
-          fields: [
-            'subImages',
-            'quantity',
-            'category',
-            'attributes',
-            'views',
-            'uniqueViews',
-            'createdAt',
-            'updatedAt',
-            'sold',
-            'status',
-          ],
-          object: product,
-        })
-      ),
+      price,
+      discountedPrice,
+      hasDiscount: isDiscountActive && discountValue > 0,
     };
+  }
+
+  _calculateDiscountedValue(price, discountType, discountValue) {
+    if (discountType === 'AMOUNT') {
+      return price - discountValue;
+    } else if (discountType === 'PERCENT') {
+      return price * (1 - discountValue / 100);
+    }
+    return price;
   }
 
   async getAllProducts({
