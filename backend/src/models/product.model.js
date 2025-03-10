@@ -18,7 +18,7 @@ const productSchema = new Schema(
     // Basic product information
     prd_code: { type: String, required: true, unique: true, trim: true },
     prd_name: { type: String, required: true },
-    prd_slug: { type: String, unique: true, trim: true },
+    prd_slug: { type: String, unique: true, trim: true, default: '' },
     prd_description: { type: String },
     prd_video: { type: String },
 
@@ -66,9 +66,9 @@ const productSchema = new Schema(
     },
 
     // Product pricing
-    prd_original_price: { type: Number },
-    prd_min_price: { type: Number },
-    prd_max_price: { type: Number },
+    prd_original_price: { type: Number, default: 0 },
+    prd_min_price: { type: Number, default: 0 },
+    prd_max_price: { type: Number, default: 0 },
 
     // Discount details
     prd_discount_type: {
@@ -77,8 +77,8 @@ const productSchema = new Schema(
       default: CouponType.AMOUNT, // PERCENT
     },
     prd_discount_value: { type: Number, required: true, default: 0 },
-    prd_discount_start: { type: Date },
-    prd_discount_end: { type: Date },
+    prd_discount_start: { type: Date, default: null },
+    prd_discount_end: { type: Date, default: null },
 
     // Stock & sales tracking
     prd_quantity: { type: Number, required: true, default: 0 },
@@ -108,6 +108,7 @@ const productSchema = new Schema(
 
     // Analytics
     prd_rating: { type: Number, required: true, default: 0 },
+    prd_rating_count: { type: Number, required: true, default: 0 },
     prd_views: { type: Number, default: 0 },
     prd_unique_views: { type: Array, default: [] },
 

@@ -26,10 +26,12 @@ router.post(
 );
 
 router.get(
-  '/',
+  '/all',
   authentication,
   verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.ATTRIBUTE.VIEW),
   asyncHandler(AttributeController.getAllAttributes)
 );
+
+router.get('/', asyncHandler(AttributeController.getAttributesByUser));
 
 module.exports = router;

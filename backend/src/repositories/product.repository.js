@@ -3,6 +3,7 @@
 const BaseRepository = require('./base.repository');
 const productModels = require('../models/product.model');
 const mongoose = require('mongoose');
+const { ProductStatus } = require('../constants/status');
 
 class ProductRepository extends BaseRepository {
   constructor() {
@@ -34,6 +35,23 @@ class ProductRepository extends BaseRepository {
     return this.formatDocument(await this.model.findOne(query));
   }
 
+  async getProductsPublished(identifier) {
+    let productFilter = { prd_status: ProductStatus.PUBLISHED };
+
+    if (mongoose.Types.ObjectId.isValid(identifier)) {
+      productFilter._id = identifier;
+    } else {
+      productFilter.$or = [{ prd_code: identifier }, { prd_slug: identifier }];
+    }
+
+    const populateOptions = [
+      { path: 'prd_attributes.id', model: 'Attribute' },
+      { path: 'prd_attributes.values.id', model: 'AttributeValue' },
+    ];
+
+    return await this.getByQuery(productFilter, populateOptions);
+  }
+
   formatDocument(product) {
     if (!product) return null;
 
@@ -57,9 +75,20 @@ class ProductRepository extends BaseRepository {
       quantity: product.prd_quantity,
       sold: product.prd_sold,
       category: product.prd_category,
-      attributes: product.prd_attributes,
+      attributes: product.prd_attributes.map((attr) => ({
+        id: attr.id._id,
+        name: attr.id.attr_name,
+        type: attr.id.attr_type,
+        isVariant: attr.id.attr_is_variant,
+        values: attr.values.map((val) => ({
+          id: val.id._id,
+          value: val.id.value,
+          descriptionUrl: val.id.description_url,
+        })),
+      })),
       status: product.prd_status,
       rating: product.prd_rating,
+      ratingCount: product.prd_rating_count,
       views: product.prd_views,
       uniqueViews: product.prd_unique_views,
       createdBy: product.createdBy,

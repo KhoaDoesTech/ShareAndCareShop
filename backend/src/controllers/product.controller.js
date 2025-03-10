@@ -23,7 +23,10 @@ class ProductController {
   updateProduct = async (req, res, next) => {
     new ActionSuccess({
       message: 'Product updated successfully',
-      metadata: await this.productService.updateProduct(req.body),
+      metadata: await this.productService.updateProduct({
+        userId: req.user.id,
+        ...req.body,
+      }),
     }).send(res);
   };
 

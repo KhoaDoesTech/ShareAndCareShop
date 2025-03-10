@@ -22,6 +22,29 @@ class VariantRepository extends BaseRepository {
     return variants;
   }
 
+  async findBySlug(productId, slug) {
+    const variant = await this.model
+      .findOne({ prd_id: productId, var_slug: slug })
+      .lean();
+
+    return this.formatDocument(variant);
+  }
+
+  async updateSku(sku) {
+    const updateData = {
+      var_price: sku.price,
+      var_quantity: sku.quantity,
+      var_status: sku.status,
+      updatedBy: sku.updatedBy,
+      updatedAt: new Date(),
+    };
+
+    return await this.model.updateOne(
+      { prd_id: sku.productId, var_slug: sku.slug },
+      { $set: updateData }
+    );
+  }
+
   formatDocument(variant) {
     if (!variant) return null;
 

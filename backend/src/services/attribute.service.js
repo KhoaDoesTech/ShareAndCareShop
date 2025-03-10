@@ -189,6 +189,58 @@ class AttributeService {
       size: formatSize,
     });
   }
+
+  async getAttributesByUser() {
+    const filters = { attr_is_active: true };
+    const queryOptions = { sort: 'attr_name' };
+    const populateOptions = 'attr_values';
+
+    const attributes = await this.attributeRepository.getAll({
+      filter: filters,
+      queryOptions,
+      populateOptions,
+    });
+
+    return {
+      attributes: attributes.map((attribute) => ({
+        id: attribute.id,
+        type: attribute.type,
+        name: attribute.name,
+        values: attribute.values.map((value) => ({
+          id: value.valueId,
+          value: value.value,
+          description_url: value.descriptionUrl,
+        })),
+      })),
+    };
+  }
+
+  async getProductAttributes(isVariant) {
+    const filters = { attr_is_active: true, attr_is_variant: isVariant };
+    const queryOptions = { sort: 'attr_name' };
+    const populateOptions = 'attr_values';
+
+    const attributes = await this.attributeRepository.getAll({
+      filter: filters,
+      queryOptions,
+      populateOptions,
+    });
+
+    return {
+      attributes: attributes.map((attribute) => ({
+        id: attribute.id,
+        type: attribute.type,
+        name: attribute.name,
+        values: attribute.values.map((value) => ({
+          id: value.valueId,
+          value: value.value,
+          description_url: value.descriptionUrl,
+        })),
+      })),
+    };
+  }
+
+  async deleteUnusedAttributes() {}
 }
 
 module.exports = AttributeService;

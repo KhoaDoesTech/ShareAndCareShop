@@ -32,6 +32,13 @@ class AttributeController {
       metadata: await this.attributeService.getAllAttributes(req.query),
     }).send(res);
   };
+
+  getAttributesByUser = async (req, res, next) => {
+    new ActionSuccess({
+      message: 'Attributes retrieved successfully',
+      metadata: await this.attributeService.getAttributesByUser(),
+    }).send(res);
+  };
 }
 
 module.exports = new AttributeController();
