@@ -1,5 +1,9 @@
 'use strict';
-const { ProductStatus, SortFieldProduct } = require('../constants/status');
+const {
+  ProductStatus,
+  SortFieldProduct,
+  SELLABLE_STATUSES,
+} = require('../constants/status');
 const AttributeRepository = require('../repositories/attribute.repository');
 const AttributeValueRepository = require('../repositories/attributeValue.repository');
 const CategoryRepository = require('../repositories/category.repository');
@@ -251,7 +255,7 @@ class ProductService {
     }
 
     const prices = updatedSkuList
-      .filter((sku) => sku.status === ProductStatus.PUBLISHED)
+      .filter((sku) => SELLABLE_STATUSES.has(sku.status))
       .map((sku) => sku.price);
     let minPrice = prices.length ? Math.min(...prices) : foundProduct.minPrice;
     let maxPrice = prices.length ? Math.max(...prices) : foundProduct.maxPrice;

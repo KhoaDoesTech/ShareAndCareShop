@@ -35,6 +35,11 @@ const ProductStatus = {
   DISCONTINUED: 'DISCONTINUED',
 };
 
+const SELLABLE_STATUSES = new Set([
+  ProductStatus.PUBLISHED,
+  ProductStatus.OUT_OF_STOCK,
+]);
+
 const AvailableProductStatus = Object.values(ProductStatus);
 
 const SortFieldProduct = {
@@ -151,4 +156,5 @@ module.exports = {
   AttributeType,
   AvailableAttributeTypes,
   SortFieldAttribute,
+  SELLABLE_STATUSES,
 };
