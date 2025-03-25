@@ -110,6 +110,8 @@ class VariantService {
             'sold',
             'name',
             'productId',
+            'createdBy',
+            'updatedBy',
           ],
           object: sku,
         })

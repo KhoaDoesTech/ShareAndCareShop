@@ -693,9 +693,49 @@ class ProductService {
   //   };
   // }
 
+  _updateProductViews(productId) {
+    const updatedProduct = this.productRepository.updateById(productId, {
+      $inc: { prd_views: 1 },
+    });
+
+    if (!updatedProduct) {
+      throw new BadRequestError('Product not found');
+    }
+  }
+
+  async updateProductUniqueViews({ productId, deviceId }) {
+    const updatedProduct = await this.productRepository.updateById(productId, {
+      $addToSet: { prd_unique_views: deviceId },
+    });
+
+    if (!updatedProduct) {
+      throw new BadRequestError('Failed to update product views');
+    }
+  }
+
+  // async getProductDetails({ productId }) {
+  //   const foundProduct = await this.productRepository.getById(productId);
+
+  //   if (!foundProduct) {
+  //     throw new BadRequestError('Product not found');
+  //   }
+
+  //   const skuList = await this.variantService.getVariantByProductId(productId);
+
+  //   return {
+  //     product: omitFields({
+  //       fields: ['createdAt', 'updatedAt'],
+  //       object: foundProduct,
+  //     }),
+  //     skuList,
+  //   };
+  // }
+
   async getProductDetailsPublic({ productKey }) {
-    const foundProduct = await this.productRepository.getProductsPublished(
-      productKey
+    const productFilter = { prd_status: ProductStatus.PUBLISHED };
+    const foundProduct = await this.productRepository.getProductsInfo(
+      productKey,
+      productFilter
     );
 
     if (!foundProduct) {
@@ -743,46 +783,12 @@ class ProductService {
     };
   }
 
-  _updateProductViews(productId) {
-    const updatedProduct = this.productRepository.updateById(productId, {
-      $inc: { prd_views: 1 },
-    });
-
-    if (!updatedProduct) {
-      throw new BadRequestError('Product not found');
-    }
-  }
-
-  async updateProductUniqueViews({ productId, deviceId }) {
-    const updatedProduct = await this.productRepository.updateById(productId, {
-      $addToSet: { prd_unique_views: deviceId },
-    });
-
-    if (!updatedProduct) {
-      throw new BadRequestError('Failed to update product views');
-    }
-  }
-
-  // async getProductDetails({ productId }) {
-  //   const foundProduct = await this.productRepository.getById(productId);
-
-  //   if (!foundProduct) {
-  //     throw new BadRequestError('Product not found');
-  //   }
-
-  //   const skuList = await this.variantService.getVariantByProductId(productId);
-
-  //   return {
-  //     product: omitFields({
-  //       fields: ['createdAt', 'updatedAt'],
-  //       object: foundProduct,
-  //     }),
-  //     skuList,
-  //   };
-  // }
-
   async getProductDetails({ productKey }) {
-    const foundProduct = await this.productRepository.getProduct(productKey);
+    const productFilter = {};
+    const foundProduct = await this.productRepository.getProductsInfo(
+      productKey,
+      productFilter
+    );
 
     if (!foundProduct) {
       throw new BadRequestError('Product not found');

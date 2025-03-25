@@ -35,9 +35,7 @@ class ProductRepository extends BaseRepository {
     return this.formatDocument(await this.model.findOne(query));
   }
 
-  async getProductsPublished(identifier) {
-    let productFilter = { prd_status: ProductStatus.PUBLISHED };
-
+  async getProductsInfo(identifier, productFilter = {}) {
     if (mongoose.Types.ObjectId.isValid(identifier)) {
       productFilter._id = identifier;
     } else {
@@ -75,12 +73,12 @@ class ProductRepository extends BaseRepository {
       quantity: product.prd_quantity,
       sold: product.prd_sold,
       category: product.prd_category,
-      attributes: product.prd_attributes.map((attr) => ({
+      attributes: product.prd_attributes?.map((attr) => ({
         id: attr.id?._id,
         name: attr.id?.attr_name,
         type: attr.id?.attr_type,
         isVariant: attr.id?.attr_is_variant,
-        values: attr.values.map((val) => ({
+        values: attr.values?.map((val) => ({
           id: val.id?._id,
           value: val.id?.value,
           descriptionUrl: val.id?.description_url,

@@ -18,6 +18,8 @@ class BaseRepository {
     }
     const document = await documentQuery.lean();
 
+    console.log(document);
+
     return this.formatDocument(document);
   }
 

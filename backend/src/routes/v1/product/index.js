@@ -13,7 +13,7 @@ const productController = new ProductController();
 
 router.get('/public', asyncHandler(productController.getAllProductsByUser));
 router.get(
-  '/public/:productId',
+  '/public/:productKey',
   asyncHandler(productController.getProductDetailsByUser)
 );
 router.patch(
