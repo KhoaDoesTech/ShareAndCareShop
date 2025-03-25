@@ -20,11 +20,13 @@ const {
   listResponse,
 } = require('../utils/helpers');
 const UploadService = require('./upload.service');
+const VariantService = require('./variant.service');
 
 class ProductService {
   constructor() {
     this.productRepository = new ProductRepository();
     this.variantRepository = new VariantRepository();
+    this.variantService = new VariantService();
     this.categoryRepository = new CategoryRepository();
     this.attributeRepository = new AttributeRepository();
     this.attributeValueRepository = new AttributeValueRepository();
@@ -354,143 +356,6 @@ class ProductService {
     return updatedSkuList;
   }
 
-  async deleteProduct({ productId }) {
-    const deletedProduct = await this.productRepository.deleteById(productId);
-
-    if (!deletedProduct) {
-      throw new BadRequestError('Product not found');
-    }
-
-    await this.variantService.deleteVariants(productId);
-
-    // this.uploadService.deleteUsedImage(
-    //   deletedProduct.mainImage,
-    //   deletedProduct.subImages
-    // );
-  }
-
-  // async getProductDetailsPublic({ productId }) {
-  //   const foundProduct = await this.productRepository.getByQuery({
-  //     _id: productId,
-  //     prd_status: ProductStatus.PUBLISHED,
-  //   });
-
-  //   if (!foundProduct) {
-  //     throw new BadRequestError('Product not found');
-  //   }
-
-  //   const skuList = await this.variantService.getPublicVariantByProductId(
-  //     productId
-  //   );
-
-  //   this._updateProductViews(productId);
-
-  //   return {
-  //     product: omitFields({
-  //       fields: [
-  //         'views',
-  //         'uniqueViews',
-  //         'createdAt',
-  //         'updatedAt',
-  //         'sold',
-  //         'status',
-  //       ],
-  //       object: foundProduct,
-  //     }),
-  //     skuList,
-  //   };
-  // }
-
-  async getProductDetailsPublic({ productKey }) {
-    const foundProduct = await this.productRepository.getProductsPublished(
-      productKey
-    );
-
-    console.log(foundProduct);
-
-    if (!foundProduct) {
-      throw new BadRequestError('Product not found');
-    }
-
-    const skuList = await this.variantService.getPublicVariantByProductId(
-      foundProduct.id
-    );
-
-    this._updateProductViews(foundProduct.id);
-
-    const priceInfo = this._calculateProductPrice(foundProduct);
-
-    return {
-      product: {
-        ...pickFields({
-          fields: [
-            'code',
-            'name',
-            'slug',
-            'mainImage',
-            'subImages',
-            'qrCode',
-            'description',
-            'video',
-            'returnDays',
-            'variants',
-            'rating',
-            'ratingCount',
-          ],
-          object: foundProduct,
-        }),
-        attributes: this._formatAttributes(
-          foundProduct.attributes.filter((attr) => !attr.isVariant)
-        ),
-        variantAttributes: this._formatAttributes(
-          foundProduct.attributes.filter((attr) => attr.isVariant)
-        ),
-        price: priceInfo.price,
-        discountedPrice: priceInfo.discountedPrice,
-        hasDiscount: priceInfo.hasDiscount,
-      },
-      skuList,
-    };
-  }
-
-  _updateProductViews(productId) {
-    const updatedProduct = this.productRepository.updateById(productId, {
-      $inc: { prd_views: 1 },
-    });
-
-    if (!updatedProduct) {
-      throw new BadRequestError('Product not found');
-    }
-  }
-
-  async updateProductUniqueViews({ productId, deviceId }) {
-    const updatedProduct = await this.productRepository.updateById(productId, {
-      $addToSet: { prd_unique_views: deviceId },
-    });
-
-    if (!updatedProduct) {
-      throw new BadRequestError('Failed to update product views');
-    }
-  }
-
-  async getProductDetails({ productId }) {
-    const foundProduct = await this.productRepository.getById(productId);
-
-    if (!foundProduct) {
-      throw new BadRequestError('Product not found');
-    }
-
-    const skuList = await this.variantService.getVariantByProductId(productId);
-
-    return {
-      product: omitFields({
-        fields: ['createdAt', 'updatedAt'],
-        object: foundProduct,
-      }),
-      skuList,
-    };
-  }
-
   async getAllProductsPublic({
     search,
     category,
@@ -778,6 +643,176 @@ class ProductService {
           object: product,
         })
       ),
+    };
+  }
+
+  async deleteProduct({ productId }) {
+    const deletedProduct = await this.productRepository.deleteById(productId);
+
+    if (!deletedProduct) {
+      throw new BadRequestError('Product not found');
+    }
+
+    await this.variantService.deleteVariants(productId);
+
+    // this.uploadService.deleteUsedImage(
+    //   deletedProduct.mainImage,
+    //   deletedProduct.subImages
+    // );
+  }
+
+  // async getProductDetailsPublic({ productId }) {
+  //   const foundProduct = await this.productRepository.getByQuery({
+  //     _id: productId,
+  //     prd_status: ProductStatus.PUBLISHED,
+  //   });
+
+  //   if (!foundProduct) {
+  //     throw new BadRequestError('Product not found');
+  //   }
+
+  //   const skuList = await this.variantService.getPublicVariantByProductId(
+  //     productId
+  //   );
+
+  //   this._updateProductViews(productId);
+
+  //   return {
+  //     product: omitFields({
+  //       fields: [
+  //         'views',
+  //         'uniqueViews',
+  //         'createdAt',
+  //         'updatedAt',
+  //         'sold',
+  //         'status',
+  //       ],
+  //       object: foundProduct,
+  //     }),
+  //     skuList,
+  //   };
+  // }
+
+  async getProductDetailsPublic({ productKey }) {
+    const foundProduct = await this.productRepository.getProductsPublished(
+      productKey
+    );
+
+    if (!foundProduct) {
+      throw new BadRequestError('Product not found');
+    }
+
+    const skuList = await this.variantService.getPublicVariantByProductId(
+      foundProduct.id
+    );
+
+    this._updateProductViews(foundProduct.id);
+
+    const priceInfo = this._calculateProductPrice(foundProduct);
+
+    return {
+      product: {
+        ...pickFields({
+          fields: [
+            'code',
+            'name',
+            'slug',
+            'mainImage',
+            'subImages',
+            'qrCode',
+            'description',
+            'video',
+            'returnDays',
+            'variants',
+            'rating',
+            'ratingCount',
+          ],
+          object: foundProduct,
+        }),
+        attributes: this._formatAttributes(
+          foundProduct.attributes.filter((attr) => !attr.isVariant)
+        ),
+        variantAttributes: this._formatAttributes(
+          foundProduct.attributes.filter((attr) => attr.isVariant)
+        ),
+        price: priceInfo.price,
+        discountedPrice: priceInfo.discountedPrice,
+        hasDiscount: priceInfo.hasDiscount,
+      },
+      skuList,
+    };
+  }
+
+  _updateProductViews(productId) {
+    const updatedProduct = this.productRepository.updateById(productId, {
+      $inc: { prd_views: 1 },
+    });
+
+    if (!updatedProduct) {
+      throw new BadRequestError('Product not found');
+    }
+  }
+
+  async updateProductUniqueViews({ productId, deviceId }) {
+    const updatedProduct = await this.productRepository.updateById(productId, {
+      $addToSet: { prd_unique_views: deviceId },
+    });
+
+    if (!updatedProduct) {
+      throw new BadRequestError('Failed to update product views');
+    }
+  }
+
+  // async getProductDetails({ productId }) {
+  //   const foundProduct = await this.productRepository.getById(productId);
+
+  //   if (!foundProduct) {
+  //     throw new BadRequestError('Product not found');
+  //   }
+
+  //   const skuList = await this.variantService.getVariantByProductId(productId);
+
+  //   return {
+  //     product: omitFields({
+  //       fields: ['createdAt', 'updatedAt'],
+  //       object: foundProduct,
+  //     }),
+  //     skuList,
+  //   };
+  // }
+
+  async getProductDetails({ productKey }) {
+    const foundProduct = await this.productRepository.getProduct(productKey);
+
+    if (!foundProduct) {
+      throw new BadRequestError('Product not found');
+    }
+
+    const skuList = await this.variantService.getVariantByProductId(
+      foundProduct.id
+    );
+
+    this._updateProductViews(foundProduct.id);
+
+    const priceInfo = this._calculateProductPrice(foundProduct);
+
+    return {
+      product: {
+        ...omitFields({
+          fields: ['createdAt', 'updatedAt'],
+          object: foundProduct,
+        }),
+        attributes: this._formatAttributes(
+          foundProduct.attributes.filter((attr) => !attr.isVariant)
+        ),
+        variantAttributes: this._formatAttributes(
+          foundProduct.attributes.filter((attr) => attr.isVariant)
+        ),
+        price: priceInfo.price,
+        discountedPrice: priceInfo.discountedPrice,
+        hasDiscount: priceInfo.hasDiscount,
+      },
+      skuList,
     };
   }
 

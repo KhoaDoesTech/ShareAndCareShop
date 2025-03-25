@@ -41,7 +41,7 @@ router.get(
   asyncHandler(productController.getAllProducts)
 );
 router.get(
-  '/:productId',
+  '/:productKey',
   authentication,
   verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.PRODUCT.VIEW),
   asyncHandler(productController.getProductDetails)
