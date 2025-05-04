@@ -48,14 +48,14 @@ router.get(
 );
 
 router.patch(
-  '/publish/:productId',
+  '/publish/:productKey',
   authentication,
   verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.PRODUCT.UPDATE),
   asyncHandler(productController.publishProduct)
 );
 
 router.patch(
-  '/unpublish/:productId',
+  '/unpublish/:productKey',
   authentication,
   verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.PRODUCT.UPDATE),
   asyncHandler(productController.unpublishProduct)

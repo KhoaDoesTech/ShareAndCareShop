@@ -125,83 +125,6 @@ class ProductService {
     });
   }
 
-  async _validateCategories(categories) {
-    if (!categories || !categories.length) return [];
-
-    const validCategories = [];
-    await Promise.all(
-      categories.map(async (id) => {
-        const categoryData = await this.categoryRepository.getById(id);
-        if (!categoryData) {
-          throw new BadRequestError(`Category with ID ${id} not found`);
-        }
-        validCategories.push(categoryData);
-      })
-    );
-
-    return validCategories.map((category) => ({
-      id: category.id,
-      name: category.name,
-    }));
-  }
-
-  async _validateAttributes(attributes) {
-    if (!Array.isArray(attributes) || attributes.length === 0) {
-      throw new BadRequestError('Attributes must be a non-empty array.');
-    }
-
-    const attributeIds = attributes.map((attr) => attr.id);
-
-    const attributeList = await this.attributeRepository.getAll({
-      filter: { _id: { $in: attributeIds } },
-    });
-
-    const attributeMap = new Map(
-      attributeList.map((attr) => [attr.id.toString(), attr])
-    );
-
-    const missingAttributes = attributeIds.filter(
-      (id) => !attributeMap.has(id)
-    );
-    if (missingAttributes.length) {
-      throw new BadRequestError(
-        `Attributes not found: ${missingAttributes.join(', ')}`
-      );
-    }
-
-    return attributes.map((attr) => {
-      const attribute = attributeMap.get(attr.id);
-
-      if (!Array.isArray(attr.values) || attr.values.length === 0) {
-        throw new BadRequestError(
-          `Values for attribute ${attr.id} must be a non-empty array.`
-        );
-      }
-
-      const validValuesSet = new Set(
-        attribute.values.map((v) => v.valueId.toString())
-      );
-
-      const validatedValues = attr.values.filter((val) =>
-        validValuesSet.has(val)
-      );
-      const invalidValues = attr.values.filter(
-        (val) => !validValuesSet.has(val)
-      );
-
-      if (invalidValues.length) {
-        throw new BadRequestError(
-          `Invalid values for attribute ${attr.id}: ${invalidValues.join(', ')}`
-        );
-      }
-
-      return {
-        id: attribute.id,
-        values: validatedValues.map((val) => ({ id: val })),
-      };
-    });
-  }
-
   async updateProduct({
     productKey,
     userId,
@@ -231,20 +154,19 @@ class ProductService {
     let updatedCategories = category
       ? await this._validateCategories(category)
       : undefined;
-    let updatedVariants = variants
-      ? variants.map((variant) => ({
-          var_name: variant.name,
-          var_options: variant.options,
-          var_images: variant.images || [],
-        }))
-      : undefined;
+
+    let updatedVariants = variants?.map((variant) => ({
+      var_name: variant.name,
+      var_options: variant.options,
+      var_images: variant.images || [],
+    }));
 
     const currentSkus = await this.variantRepository.getVariantByFilter({
       prd_id: foundProduct.id,
     });
 
     let updatedSkuList = [];
-    if (skuList && skuList.length > 0) {
+    if (skuList?.length > 0) {
       updatedSkuList = this._updateSkuList({
         currentSkus,
         skuList,
@@ -259,17 +181,23 @@ class ProductService {
     const prices = updatedSkuList
       .filter((sku) => SELLABLE_STATUSES.has(sku.status))
       .map((sku) => sku.price);
-    let minPrice = prices.length ? Math.min(...prices) : foundProduct.minPrice;
-    let maxPrice = prices.length ? Math.max(...prices) : foundProduct.maxPrice;
+    const minPrice = prices.length
+      ? Math.min(...prices)
+      : foundProduct.minPrice;
+    const maxPrice = prices.length
+      ? Math.max(...prices)
+      : foundProduct.maxPrice;
 
-    let updatedSubImages = subImages
-      ? Array.from(
-          new Set([
-            ...(subImages || foundProduct.subImages),
-            ...updatedVariants.flatMap((v) => v.var_images || []),
-          ])
-        )
-      : undefined;
+    const variantsSource = updatedVariants || foundProduct.variants;
+    const variantImages = variantsSource.flatMap(
+      (v) => v.var_images || v.images || []
+    );
+    const baseSubImages =
+      subImages !== undefined ? subImages : foundProduct.subImages || [];
+
+    const updatedSubImages = Array.from(
+      new Set([...baseSubImages, ...variantImages])
+    );
 
     const updateData = removeUndefinedObject({
       prd_name: name,
@@ -297,63 +225,11 @@ class ProductService {
       updateNestedObjectParser(updateData)
     );
 
-    await Promise.all(updatedSkuList.map((sku) => this.upsertSku(sku)));
+    if (updatedSkuList.length > 0) {
+      await Promise.all(updatedSkuList.map((sku) => this._upsertSku(sku)));
+    }
 
     return updateData;
-  }
-
-  async upsertSku(sku) {
-    const existingSku = await this.variantRepository.findBySlug(
-      sku.productId,
-      sku.slug
-    );
-    const skuData = {
-      prd_name: sku.name,
-      var_price: sku.price,
-      var_tier_idx: sku.tierIndex,
-      var_status: sku.status,
-      updatedBy: sku.updatedBy,
-    };
-
-    existingSku
-      ? await this.variantRepository.updateById(existingSku.id, skuData)
-      : await this.variantRepository.create({
-          ...skuData,
-          prd_id: sku.productId,
-          var_slug: sku.slug,
-          createdBy: sku.createdBy,
-        });
-  }
-
-  _updateSkuList({ currentSkus, skuList, foundProduct, userId, name }) {
-    const updatedSkuList = [];
-    const existingSlugs = new Set();
-
-    for (const newSku of skuList) {
-      const existingSku = currentSkus.find((sku) => sku.slug === newSku.slug);
-
-      const skuData = {
-        name: name || foundProduct.name,
-        price: newSku.price ?? existingSku?.price,
-        status: newSku.status ?? existingSku?.status,
-        tierIndex: newSku.tierIndex ?? existingSku?.tierIndex,
-        updatedBy: userId,
-        productId: foundProduct.id,
-        slug: newSku.slug,
-        createdBy: userId,
-      };
-
-      updatedSkuList.push(skuData);
-      existingSlugs.add(newSku.slug);
-    }
-
-    for (const sku of currentSkus) {
-      if (!existingSlugs.has(sku.slug)) {
-        updatedSkuList.push({ ...sku, status: ProductStatus.DISCONTINUED });
-      }
-    }
-
-    return updatedSkuList;
   }
 
   async getAllProductsPublic({
@@ -479,90 +355,6 @@ class ProductService {
     });
   }
 
-  _formatAttributes(attributes) {
-    return attributes.map((attr) => ({
-      type: attr.type,
-      name: attr.name,
-      values: attr.values.map((val) => ({
-        value: val.value,
-        descriptionUrl: val.descriptionUrl,
-      })),
-    }));
-  }
-
-  _calculateProductPrice(product) {
-    const {
-      originalPrice,
-      minPrice,
-      maxPrice,
-      discountType,
-      discountValue,
-      discountStart,
-      discountEnd,
-      variants,
-    } = product;
-
-    const hasVariants = variants && variants.length > 0;
-
-    let price;
-    if (hasVariants) {
-      if (minPrice === maxPrice) {
-        price = minPrice;
-      } else {
-        price = { min: minPrice, max: maxPrice };
-      }
-    } else {
-      price = originalPrice;
-    }
-
-    const now = new Date();
-    const isDiscountActive =
-      discountStart != null &&
-      discountEnd != null &&
-      now >= new Date(discountStart) &&
-      now <= new Date(discountEnd);
-
-    let discountedPrice = null;
-    if (isDiscountActive && discountValue > 0) {
-      if (typeof price === 'object') {
-        discountedPrice = {
-          min: this._calculateDiscountedValue(
-            price.min,
-            discountType,
-            discountValue
-          ),
-          max: this._calculateDiscountedValue(
-            price.max,
-            discountType,
-            discountValue
-          ),
-        };
-      } else {
-        discountedPrice = this._calculateDiscountedValue(
-          price,
-          discountType,
-          discountValue
-        );
-      }
-    }
-
-    return {
-      price,
-      discountedPrice,
-      hasDiscount: isDiscountActive && discountValue > 0,
-    };
-  }
-
-  _calculateDiscountedValue(price, discountType, discountValue) {
-    let finalPrice = price;
-    if (discountType === 'AMOUNT') {
-      finalPrice = price - discountValue;
-    } else if (discountType === 'PERCENT') {
-      finalPrice = price * (1 - discountValue / 100);
-    }
-    return Math.max(0, finalPrice);
-  }
-
   async getAllProducts({
     search,
     category,
@@ -661,76 +453,6 @@ class ProductService {
     // );
   }
 
-  // async getProductDetailsPublic({ productId }) {
-  //   const foundProduct = await this.productRepository.getByQuery({
-  //     _id: productId,
-  //     prd_status: ProductStatus.PUBLISHED,
-  //   });
-
-  //   if (!foundProduct) {
-  //     throw new BadRequestError('Product not found');
-  //   }
-
-  //   const skuList = await this.variantService.getPublicVariantByProductId(
-  //     productId
-  //   );
-
-  //   this._updateProductViews(productId);
-
-  //   return {
-  //     product: omitFields({
-  //       fields: [
-  //         'views',
-  //         'uniqueViews',
-  //         'createdAt',
-  //         'updatedAt',
-  //         'sold',
-  //         'status',
-  //       ],
-  //       object: foundProduct,
-  //     }),
-  //     skuList,
-  //   };
-  // }
-
-  _updateProductViews(productId) {
-    const updatedProduct = this.productRepository.updateById(productId, {
-      $inc: { prd_views: 1 },
-    });
-
-    if (!updatedProduct) {
-      throw new BadRequestError('Product not found');
-    }
-  }
-
-  async updateProductUniqueViews({ productId, deviceId }) {
-    const updatedProduct = await this.productRepository.updateById(productId, {
-      $addToSet: { prd_unique_views: deviceId },
-    });
-
-    if (!updatedProduct) {
-      throw new BadRequestError('Failed to update product views');
-    }
-  }
-
-  // async getProductDetails({ productId }) {
-  //   const foundProduct = await this.productRepository.getById(productId);
-
-  //   if (!foundProduct) {
-  //     throw new BadRequestError('Product not found');
-  //   }
-
-  //   const skuList = await this.variantService.getVariantByProductId(productId);
-
-  //   return {
-  //     product: omitFields({
-  //       fields: ['createdAt', 'updatedAt'],
-  //       object: foundProduct,
-  //     }),
-  //     skuList,
-  //   };
-  // }
-
   async getProductDetailsPublic({ productKey }) {
     const productFilter = { prd_status: ProductStatus.PUBLISHED };
     const foundProduct = await this.productRepository.getProductsInfo(
@@ -763,6 +485,7 @@ class ProductService {
             'description',
             'video',
             'returnDays',
+            'category',
             'variants',
             'rating',
             'ratingCount',
@@ -798,8 +521,6 @@ class ProductService {
       foundProduct.id
     );
 
-    this._updateProductViews(foundProduct.id);
-
     const priceInfo = this._calculateProductPrice(foundProduct);
 
     return {
@@ -822,18 +543,21 @@ class ProductService {
     };
   }
 
-  async publishProduct({ productId }) {
-    const foundProduct = await this.productRepository.getById(productId);
+  async publishProduct({ productKey }) {
+    const foundProduct = await this.productRepository.getProduct(productKey);
 
     if (!foundProduct) {
       throw new BadRequestError('Product not found');
     }
 
-    const updatedProduct = await this.productRepository.updateById(productId, {
-      prd_status: ProductStatus.PUBLISHED,
-    });
+    const updatedProduct = await this.productRepository.updateById(
+      foundProduct.id,
+      {
+        prd_status: ProductStatus.PUBLISHED,
+      }
+    );
 
-    await this.variantService.publicAllVariants(productId);
+    await this.variantService.publicAllVariants(foundProduct.id);
 
     return pickFields({
       fields: ['status', 'updatedAt'],
@@ -841,21 +565,261 @@ class ProductService {
     });
   }
 
-  async unpublishProduct({ productId }) {
-    const foundProduct = await this.productRepository.getById(productId);
+  async unpublishProduct({ productKey }) {
+    const foundProduct = await this.productRepository.getProduct(productKey);
 
     if (!foundProduct) {
       throw new BadRequestError('Product not found');
     }
 
-    const updatedProduct = await this.productRepository.updateById(productId, {
-      prd_status: ProductStatus.DISCONTINUED,
-    });
+    const updatedProduct = await this.productRepository.updateById(
+      foundProduct.id,
+      {
+        prd_status: ProductStatus.DISCONTINUED,
+      }
+    );
+
+    await this.variantService.unPublicAllVariants(foundProduct.id);
 
     return pickFields({
       fields: ['status', 'updatedAt'],
       object: updatedProduct,
     });
+  }
+
+  async _validateCategories(categories) {
+    if (!categories || !categories.length) return [];
+
+    const validCategories = [];
+    await Promise.all(
+      categories.map(async (id) => {
+        const categoryData = await this.categoryRepository.getById(id);
+        if (!categoryData) {
+          throw new BadRequestError(`Category with ID ${id} not found`);
+        }
+        validCategories.push(categoryData);
+      })
+    );
+
+    return validCategories.map((category) => ({
+      id: category.id,
+      name: category.name,
+    }));
+  }
+
+  async _validateAttributes(attributes) {
+    if (!Array.isArray(attributes) || attributes.length === 0) {
+      throw new BadRequestError('Attributes must be a non-empty array.');
+    }
+
+    const attributeIds = attributes.map((attr) => attr.id);
+
+    const attributeList = await this.attributeRepository.getAll({
+      filter: { _id: { $in: attributeIds } },
+    });
+
+    const attributeMap = new Map(
+      attributeList.map((attr) => [attr.id.toString(), attr])
+    );
+
+    const missingAttributes = attributeIds.filter(
+      (id) => !attributeMap.has(id)
+    );
+    if (missingAttributes.length) {
+      throw new BadRequestError(
+        `Attributes not found: ${missingAttributes.join(', ')}`
+      );
+    }
+
+    return attributes.map((attr) => {
+      const attribute = attributeMap.get(attr.id);
+
+      if (!Array.isArray(attr.values) || attr.values.length === 0) {
+        throw new BadRequestError(
+          `Values for attribute ${attr.id} must be a non-empty array.`
+        );
+      }
+
+      const validValuesSet = new Set(
+        attribute.values.map((v) => v.valueId.toString())
+      );
+
+      const validatedValues = attr.values.filter((val) =>
+        validValuesSet.has(val)
+      );
+      const invalidValues = attr.values.filter(
+        (val) => !validValuesSet.has(val)
+      );
+
+      if (invalidValues.length) {
+        throw new BadRequestError(
+          `Invalid values for attribute ${attr.id}: ${invalidValues.join(', ')}`
+        );
+      }
+
+      return {
+        id: attribute.id,
+        values: validatedValues.map((val) => ({ id: val })),
+      };
+    });
+  }
+
+  async _upsertSku(sku) {
+    const existingSku = await this.variantRepository.findBySlug(
+      sku.productId,
+      sku.slug
+    );
+    const skuData = {
+      prd_name: sku.name,
+      var_price: sku.price,
+      var_tier_idx: sku.tierIndex,
+      var_status: sku.status,
+      updatedBy: sku.updatedBy,
+    };
+
+    existingSku
+      ? await this.variantRepository.updateById(existingSku.id, skuData)
+      : await this.variantRepository.create({
+          ...skuData,
+          prd_id: sku.productId,
+          var_slug: sku.slug,
+          createdBy: sku.createdBy,
+        });
+  }
+
+  _updateSkuList({ currentSkus, skuList, foundProduct, userId, name }) {
+    const updatedSkuList = [];
+    const existingSlugs = new Set();
+
+    for (const newSku of skuList) {
+      const existingSku = currentSkus.find((sku) => sku.slug === newSku.slug);
+
+      const skuData = {
+        name: name || foundProduct.name,
+        price: newSku.price ?? existingSku?.price,
+        status: newSku.status ?? existingSku?.status,
+        tierIndex: newSku.tierIndex ?? existingSku?.tierIndex,
+        updatedBy: userId,
+        productId: foundProduct.id,
+        slug: newSku.slug,
+        createdBy: userId,
+      };
+
+      updatedSkuList.push(skuData);
+      existingSlugs.add(newSku.slug);
+    }
+
+    for (const sku of currentSkus) {
+      if (!existingSlugs.has(sku.slug)) {
+        updatedSkuList.push({ ...sku, status: ProductStatus.DISCONTINUED });
+      }
+    }
+
+    return updatedSkuList;
+  }
+
+  _formatAttributes(attributes) {
+    return attributes.map((attr) => ({
+      type: attr.type,
+      name: attr.name,
+      values: attr.values.map((val) => ({
+        value: val.value,
+        descriptionUrl: val.descriptionUrl,
+      })),
+    }));
+  }
+
+  _calculateProductPrice(product) {
+    const {
+      originalPrice,
+      minPrice,
+      maxPrice,
+      discountType,
+      discountValue,
+      discountStart,
+      discountEnd,
+      variants,
+    } = product;
+
+    const hasVariants = variants && variants.length > 0;
+
+    let price;
+    if (hasVariants) {
+      if (minPrice === maxPrice) {
+        price = minPrice;
+      } else {
+        price = { min: minPrice, max: maxPrice };
+      }
+    } else {
+      price = originalPrice;
+    }
+
+    const now = new Date();
+    const isDiscountActive =
+      discountStart != null &&
+      discountEnd != null &&
+      now >= new Date(discountStart) &&
+      now <= new Date(discountEnd);
+
+    let discountedPrice = null;
+    if (isDiscountActive && discountValue > 0) {
+      if (typeof price === 'object') {
+        discountedPrice = {
+          min: this._calculateDiscountedValue(
+            price.min,
+            discountType,
+            discountValue
+          ),
+          max: this._calculateDiscountedValue(
+            price.max,
+            discountType,
+            discountValue
+          ),
+        };
+      } else {
+        discountedPrice = this._calculateDiscountedValue(
+          price,
+          discountType,
+          discountValue
+        );
+      }
+    }
+
+    return {
+      price,
+      discountedPrice,
+      hasDiscount: isDiscountActive && discountValue > 0,
+    };
+  }
+
+  _calculateDiscountedValue(price, discountType, discountValue) {
+    let finalPrice = price;
+    if (discountType === 'AMOUNT') {
+      finalPrice = price - discountValue;
+    } else if (discountType === 'PERCENT') {
+      finalPrice = price * (1 - discountValue / 100);
+    }
+    return Math.max(0, finalPrice);
+  }
+
+  _updateProductViews(productId) {
+    const updatedProduct = this.productRepository.updateById(productId, {
+      $inc: { prd_views: 1 },
+    });
+
+    if (!updatedProduct) {
+      throw new BadRequestError('Product not found');
+    }
+  }
+
+  async updateProductUniqueViews({ productId, deviceId }) {
+    const updatedProduct = await this.productRepository.updateById(productId, {
+      $addToSet: { prd_unique_views: deviceId },
+    });
+
+    if (!updatedProduct) {
+      throw new BadRequestError('Failed to update product views');
+    }
   }
 
   async updateProductQuantity({ id, quantity = null, skuList }) {
