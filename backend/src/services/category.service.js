@@ -12,30 +12,24 @@ class CategoryService {
 
     if (parentId) {
       const parentCategory = await this.categoryRepository.getById(parentId);
-      if (!parentCategory)
+      if (!parentCategory) {
         throw new BadRequestError('Parent category not found');
-
+      }
       rightValue = parentCategory.right;
-
       await this.categoryRepository.updateManyCategories(rightValue, 2);
     } else {
       const maxRightValue = await this.categoryRepository.getByQuery({
         fields: 'cat_right',
         options: { sort: { cat_right: -1 } },
       });
-
-      if (maxRightValue) {
-        rightValue = maxRightValue.cat_right + 1;
-      } else {
-        rightValue = 1;
-      }
+      rightValue = maxRightValue ? maxRightValue.cat_right + 1 : 1;
     }
 
     const newCategory = await this.categoryRepository.create({
       cat_name: name,
       cat_left: rightValue,
       cat_right: rightValue + 1,
-      cat_parent_id: parentId,
+      cat_parent_id: parentId || null,
     });
 
     if (!newCategory) throw new BadRequestError('Failed to create category');
@@ -73,20 +67,21 @@ class CategoryService {
   }
 
   async getCategoriesByParentId({ parentId }) {
-    try {
-      await this.categoryRepository.getById(parentId);
-    } catch (error) {
-      throw new BadRequestError('Parent category not found');
+    if (parentId) {
+      const parentCategory = await this.categoryRepository.getById(parentId);
+      if (!parentCategory) {
+        throw new BadRequestError('Parent category not found');
+      }
     }
 
     const queryOptions = {
       sort: 'cat_left',
-      fields: 'cat_name,cat_left,cat_right,cat_parent_id',
+      fields: 'cat_name cat_left cat_right cat_parent_id',
     };
 
     const categories = await this.categoryRepository.getAll({
       filter: {
-        cat_parent_id: parentId,
+        cat_parent_id: parentId || null,
       },
       queryOptions,
     });

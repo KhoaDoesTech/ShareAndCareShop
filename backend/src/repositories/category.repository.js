@@ -9,12 +9,15 @@ class CategoryRepository extends BaseRepository {
 
   async deleteCategoryById(categoryId) {
     const category = await this.model.findById(categoryId);
+    if (!category) {
+      throw new Error('Category not found');
+    }
 
     const leftValue = category.cat_left;
     const rightValue = category.cat_right;
     const width = rightValue - leftValue + 1;
 
-    await this.model.deleteMany({
+    const deleteResult = await this.model.deleteMany({
       cat_left: { $gte: leftValue, $lte: rightValue },
     });
 
@@ -24,11 +27,11 @@ class CategoryRepository extends BaseRepository {
     );
 
     await this.model.updateMany(
-      { cat_left: { $gt: leftValue } },
+      { cat_left: { $gt: rightValue } },
       { $inc: { cat_left: -width } }
     );
 
-    return await this.updateManyCategories(rightValue, -width);
+    return { deletedCount: deleteResult.deletedCount };
   }
 
   async updateManyCategories(rightValue, width) {
