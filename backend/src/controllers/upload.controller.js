@@ -16,6 +16,15 @@ class UploadController {
     }).send(res);
   };
 
+  uploadChatImages = async (req, res, next) => {
+    new CreateSuccess({
+      message: 'Images uploaded successfully',
+      metadata: await this.uploadService.uploadChatImages({
+        files: req.files,
+      }),
+    }).send(res);
+  };
+
   deleteImageByUrl = async (req, res, next) => {
     new NoContentSuccess({
       message: 'Image deleted successfully',

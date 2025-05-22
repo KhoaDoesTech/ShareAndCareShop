@@ -129,6 +129,21 @@ const AttributeType = {
 
 const AvailableAttributeTypes = Object.values(AttributeType);
 
+const BlogStatus = {
+  INACTIVE: 'INACTIVE',
+  ACTIVE: 'ACTIVE',
+};
+
+const AvailableBlogStatus = Object.values(BlogStatus);
+
+const ChatRoles = {
+  USER: 'user',
+  AI: 'ai',
+  ADMIN: 'admin',
+};
+
+const AvailableChatRoles = Object.values(ChatRoles);
+
 module.exports = {
   UserLoginType,
   AvailableSocialLogins,
@@ -157,4 +172,8 @@ module.exports = {
   AvailableAttributeTypes,
   SortFieldAttribute,
   SELLABLE_STATUSES,
+  BlogStatus,
+  AvailableBlogStatus,
+  ChatRoles,
+  AvailableChatRoles,
 };

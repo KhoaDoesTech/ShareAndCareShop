@@ -18,6 +18,9 @@ const SERVER_CONFIG = {
     product: 'https://via.placeholder.com/900x1200.png',
     avatar: 'https://via.placeholder.com/400x400.png',
   },
+  openAi: {
+    API_KEY: process.env.OPENAI_API_KEY,
+  },
 };
 
 module.exports = SERVER_CONFIG;

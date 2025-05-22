@@ -21,5 +21,7 @@ router.use('/api/v1/statistics', require('./statistics'));
 router.use('/api/v1/review', require('./review'));
 // router.use('/api/v1/comment', require('./comment'));
 router.use('/api/v1/attributes', require('./attributes'));
+router.use('/api/v1/blogs', require('./blog'));
+router.use('/api/v1/chats', require('./chat'));
 
 module.exports = router;
