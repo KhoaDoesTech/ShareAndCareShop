@@ -34,40 +34,38 @@ class OrderService {
 
   async validateAndCalculateItems({ items }) {
     let totalItemsPrice = 0;
+    let totalProductDiscount = 0;
     const itemsDetails = [];
 
     for (const item of items) {
-      // Find the product
-      const foundProduct = await this.productRepository.getById(item.productId);
-      if (!foundProduct)
+      const product = await this.productRepository.getById(item.productId);
+      if (!product) {
         throw new NotFoundError(`Product ${item.productId} not found`);
+      }
 
       // Check if product requires a variant
-      if (foundProduct.variants.length > 0 && !item.variantId) {
+      if (product.variants.length > 0 && !item.variantId) {
         throw new BadRequestError(
-          `Product ${foundProduct.name} requires a variantId`
+          `Product ${product.name} requires a variantId`
         );
       }
 
       // Check for variant (if applicable)
-      const foundVariant = item.variantId
+      const variant = item.variantId
         ? await this.variantRepository.getByQuery({
-            prd_id: item.productId,
+            productId: item.productId,
             _id: item.variantId,
           })
         : null;
 
-      if (item.variantId && !foundVariant) {
+      if (item.variantId && !variant) {
         throw new NotFoundError(
-          `Variant ${item.variantId} for Product ${foundProduct.name} not found`
+          `Variant ${item.variantId} for Product ${product.name} not found`
         );
       }
 
       // Check stock quantity
-      const availableQuantity = foundVariant
-        ? foundVariant.quantity
-        : foundProduct.quantity;
-
+      const availableQuantity = variant ? variant.quantity : product.quantity;
       if (availableQuantity < item.quantity) {
         throw new BadRequestError(
           `Product ${item.productId} ${
@@ -79,34 +77,53 @@ class OrderService {
       }
 
       // Check stock status
-      const stockAvailable = foundVariant
-        ? foundVariant.status
-        : foundProduct.status;
-
-      if (stockAvailable !== ProductStatus.PUBLISHED) {
+      const stockStatus = variant ? variant.status : product.status;
+      if (stockStatus !== ProductStatus.PUBLISHED) {
         throw new BadRequestError(
           `Product ${item.productId} is not available for sale`
         );
       }
 
-      // Calculate item price
-      const price = item.variantId ? foundVariant.price : foundProduct.price;
-      totalItemsPrice += price * item.quantity;
+      // Calculate item price and product discount
+      const price = variant ? variant.price : product.originalPrice;
+      let productDiscount = 0;
 
-      // Prepare item details
+      // Apply product discount if active
+      const now = new Date();
+      const isDiscountActive =
+        product.discountStart &&
+        product.discountEnd &&
+        now >= new Date(product.discountStart) &&
+        now <= new Date(product.discountEnd) &&
+        product.discountValue > 0;
+
+      if (isDiscountActive) {
+        productDiscount =
+          product.discountType === 'AMOUNT'
+            ? product.discountValue
+            : price * (product.discountValue / 100);
+      }
+
+      const discountedPrice = Math.max(0, price - productDiscount);
+      const itemTotal = discountedPrice * item.quantity;
+
+      totalItemsPrice += price * item.quantity;
+      totalProductDiscount += productDiscount * item.quantity;
+
       itemsDetails.push({
-        productId: foundProduct.id,
-        variantId: foundVariant?.id || null,
-        productName: foundProduct.name,
-        variantSlug: foundVariant?.slug || '',
-        image: foundProduct.mainImage,
-        price: price,
+        productId: product.id,
+        variantId: variant?.id || null,
+        productName: product.name,
+        variantSlug: variant?.slug || '',
+        image: product.mainImage,
+        price, // Original price
         quantity: item.quantity,
-        total: price * item.quantity,
+        productDiscount, // Product discount per unit
+        total: itemTotal, // Total after product discount
       });
     }
 
-    return { totalItemsPrice, itemsDetails };
+    return { totalItemsPrice, totalProductDiscount, itemsDetails };
   }
 
   async reviewOrder({
@@ -119,9 +136,9 @@ class OrderService {
     let shippingPrice = 0;
     let shippingDiscount = 0;
     let orderDiscount = 0;
-    let discount = 0;
+    let totalCouponDiscount = 0;
 
-    // Step 1: Validate shipping address and get place details
+    // Validate shipping address and calculate delivery fee
     if (shippingAddress && deliveryId) {
       const addressData = await this.addressService.getPlaceDetails({
         street: shippingAddress.street,
@@ -130,29 +147,27 @@ class OrderService {
         city: shippingAddress.city,
       });
 
-      // Step 2: Calculate order prices
       shippingPrice = await this.deliveryService.calculateDeliveryFee({
         deliveryId,
         destinationId: addressData[0].placeId,
       });
     }
 
-    // Step 3: Calculate total item price and details
-    const { totalItemsPrice, itemsDetails } =
+    // Calculate item prices and product discounts
+    const { totalItemsPrice, totalProductDiscount, itemsDetails } =
       await this.validateAndCalculateItems({ items });
 
-    // Step 4: Initialize discounts
+    // Apply coupon discounts
     if (couponCode) {
       const discountResult = await this.couponService.reviewDiscount({
         userId,
         items,
-        totalOrder: totalItemsPrice,
+        totalOrder: totalItemsPrice - totalProductDiscount,
         shippingFee: shippingPrice,
         couponCode,
       });
 
-      // Extract discounts
-      discount = discountResult.totalDiscount;
+      totalCouponDiscount = discountResult.totalDiscount;
 
       shippingDiscount =
         discountResult.discountDetails.find((d) => d.type === 'Delivery')
@@ -161,40 +176,43 @@ class OrderService {
         discountResult.discountDetails.find((d) => d.type === 'Order')
           ?.discount || 0;
 
+      // Apply product- or category-level coupon discounts
       discountResult.discountDetails.forEach((discountDetail) => {
-        const itemIndex = itemsDetails.findIndex((item) => {
-          const productIdMatch =
-            item.productId && discountDetail.productId
-              ? item.productId.toString() ===
-                discountDetail.productId.toString()
-              : false;
+        if (discountDetail.productId) {
+          const itemIndex = itemsDetails.findIndex(
+            (item) =>
+              item.productId.toString() ===
+                discountDetail.productId.toString() &&
+              (item.variantId
+                ? item.variantId.toString() ===
+                  discountDetail.variantId?.toString()
+                : discountDetail.variantId === null)
+          );
 
-          const variantIdMatch =
-            item.variantId && discountDetail.variantId
-              ? item.variantId.toString() ===
-                discountDetail.variantId.toString()
-              : item.variantId === null && discountDetail.variantId === null;
-
-          return productIdMatch && variantIdMatch;
-        });
-
-        console.log(discountDetail.discount);
-
-        if (itemIndex !== -1) {
-          itemsDetails[itemIndex].discount = discountDetail.discount;
+          if (itemIndex !== -1) {
+            itemsDetails[itemIndex].couponDiscount = discountDetail.discount;
+            itemsDetails[itemIndex].total -= discountDetail.discount;
+            itemsDetails[itemIndex].total = Math.max(
+              0,
+              itemsDetails[itemIndex].total
+            );
+          }
         }
       });
     }
 
-    // Step 5: Calculate total price
-    const totalPrice = totalItemsPrice + shippingPrice - discount;
+    // Calculate final totals
+    const totalDiscount = totalProductDiscount + totalCouponDiscount;
+    const totalPrice = totalItemsPrice + shippingPrice - totalDiscount;
 
     return {
       totalItemsPrice,
+      totalProductDiscount,
       shippingPrice,
       shippingDiscount,
       orderDiscount,
-      discount,
+      totalCouponDiscount,
+      totalDiscount,
       totalPrice,
       itemsDetails,
     };
@@ -209,13 +227,15 @@ class OrderService {
     deliveryId,
   }) {
     try {
-      // Step 1: Validate items and calculate total price
+      // Validate and calculate order details
       const {
         totalItemsPrice,
+        totalProductDiscount,
         shippingPrice,
         shippingDiscount,
         orderDiscount,
-        discount,
+        totalCouponDiscount,
+        totalDiscount,
         totalPrice,
         itemsDetails,
       } = await this.reviewOrder({
@@ -226,13 +246,13 @@ class OrderService {
         deliveryId,
       });
 
-      let status = OrderStatus.PENDING;
-      if (paymentMethod !== PaymentMethod.COD) {
-        status = OrderStatus.AWAITING_PAYMENT;
-      }
+      const status =
+        paymentMethod === PaymentMethod.COD
+          ? OrderStatus.PENDING
+          : OrderStatus.AWAITING_PAYMENT;
 
-      // Step 3: Create order
-      const newOrder = this.orderRepository.create({
+      // Create order
+      const newOrder = await this.orderRepository.create({
         ord_user_id: userId,
         ord_coupon_code: couponCode || null,
         ord_shipping_address: {
@@ -251,51 +271,44 @@ class OrderService {
           prd_id: item.productId,
           var_id: item.variantId,
           prd_img: item.image,
-          prd_discount: item.discount || 0,
+          prd_discount:
+            (item.productDiscount || 0) + (item.couponDiscount || 0),
         })),
         ord_items_price: totalItemsPrice,
-        ord_items_discount: orderDiscount,
-
+        ord_items_discount: totalProductDiscount,
         ord_shipping_price: shippingPrice,
         ord_shipping_discount: shippingDiscount,
-
-        ord_discount_price: discount,
+        ord_discount_price: totalCouponDiscount,
         ord_total_price: totalPrice,
-
         ord_payment_method: paymentMethod,
         ord_delivery_method: deliveryId,
         ord_status: status,
       });
 
+      // Update coupon usage
       if (couponCode) {
-        this.couponService.useCoupon(couponCode, userId);
+        await this.couponService.useCoupon(couponCode, userId);
       }
 
-      // Step 4: Update stock for products and variants
+      // Update stock
       await this._updateStock(itemsDetails);
 
       return newOrder;
     } catch (error) {
-      throw new BadRequestError(error.message);
+      throw new BadRequestError(`Failed to create order: ${error.message}`);
     }
   }
 
   async _updateStock(items) {
     for (const item of items) {
       if (item.variantId) {
-        // Update variant stock and sold count
         const updatedVariant = await this.variantRepository.updateById(
           item.variantId,
           {
-            $inc: {
-              var_quantity: -item.quantity,
-              var_sold: item.quantity,
-            },
-          },
-          { new: true }
+            $inc: { var_quantity: -item.quantity, var_sold: item.quantity },
+          }
         );
 
-        // Check and update variant's stock status
         if (updatedVariant.quantity <= 0) {
           await this.variantRepository.updateById(item.variantId, {
             status: ProductStatus.OUT_OF_STOCK,
@@ -303,19 +316,13 @@ class OrderService {
         }
       }
 
-      // Update parent product's stock and sold count
       const updatedProduct = await this.productRepository.updateById(
         item.productId,
         {
-          $inc: {
-            prd_quantity: -item.quantity,
-            prd_sold: item.quantity,
-          },
-        },
-        { new: true }
+          $inc: { prd_quantity: -item.quantity, prd_sold: item.quantity },
+        }
       );
 
-      // Check and update product's stock status
       if (updatedProduct.quantity <= 0) {
         await this.productRepository.updateById(item.productId, {
           status: ProductStatus.OUT_OF_STOCK,
@@ -327,38 +334,34 @@ class OrderService {
   async _reverseStock(items) {
     for (const item of items) {
       if (item.variantId) {
-        // Revert variant stock and sold count
         const updatedVariant = await this.variantRepository.updateById(
           item.variantId,
           {
-            $inc: {
-              var_quantity: item.quantity,
-              var_sold: -item.quantity,
-            },
-          },
-          { new: true }
+            $inc: { var_quantity: item.quantity, var_sold: -item.quantity },
+          }
         );
 
-        // Remove OUT_OF_STOCK status if stock is restored
-        if (updatedVariant.status === ProductStatus.OUT_OF_STOCK) {
+        if (
+          updatedVariant.status === ProductStatus.OUT_OF_STOCK &&
+          updatedVariant.quantity > 0
+        ) {
           await this.variantRepository.updateById(item.variantId, {
             status: ProductStatus.PUBLISHED,
           });
         }
       }
-      // Revert product sold count for variant's parent product
+
       const updatedProduct = await this.productRepository.updateById(
         item.productId,
         {
-          $inc: {
-            prd_quantity: item.quantity,
-            prd_sold: -item.quantity,
-          },
-        },
-        { new: true }
+          $inc: { prd_quantity: item.quantity, prd_sold: -item.quantity },
+        }
       );
-      // Remove OUT_OF_STOCK status if stock is restored
-      if (updatedProduct.status === ProductStatus.OUT_OF_STOCK) {
+
+      if (
+        updatedProduct.status === ProductStatus.OUT_OF_STOCK &&
+        updatedProduct.quantity > 0
+      ) {
         await this.productRepository.updateById(item.productId, {
           status: ProductStatus.PUBLISHED,
         });

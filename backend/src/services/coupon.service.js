@@ -70,7 +70,6 @@ class CouponService {
 
   async useCoupon(couponCode, userId) {
     const foundCoupon = await this.couponRepository.findByCode(couponCode);
-
     if (!foundCoupon) {
       throw new BadRequestError('Coupon not found');
     }
@@ -79,15 +78,10 @@ class CouponService {
       (user) => user.userId.toString() === userId.toString()
     );
 
-    console.log(userUsageIndex);
-
     if (userUsageIndex !== -1) {
       foundCoupon.usersUsed[userUsageIndex].usageCount += 1;
     } else {
-      foundCoupon.usersUsed.push({
-        userId: userId,
-        usageCount: 1,
-      });
+      foundCoupon.usersUsed.push({ userId, usageCount: 1 });
     }
 
     await this.couponRepository.updateById(foundCoupon.id, {
@@ -97,9 +91,7 @@ class CouponService {
   }
 
   async revokeCouponUsage(couponCode, userId) {
-    console.log(couponCode);
     const foundCoupon = await this.couponRepository.findByCode(couponCode);
-
     if (!foundCoupon) {
       throw new BadRequestError('Coupon not found');
     }
@@ -130,8 +122,7 @@ class CouponService {
     const discountDetails = [];
     let totalDiscount = 0;
 
-    // Get the appropriate handler for the coupon's target type
-    const TARGET_DISCOUNT_HANDLERS = {
+    const handlers = {
       Order: async () =>
         this._applyOrderDiscount(foundCoupon, totalOrder, discountDetails),
       Delivery: async () =>
@@ -142,45 +133,36 @@ class CouponService {
         this._applyProductDiscount(foundCoupon, items, discountDetails),
     };
 
-    if (TARGET_DISCOUNT_HANDLERS[foundCoupon.targetType]) {
-      totalDiscount = await TARGET_DISCOUNT_HANDLERS[foundCoupon.targetType]();
-    } else {
+    const handler = handlers[foundCoupon.targetType];
+    if (!handler) {
       throw new BadRequestError(
         `Unsupported target type: ${foundCoupon.targetType}`
       );
     }
 
-    return {
-      totalDiscount,
-      discountDetails,
-    };
+    totalDiscount = await handler();
+    return { totalDiscount, discountDetails };
   }
 
-  // TODO: Implement the updateCoupon method
   async getAllCoupons({ page = 1, size = 10 }) {
-    const filter = {};
-    const formatPage = parseInt(page);
-    const formatSize = parseInt(size);
+    const formatPage = parseInt(page, 10);
+    const formatSize = parseInt(size, 10);
 
-    const query = {
-      // sort: mappedSort,
-      page: formatPage,
-      size: formatSize,
-    };
+    if (formatPage < 1 || formatSize < 1) {
+      throw new BadRequestError('Page and size must be positive integers');
+    }
+
+    const filter = {};
+    const queryOptions = { page: formatPage, size: formatSize };
 
     const coupons = await this.couponRepository.getAll({
       filter,
-      queryOptions: query,
+      queryOptions,
     });
+    const totalCoupons = await this.couponRepository.countDocuments(filter);
 
-    const totalCoupons = await this.productRepository.countDocuments(filter);
-    const totalPages = Math.ceil(totalCoupons / size);
-
-    return {
-      totalCoupons,
-      totalPages,
-      currentPage: page,
-      coupons: coupons.map((coupon) =>
+    return listResponse({
+      items: coupons.map((coupon) =>
         pickFields({
           fields: [
             'id',
@@ -196,7 +178,10 @@ class CouponService {
           object: coupon,
         })
       ),
-    };
+      total: totalCoupons,
+      page: formatPage,
+      size: formatSize,
+    });
   }
 
   async _applyCategoryDiscount(coupon, items, discountDetails) {
@@ -205,7 +190,7 @@ class CouponService {
     for (const item of items) {
       const product = await this.productRepository.getById(item.productId);
       if (!product) {
-        throw new BadRequestError('Product not found');
+        throw new BadRequestError(`Product ${item.productId} not found`);
       }
 
       const isEligible = product.category.some((cat) =>
@@ -215,13 +200,30 @@ class CouponService {
       if (isEligible) {
         const price = item.variantId
           ? (await this.variantRepository.getById(item.variantId))?.price
-          : product.price;
+          : product.originalPrice;
 
         if (!price) {
           throw new BadRequestError('Price not found for product or variant');
         }
 
-        const total = price * item.quantity;
+        // Apply product discount first
+        let itemPrice = price;
+        const now = new Date();
+        const isProductDiscountActive =
+          product.discountStart &&
+          product.discountEnd &&
+          now >= new Date(product.discountStart) &&
+          now <= new Date(product.discountEnd) &&
+          product.discountValue > 0;
+
+        if (isProductDiscountActive) {
+          itemPrice =
+            product.discountType === 'AMOUNT'
+              ? Math.max(0, price - product.discountValue)
+              : Math.max(0, price * (1 - product.discountValue / 100));
+        }
+
+        const total = itemPrice * item.quantity;
         const discount = this._applyDiscount(total, coupon);
         totalDiscount += discount;
 
@@ -244,25 +246,39 @@ class CouponService {
     for (const item of items) {
       const product = await this.productRepository.getById(item.productId);
       if (!product) {
-        throw new BadRequestError('Product not found');
+        throw new BadRequestError(`Product ${item.productId} not found`);
       }
 
-      if (coupon.targetIds.includes(product.id)) {
-        // Lấy giá của variant nếu có
+      if (coupon.targetIds.includes(product.id.toString())) {
         const price = item.variantId
           ? (await this.variantRepository.getById(item.variantId))?.price
-          : product.price;
+          : product.originalPrice;
 
         if (!price) {
           throw new BadRequestError('Price not found for product or variant');
         }
 
-        // Tính tổng giá trị và giảm giá
-        const total = price * item.quantity;
+        // Apply product discount first
+        let itemPrice = price;
+        const now = new Date();
+        const isProductDiscountActive =
+          product.discountStart &&
+          product.discountEnd &&
+          now >= new Date(product.discountStart) &&
+          now <= new Date(product.discountEnd) &&
+          product.discountValue > 0;
+
+        if (isProductDiscountActive) {
+          itemPrice =
+            product.discountType === 'AMOUNT'
+              ? Math.max(0, price - product.discountValue)
+              : Math.max(0, price * (1 - product.discountValue / 100));
+        }
+
+        const total = itemPrice * item.quantity;
         const discount = this._applyDiscount(total, coupon);
         totalDiscount += discount;
 
-        // Lưu chi tiết
         discountDetails.push({
           productId: product.id,
           variantId: item.variantId || null,
@@ -278,56 +294,46 @@ class CouponService {
 
   async _applyDeliveryDiscount(coupon, shippingFee, discountDetails) {
     const discount = this._applyDiscount(shippingFee, coupon);
-    discountDetails.push({
-      type: 'Delivery',
-      discount,
-      shippingFee,
-    });
-
+    discountDetails.push({ type: 'Delivery', discount, shippingFee });
     return discount;
   }
 
   async _applyOrderDiscount(coupon, totalOrder, discountDetails) {
     const discount = this._applyDiscount(totalOrder, coupon);
-    discountDetails.push({
-      type: 'Order',
-      discount,
-      totalOrder,
-    });
-
+    discountDetails.push({ type: 'Order', discount, totalOrder });
     return discount;
   }
 
-  _checkCoupon(foundCoupon, userId) {
-    if (!foundCoupon) {
+  _checkCoupon(coupon, userId) {
+    if (!coupon) {
       throw new BadRequestError('Coupon code not found');
     }
 
-    if (!foundCoupon.isActive) {
+    if (!coupon.isActive) {
       throw new BadRequestError('Coupon code is not active');
     }
 
-    if (new Date(foundCoupon.startDate) > new Date()) {
+    if (new Date(coupon.startDate) > new Date()) {
       throw new BadRequestError('Coupon code is not yet active');
     }
 
-    if (new Date(foundCoupon.endDate) < new Date()) {
+    if (new Date(coupon.endDate) < new Date()) {
       throw new BadRequestError('Coupon code has expired');
     }
 
-    if (foundCoupon.maxUses <= foundCoupon.usesCount) {
+    if (coupon.maxUses <= coupon.usesCount) {
       throw new BadRequestError('Coupon code has reached its maximum uses');
     }
 
-    const maxUser = foundCoupon.maxUsesPerUser;
-
-    if (maxUser > 0) {
-      const usersUsedDiscount = foundCoupon.usersUsed.find(
+    if (coupon.maxUsesPerUser > 0) {
+      const userUsage = coupon.usersUsed.find(
         (user) => user.userId.toString() === userId.toString()
       );
 
-      if (usersUsedDiscount?.usageCount >= maxUser) {
-        throw new BadRequestError(`Discount just used ${maxUser}`);
+      if (userUsage?.usageCount >= coupon.maxUsesPerUser) {
+        throw new BadRequestError(
+          `Coupon can only be used ${coupon.maxUsesPerUser} times per user`
+        );
       }
     }
   }
@@ -339,15 +345,12 @@ class CouponService {
       return 0;
     }
 
-    let discount = 0;
-    if (type === 'AMOUNT') {
-      discount = value;
-    } else if (type === 'PERCENT') {
-      discount = basePrice * (value / 100);
+    let discount = type === 'AMOUNT' ? value : basePrice * (value / 100);
+    if (type === 'PERCENT' && maxValue) {
       discount = Math.min(discount, maxValue);
     }
 
-    return discount;
+    return Math.max(0, discount);
   }
 
   _validateCouponPayload({
@@ -363,7 +366,7 @@ class CouponService {
     }
 
     if (
-      (targetType === 'Product' || targetType === 'Category') &&
+      ['Product', 'Category'].includes(targetType) &&
       (!targetIds || targetIds.length === 0)
     ) {
       throw new BadRequestError('Target IDs are required for targetType');

@@ -331,6 +331,7 @@ class ProductService {
         return {
           ...pickFields({
             fields: [
+              'id',
               'code',
               'name',
               'slug',
@@ -476,6 +477,7 @@ class ProductService {
       product: {
         ...pickFields({
           fields: [
+            'id',
             'code',
             'name',
             'slug',
@@ -585,6 +587,248 @@ class ProductService {
       fields: ['status', 'updatedAt'],
       object: updatedProduct,
     });
+  }
+
+  async importStock({ items, userId }) {
+    if (!Array.isArray(items) || items.length === 0) {
+      throw new BadRequestError('Items array is required and cannot be empty');
+    }
+
+    if (!userId) {
+      throw new BadRequestError('User ID is required');
+    }
+
+    const updatedData = [];
+
+    for (const item of items) {
+      const { productId, variantId, quantity } = item;
+
+      // Validate input
+      if (!productId || quantity === undefined || quantity <= 0) {
+        throw new BadRequestError(
+          `Invalid item: productId and quantity (>0) are required`
+        );
+      }
+
+      // Fetch product
+      const foundProduct = await this.productRepository.getById(productId);
+      if (!foundProduct) {
+        throw new NotFoundError(`Product ${productId} not found`);
+      }
+
+      let updateData = { updatedBy: userId };
+
+      if (variantId) {
+        // Handle variant stock import
+        const variant = await this.variantRepository.getById(variantId);
+        if (!variant || variant.productId.toString() !== productId.toString()) {
+          throw new NotFoundError(
+            `Variant ${variantId} not found or does not belong to product ${productId}`
+          );
+        }
+
+        // Update variant quantity
+        const updatedVariant = await this.variantRepository.updateById(
+          variantId,
+          {
+            $inc: { quantity: quantity },
+            updatedBy: userId,
+          }
+        );
+
+        // Update variant status
+        if (
+          updatedVariant.status === ProductStatus.OUT_OF_STOCK &&
+          updatedVariant.quantity > 0
+        ) {
+          await this.variantRepository.updateById(variantId, {
+            status: ProductStatus.PUBLISHED,
+            updatedBy: userId,
+          });
+          updatedVariant.status = ProductStatus.PUBLISHED;
+        }
+
+        // If product has variants, update product quantity as sum of variant quantities
+        if (foundProduct.variants.length > 0) {
+          const variants = await this.variantRepository.getVariantByFilter({
+            productId: productId,
+          });
+          const totalQuantity = variants.reduce(
+            (sum, v) => sum + v.quantity,
+            0
+          );
+
+          updateData = {
+            ...updateData,
+            quantity: totalQuantity,
+          };
+
+          // Update product status
+          if (
+            foundProduct.status === ProductStatus.OUT_OF_STOCK &&
+            totalQuantity > 0
+          ) {
+            updateData.status = ProductStatus.PUBLISHED;
+          }
+        }
+
+        updatedData.push({
+          productId: foundProduct.id,
+          variantId: variant.id,
+          quantity: updatedVariant.quantity,
+          productQuantity: updateData.quantity || foundProduct.quantity,
+          status: updatedVariant.status,
+        });
+      } else {
+        // Handle non-variant product stock import
+        if (foundProduct.variants.length > 0) {
+          throw new BadRequestError(
+            `Product ${productId} has variants; variantId is required`
+          );
+        }
+
+        updateData = {
+          ...updateData,
+          $inc: { quantity: quantity },
+        };
+
+        // Update product status
+        if (
+          foundProduct.status === ProductStatus.OUT_OF_STOCK &&
+          foundProduct.quantity + quantity > 0
+        ) {
+          updateData.status = ProductStatus.PUBLISHED;
+        }
+
+        updatedData.push({
+          productId: foundProduct.id,
+          variantId: null,
+          quantity: foundProduct.quantity + quantity,
+          productQuantity: foundProduct.quantity + quantity,
+          status: updateData.status || foundProduct.status,
+        });
+      }
+
+      // Update product
+      await this.productRepository.updateById(
+        foundProduct.id,
+        updateNestedObjectParser(removeUndefinedObject(updateData))
+      );
+    }
+
+    return {
+      updatedItems: updatedData.map((item) =>
+        pickFields({
+          fields: [
+            'productId',
+            'variantId',
+            'quantity',
+            'productQuantity',
+            'status',
+          ],
+          object: item,
+        })
+      ),
+    };
+  }
+
+  async applyDiscounts({ items, userId }) {
+    if (!Array.isArray(items) || items.length === 0) {
+      throw new BadRequestError('Items array is required and cannot be empty');
+    }
+
+    if (!userId) {
+      throw new BadRequestError('User ID is required');
+    }
+
+    const updatedData = [];
+
+    for (const item of items) {
+      const {
+        productId,
+        discountType,
+        discountValue,
+        discountStart,
+        discountEnd,
+      } = item;
+
+      // Validate input
+      if (
+        !productId ||
+        !discountType ||
+        discountValue === undefined ||
+        !discountStart ||
+        !discountEnd
+      ) {
+        throw new BadRequestError(
+          `Invalid item: productId, discountType, discountValue, discountStart, and discountEnd are required`
+        );
+      }
+
+      if (!['AMOUNT', 'PERCENT'].includes(discountType)) {
+        throw new BadRequestError(
+          `Invalid discountType: must be AMOUNT or PERCENT`
+        );
+      }
+
+      if (discountValue < 0) {
+        throw new BadRequestError(`discountValue must be non-negative`);
+      }
+
+      const startDate = new Date(discountStart);
+      const endDate = new Date(discountEnd);
+      if (isNaN(startDate) || isNaN(endDate)) {
+        throw new BadRequestError(`Invalid discountStart or discountEnd date`);
+      }
+
+      if (startDate >= endDate) {
+        throw new BadRequestError(`discountStart must be before discountEnd`);
+      }
+
+      // Fetch product
+      const foundProduct = await this.productRepository.getById(productId);
+      if (!foundProduct) {
+        throw new NotFoundError(`Product ${productId} not found`);
+      }
+
+      // Prepare update data
+      const updateData = removeUndefinedObject({
+        discountType,
+        discountValue,
+        discountStart: startDate,
+        discountEnd: endDate,
+        updatedBy: userId,
+      });
+
+      // Update product
+      await this.productRepository.updateById(
+        foundProduct.id,
+        updateNestedObjectParser(updateData)
+      );
+
+      updatedData.push({
+        productId: foundProduct.id,
+        discountType,
+        discountValue,
+        discountStart: startDate,
+        discountEnd: endDate,
+      });
+    }
+
+    return {
+      updatedItems: updatedData.map((item) =>
+        pickFields({
+          fields: [
+            'productId',
+            'discountType',
+            'discountValue',
+            'discountStart',
+            'discountEnd',
+          ],
+          object: item,
+        })
+      ),
+    };
   }
 
   async _validateCategories(categories) {
