@@ -60,10 +60,14 @@ class OrderRepository extends BaseRepository {
         variantId: item.var_id,
         productName: item.prd_name,
         variantSlug: item.var_slug,
-        price: item.prd_price,
         image: item.prd_img,
+        price: item.prd_price,
         quantity: item.prd_quantity,
-        discount: item.prd_discount,
+        productDiscount: item.prd_discount,
+        couponDiscount: item.prd_coupon_discount || 0,
+        total:
+          item.prd_price * item.prd_quantity -
+          (item.prd_discount + (item.prd_coupon_discount || 0)),
       })),
       shippingAddress: {
         fullname: order.ord_shipping_address.shp_fullname,
@@ -81,15 +85,15 @@ class OrderRepository extends BaseRepository {
           }
         : order.ord_delivery_method,
       itemsPrice: order.ord_items_price,
-      itemsDiscount: order.ord_items_discount,
+      productDiscount: order.ord_items_discount,
+      couponDiscount: order.ord_coupon_discount,
       shippingPrice: order.ord_shipping_price,
       shippingDiscount: order.ord_shipping_discount,
-      discountPrice: order.ord_discount_price,
+      totalSavings:
+        order.ord_items_discount +
+        order.ord_coupon_discount +
+        order.ord_shipping_discount,
       totalPrice: order.ord_total_price,
-      isPaid: order.ord_is_paid,
-      isDelivered: order.ord_is_delivered,
-      paidAt: order.ord_paid_at,
-      deliveredAt: order.ord_delivered_at,
       status: order.ord_status,
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,

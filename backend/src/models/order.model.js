@@ -22,10 +22,11 @@ const orderSchema = new Schema(
           var_id: { type: Schema.Types.ObjectId, ref: 'Variant' },
           prd_name: { type: String },
           var_slug: { type: String },
-          prd_price: { type: Number, required: true },
           prd_img: { type: String, required: true },
+          prd_price: { type: Number, required: true },
           prd_quantity: { type: Number, required: true, default: 1 },
           prd_discount: { type: Number, required: true, default: 0 },
+          prd_coupon_discount: { type: Number, default: 0 },
         },
       ],
       default: [],
@@ -51,21 +52,22 @@ const orderSchema = new Schema(
       ref: 'Delivery',
       required: true,
     },
-
+    // Tổng giá gốc sản phẩm
     ord_items_price: { type: Number, required: true },
+    // Tổng giảm giá sản phẩm
     ord_items_discount: { type: Number, required: true, default: 0 },
+    // Tổng giảm giá từ coupon
+    ord_coupon_discount: { type: Number, required: true, default: 0 },
 
     ord_shipping_price: { type: Number, required: true, default: 0 },
     ord_shipping_discount: { type: Number, required: true, default: 0 },
 
-    ord_discount_price: { type: Number, required: true, default: 0 },
     ord_total_price: { type: Number, required: true },
 
     ord_is_paid: { type: Boolean, default: false },
     ord_is_delivered: { type: Boolean, default: false },
     ord_paid_at: { type: Date, default: null },
     ord_delivered_at: { type: Date, default: null },
-
     ord_status: {
       type: String,
       enum: AvailableOrderStatus,

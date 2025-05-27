@@ -35,6 +35,7 @@ class OrderService {
   async validateAndCalculateItems({ items }) {
     let totalItemsPrice = 0;
     let totalProductDiscount = 0;
+    let totalCouponDiscount = 0;
     const itemsDetails = [];
 
     for (const item of items) {
@@ -43,17 +44,15 @@ class OrderService {
         throw new NotFoundError(`Product ${item.productId} not found`);
       }
 
-      // Check if product requires a variant
       if (product.variants.length > 0 && !item.variantId) {
         throw new BadRequestError(
           `Product ${product.name} requires a variantId`
         );
       }
 
-      // Check for variant (if applicable)
       const variant = item.variantId
         ? await this.variantRepository.getByQuery({
-            productId: item.productId,
+            prd_id: item.productId,
             _id: item.variantId,
           })
         : null;
@@ -64,7 +63,6 @@ class OrderService {
         );
       }
 
-      // Check stock quantity
       const availableQuantity = variant ? variant.quantity : product.quantity;
       if (availableQuantity < item.quantity) {
         throw new BadRequestError(
@@ -76,7 +74,6 @@ class OrderService {
         );
       }
 
-      // Check stock status
       const stockStatus = variant ? variant.status : product.status;
       if (stockStatus !== ProductStatus.PUBLISHED) {
         throw new BadRequestError(
@@ -84,11 +81,9 @@ class OrderService {
         );
       }
 
-      // Calculate item price and product discount
       const price = variant ? variant.price : product.originalPrice;
       let productDiscount = 0;
 
-      // Apply product discount if active
       const now = new Date();
       const isDiscountActive =
         product.discountStart &&
@@ -104,9 +99,6 @@ class OrderService {
             : price * (product.discountValue / 100);
       }
 
-      const discountedPrice = Math.max(0, price - productDiscount);
-      const itemTotal = discountedPrice * item.quantity;
-
       totalItemsPrice += price * item.quantity;
       totalProductDiscount += productDiscount * item.quantity;
 
@@ -116,14 +108,19 @@ class OrderService {
         productName: product.name,
         variantSlug: variant?.slug || '',
         image: product.mainImage,
-        price, // Original price
+        price,
         quantity: item.quantity,
-        productDiscount, // Product discount per unit
-        total: itemTotal, // Total after product discount
+        productDiscount,
+        couponDiscount: 0,
       });
     }
 
-    return { totalItemsPrice, totalProductDiscount, itemsDetails };
+    return {
+      totalItemsPrice,
+      totalProductDiscount,
+      totalCouponDiscount,
+      itemsDetails,
+    };
   }
 
   async reviewOrder({
@@ -138,7 +135,6 @@ class OrderService {
     let orderDiscount = 0;
     let totalCouponDiscount = 0;
 
-    // Validate shipping address and calculate delivery fee
     if (shippingAddress && deliveryId) {
       const addressData = await this.addressService.getPlaceDetails({
         street: shippingAddress.street,
@@ -153,11 +149,9 @@ class OrderService {
       });
     }
 
-    // Calculate item prices and product discounts
     const { totalItemsPrice, totalProductDiscount, itemsDetails } =
       await this.validateAndCalculateItems({ items });
 
-    // Apply coupon discounts
     if (couponCode) {
       const discountResult = await this.couponService.reviewDiscount({
         userId,
@@ -168,7 +162,6 @@ class OrderService {
       });
 
       totalCouponDiscount = discountResult.totalDiscount;
-
       shippingDiscount =
         discountResult.discountDetails.find((d) => d.type === 'Delivery')
           ?.discount || 0;
@@ -176,7 +169,6 @@ class OrderService {
         discountResult.discountDetails.find((d) => d.type === 'Order')
           ?.discount || 0;
 
-      // Apply product- or category-level coupon discounts
       discountResult.discountDetails.forEach((discountDetail) => {
         if (discountDetail.productId) {
           const itemIndex = itemsDetails.findIndex(
@@ -191,30 +183,39 @@ class OrderService {
 
           if (itemIndex !== -1) {
             itemsDetails[itemIndex].couponDiscount = discountDetail.discount;
-            itemsDetails[itemIndex].total -= discountDetail.discount;
-            itemsDetails[itemIndex].total = Math.max(
-              0,
-              itemsDetails[itemIndex].total
-            );
+            totalCouponDiscount += discountDetail.discount;
           }
         }
       });
     }
 
-    // Calculate final totals
-    const totalDiscount = totalProductDiscount + totalCouponDiscount;
-    const totalPrice = totalItemsPrice + shippingPrice - totalDiscount;
+    const totalSavings =
+      totalProductDiscount + totalCouponDiscount + shippingDiscount;
+    const totalPrice = totalItemsPrice + shippingPrice - totalSavings;
 
     return {
-      totalItemsPrice,
-      totalProductDiscount,
+      itemsPrice: totalItemsPrice,
+      productDiscount: totalProductDiscount,
+      couponDiscount: totalCouponDiscount,
       shippingPrice,
       shippingDiscount,
       orderDiscount,
-      totalCouponDiscount,
-      totalDiscount,
+      totalSavings,
       totalPrice,
-      itemsDetails,
+      items: itemsDetails.map((item) => ({
+        productId: item.productId,
+        variantId: item.variantId,
+        productName: item.productName,
+        variantSlug: item.variantSlug,
+        image: item.image,
+        price: item.price,
+        quantity: item.quantity,
+        productDiscount: item.productDiscount,
+        couponDiscount: item.couponDiscount,
+        total:
+          item.price * item.quantity -
+          (item.productDiscount + item.couponDiscount),
+      })),
     };
   }
 
@@ -227,17 +228,14 @@ class OrderService {
     deliveryId,
   }) {
     try {
-      // Validate and calculate order details
       const {
-        totalItemsPrice,
-        totalProductDiscount,
+        itemsPrice,
+        productDiscount,
+        couponDiscount,
         shippingPrice,
         shippingDiscount,
-        orderDiscount,
-        totalCouponDiscount,
-        totalDiscount,
         totalPrice,
-        itemsDetails,
+        items: itemsDetails,
       } = await this.reviewOrder({
         userId,
         shippingAddress,
@@ -251,7 +249,6 @@ class OrderService {
           ? OrderStatus.PENDING
           : OrderStatus.AWAITING_PAYMENT;
 
-      // Create order
       const newOrder = await this.orderRepository.create({
         ord_user_id: userId,
         ord_coupon_code: couponCode || null,
@@ -271,26 +268,24 @@ class OrderService {
           prd_id: item.productId,
           var_id: item.variantId,
           prd_img: item.image,
-          prd_discount:
-            (item.productDiscount || 0) + (item.couponDiscount || 0),
+          prd_discount: item.productDiscount,
+          prd_coupon_discount: item.couponDiscount,
         })),
-        ord_items_price: totalItemsPrice,
-        ord_items_discount: totalProductDiscount,
+        ord_items_price: itemsPrice,
+        ord_items_discount: productDiscount,
+        ord_coupon_discount: couponDiscount,
         ord_shipping_price: shippingPrice,
         ord_shipping_discount: shippingDiscount,
-        ord_discount_price: totalCouponDiscount,
         ord_total_price: totalPrice,
         ord_payment_method: paymentMethod,
         ord_delivery_method: deliveryId,
         ord_status: status,
       });
 
-      // Update coupon usage
       if (couponCode) {
         await this.couponService.useCoupon(couponCode, userId);
       }
 
-      // Update stock
       await this._updateStock(itemsDetails);
 
       return newOrder;
@@ -373,7 +368,6 @@ class OrderService {
     const foundOrder = await this.orderRepository.getById(orderId);
     if (!foundOrder) throw new NotFoundError(`Order ${orderId} not found`);
 
-    // Define next state transitions
     const NEXT_STATUS = {
       [OrderStatus.AWAITING_PAYMENT]: () => null,
       [OrderStatus.PENDING]: () => OrderStatus.PROCESSING,
@@ -393,7 +387,6 @@ class OrderService {
       },
     };
 
-    // Transition to the next status
     if (NEXT_STATUS[foundOrder.status]) {
       foundOrder.status = NEXT_STATUS[foundOrder.status]();
     } else {
@@ -402,16 +395,13 @@ class OrderService {
       );
     }
 
-    // Check payment handler
     if (foundOrder.paymentMethod === PaymentMethod.COD) {
-      // COD: Mark as paid if delivered
       if (foundOrder.status === OrderStatus.DELIVERED) {
         foundOrder.isPaid = true;
         foundOrder.paidAt = new Date();
       }
     } else {
-      // All other methods require payment to be completed beforehand
-      if (!isPaid) {
+      if (!foundOrder.isPaid) {
         throw new BadRequestError(
           'Payment must be completed before proceeding.'
         );
@@ -428,6 +418,7 @@ class OrderService {
 
     if (!updatedOrder)
       throw new InternalServerError('Failed to update order status');
+    return updatedOrder;
   }
 
   async reviewNextStatus(orderId) {
@@ -435,8 +426,6 @@ class OrderService {
     if (!foundOrder) throw new NotFoundError(`Order ${orderId} not found`);
 
     const nowStatus = foundOrder.status;
-
-    // Transition to the next status
     const nextStatus = this._nextStatus(foundOrder.status);
 
     return {
@@ -479,24 +468,16 @@ class OrderService {
     }
 
     this.couponService.revokeCouponUsage(foundOrder.couponCode, userId);
-
-    // Reverse stock
     await this._reverseStock(foundOrder.items);
 
-    // Update order status
     const updatedOrder = await this.orderRepository.updateById(orderId, {
       ord_status: OrderStatus.CANCELLED,
     });
 
     if (!updatedOrder) throw new InternalServerError('Failed to cancel order');
 
-    return {
-      status: updatedOrder.status,
-    };
+    return { status: updatedOrder.status };
   }
-
-  // TODO: Implement return order feature
-  async returnOrder(orderId) {}
 
   async getOrderDetailsByUser({ userId, orderId }) {
     const foundOrder = await this.orderRepository.getByQuery(
@@ -511,19 +492,7 @@ class OrderService {
     );
     if (!foundOrder) throw new NotFoundError(`Order ${orderId} not found`);
 
-    return {
-      orders: omitFields({
-        object: foundOrder,
-        fields: [
-          'isPaid',
-          'isDelivered',
-          'paidAt',
-          'deliveredAt',
-          'createdAt',
-          'updatedAt',
-        ],
-      }),
-    };
+    return { order: foundOrder };
   }
 
   async getOrderDetails(orderId) {
@@ -538,19 +507,7 @@ class OrderService {
     );
     if (!foundOrder) throw new NotFoundError(`Order ${orderId} not found`);
 
-    return {
-      orders: omitFields({
-        object: foundOrder,
-        fields: [
-          'isPaid',
-          'isDelivered',
-          'paidAt',
-          'deliveredAt',
-          'createdAt',
-          'updatedAt',
-        ],
-      }),
-    };
+    return { order: foundOrder };
   }
 
   async getOrdersByUserId({
@@ -562,30 +519,20 @@ class OrderService {
     page = 1,
     size = 10,
   }) {
-    // Initialize the filter object for querying the database
     const filter = { ord_user_id: userId };
 
-    // Search by user name or phone in shipping address
     if (search) {
       const keyword = search.trim();
       const regexOptions = { $regex: keyword, $options: 'i' };
-
       filter.$or = [
         { 'ord_shipping_address.shp_fullname': regexOptions },
         { 'ord_shipping_address.shp_phone': regexOptions },
       ];
     }
 
-    // Filter by status and payment method
-    if (status) {
-      filter.ord_status = status;
-    }
+    if (status) filter.ord_status = status;
+    if (paymentMethod) filter.ord_payment_method = paymentMethod;
 
-    if (paymentMethod) {
-      filter.ord_payment_method = paymentMethod;
-    }
-
-    // Sorting configuration
     const mappedSort = sort
       ? `${sort.startsWith('-') ? '-' : ''}${
           SortFieldOrder[sort.replace('-', '')] || 'createdAt'
@@ -598,7 +545,6 @@ class OrderService {
       size: parseInt(size, 10),
     };
 
-    // Fetch orders from the repository
     const orders = await this.orderRepository.getAllOrder({
       filter,
       queryOptions,
@@ -615,21 +561,7 @@ class OrderService {
       totalPages,
       totalOrders,
       currentPage: page,
-      orders: orders.map((order) =>
-        pickFields({
-          fields: [
-            'id',
-            'shippingAddress.fullname',
-            'shippingAddress.phone',
-            'paymentMethod',
-            'deliveryMethod.id',
-            'deliveryMethod.name',
-            'totalPrice',
-            'status',
-          ],
-          object: order,
-        })
-      ),
+      orders,
     };
   }
 
@@ -642,55 +574,40 @@ class OrderService {
     page = 1,
     size = 10,
   }) {
-    // Initialize the filter object for querying the database
     const filter = {};
 
-    // Parse and validate pagination parameters
     page = parseInt(page, 10);
     size = parseInt(size, 10);
     if (isNaN(page) || page < 1) page = 1;
     if (isNaN(size) || size < 1) size = 10;
 
-    // Search by user name or phone in shipping address
     if (search) {
       const keyword = search.trim();
       const regexOptions = { $regex: keyword, $options: 'i' };
-
       filter.$or = [
         { 'ord_shipping_address.shp_fullname': regexOptions },
         { 'ord_shipping_address.shp_phone': regexOptions },
       ];
     }
 
-    // Filter by status and payment method
-    if (status) {
-      filter.ord_status = status;
-    }
+    if (status) filter.ord_status = status;
+    if (paymentMethod) filter.ord_payment_method = paymentMethod;
 
-    if (paymentMethod) {
-      filter.ord_payment_method = paymentMethod;
-    }
-
-    // Sorting configuration
     const mappedSort = sort
       ? `${sort.startsWith('-') ? '-' : ''}${
           SortFieldOrder[sort.replace('-', '')] || 'createdAt'
         }`
       : '-createdAt';
 
-    // Fetch orders from the repository
     const orders = await this.orderRepository.getAllOrder({
       filter,
-      queryOptions: {
-        sort: mappedSort,
-      },
+      queryOptions: { sort: mappedSort },
       populateOptions: {
         path: 'ord_delivery_method',
         select: 'dlv_name',
       },
     });
 
-    // Map orders to include `nextStatus` and filter by `nextStatus` if specified
     const ordersWithNextStatus = orders
       .map((order) => ({
         ...order,
@@ -698,7 +615,6 @@ class OrderService {
       }))
       .filter((order) => (nextStatus ? order.nextStatus === nextStatus : true));
 
-    // Paginate the filtered orders
     const paginatedOrders = ordersWithNextStatus.slice(
       (page - 1) * size,
       page * size
@@ -711,22 +627,7 @@ class OrderService {
       totalPages,
       totalOrders,
       currentPage: page,
-      orders: paginatedOrders.map((order) =>
-        pickFields({
-          fields: [
-            'id',
-            'shippingAddress.fullname',
-            'shippingAddress.phone',
-            'paymentMethod',
-            'deliveryMethod.id',
-            'deliveryMethod.name',
-            'totalPrice',
-            'status',
-            'nextStatus',
-          ],
-          object: order,
-        })
-      ),
+      orders: paginatedOrders,
     };
   }
 }
