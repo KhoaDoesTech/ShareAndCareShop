@@ -13,11 +13,19 @@ const router = express.Router();
 
 router.post(
   '/vnpay/create_payment_url',
-  asyncHandler(PaymentController.createVNPayUrl)
+  asyncHandler(PaymentController.createVNPayPaymentUrl)
 );
 router.get(
   '/vnpay/callback',
-  asyncHandler(PaymentController.checkPaymentStatus)
+  asyncHandler(PaymentController.handleVNPayCallback)
+);
+router.post(
+  '/momo/create_payment_url',
+  asyncHandler(PaymentController.createMoMoPaymentUrl)
+);
+router.post(
+  '/momo/callback',
+  asyncHandler(PaymentController.handleMoMoCallback)
 );
 
 module.exports = router;

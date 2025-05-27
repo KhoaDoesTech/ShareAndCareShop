@@ -21,6 +21,7 @@ const {
 const AddressService = require('./address.service');
 const CouponService = require('./coupon.service');
 const DeliveryService = require('./delivery.service');
+const PaymentService = require('./payment.service');
 
 class OrderService {
   constructor() {
@@ -30,6 +31,7 @@ class OrderService {
     this.addressService = new AddressService();
     this.deliveryService = new DeliveryService();
     this.couponService = new CouponService();
+    this.paymentService = new PaymentService();
   }
 
   async validateAndCalculateItems({ items }) {
@@ -226,6 +228,7 @@ class OrderService {
     items,
     paymentMethod,
     deliveryId,
+    ipAddress,
   }) {
     try {
       const {
@@ -288,7 +291,23 @@ class OrderService {
 
       await this._updateStock(itemsDetails);
 
-      return newOrder;
+      let paymentUrl = null;
+      if (paymentMethod === PaymentMethod.VNPAY) {
+        paymentUrl = await this.paymentService.createVNPayPaymentUrl({
+          orderId: newOrder.id,
+          ipAddress,
+        });
+      } else if (paymentMethod === PaymentMethod.MOMO) {
+        paymentUrl = await this.paymentService.createMoMoPaymentUrl({
+          orderId: newOrder.id,
+          ipAddress,
+        });
+      }
+
+      return {
+        order: newOrder,
+        paymentUrl,
+      };
     } catch (error) {
       throw new BadRequestError(`Failed to create order: ${error.message}`);
     }

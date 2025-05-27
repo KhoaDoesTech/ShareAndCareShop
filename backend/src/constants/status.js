@@ -102,7 +102,8 @@ const AvailableCartStatus = Object.values(CartStatus);
 
 const PaymentMethod = {
   COD: 'COD',
-  VN_PAY: 'VN_PAY',
+  VNPAY: 'VNPAY',
+  MOMO: 'MOMO',
 };
 
 const AvailablePaymentMethod = Object.values(PaymentMethod);

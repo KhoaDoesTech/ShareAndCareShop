@@ -21,11 +21,14 @@ class OrderController {
   };
 
   createOrder = async (req, res, next) => {
+    const ipAddress =
+      req.headers['x-forwarded-for'] || req.connection.remoteAddress;
     new CreateSuccess({
       message: 'Order created successfully',
       metadata: await this.orderService.createOrder({
         ...req.body,
         userId: req.user.id,
+        ipAddress,
       }),
     }).send(res);
   };
