@@ -96,7 +96,7 @@ class ProductService {
           }))
         : [],
       prd_video: video,
-      return_days: returnDays,
+      prd_return_days: returnDays,
       createdBy: userId,
       updatedBy: userId,
     });
@@ -212,7 +212,7 @@ class ProductService {
       prd_discount_start: discountStart,
       prd_discount_end: discountEnd,
       prd_video: video,
-      return_days: returnDays,
+      prd_return_days: returnDays,
       prd_category: updatedCategories,
       prd_attributes: updatedAttributes,
       prd_variants: updatedVariants,

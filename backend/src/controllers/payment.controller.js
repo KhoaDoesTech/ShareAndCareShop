@@ -8,6 +8,48 @@ class PaymentController {
     this.paymentService = new PaymentService();
   }
 
+  handleVNPayCallback = async (req, res) => {
+    try {
+      const result = await this.paymentService.verifyVNPayCallback(req.query);
+      if (result.isSuccess) {
+        res.redirect(
+          `${process.env.FRONTEND_URL}/payment/success?orderId=${result.orderId}`
+        );
+      } else {
+        res.redirect(
+          `${process.env.FRONTEND_URL}/payment/failure?orderId=${result.orderId}`
+        );
+      }
+    } catch (error) {
+      res.redirect(
+        `${process.env.FRONTEND_URL}/error?message=${encodeURIComponent(
+          error.message
+        )}`
+      );
+    }
+  };
+
+  handleMoMoCallback = async (req, res) => {
+    try {
+      const result = await this.paymentService.verifyMoMoCallback(req.body);
+      if (result.isSuccess) {
+        res.redirect(
+          `${process.env.FRONTEND_URL}/payment/success?orderId=${result.orderId}`
+        );
+      } else {
+        res.redirect(
+          `${process.env.FRONTEND_URL}/payment/failure?orderId=${result.orderId}`
+        );
+      }
+    } catch (error) {
+      res.redirect(
+        `${process.env.FRONTEND_URL}/error?message=${encodeURIComponent(
+          error.message
+        )}`
+      );
+    }
+  };
+
   createVNPayPaymentUrl = async (req, res) => {
     const ipAddress =
       req.headers['x-forwarded-for'] || req.connection.remoteAddress;
@@ -22,19 +64,6 @@ class PaymentController {
     }).send(res);
   };
 
-  handleVNPayCallback = async (req, res) => {
-    try {
-      await this.paymentService.verifyVNPayCallback(req.query);
-      res.redirect(process.env.FRONTEND_URL);
-    } catch (error) {
-      res.redirect(
-        `${process.env.FRONTEND_URL}/error?message=${encodeURIComponent(
-          error.message
-        )}`
-      );
-    }
-  };
-
   createMoMoPaymentUrl = async (req, res) => {
     const ipAddress =
       req.headers['x-forwarded-for'] || req.connection.remoteAddress;
@@ -47,19 +76,6 @@ class PaymentController {
       message: 'MoMo payment URL created successfully',
       metadata: paymentUrl,
     }).send(res);
-  };
-
-  handleMoMoCallback = async (req, res) => {
-    try {
-      await this.paymentService.verifyMoMoCallback(req.body);
-      res.redirect(process.env.FRONTEND_URL);
-    } catch (error) {
-      res.redirect(
-        `${process.env.FRONTEND_URL}/error?message=${encodeURIComponent(
-          error.message
-        )}`
-      );
-    }
   };
 }
 

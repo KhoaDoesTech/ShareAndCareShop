@@ -45,12 +45,42 @@ class VariantRepository extends BaseRepository {
     );
   }
 
+  async getByQuery({ filter = {}, fields = '', options = {} }) {
+    let documentQuery = this.model.findOne(filter, fields, options);
+    documentQuery = documentQuery.populate([
+      { path: 'prd_id', select: 'prd_name prd_code prd_slug' },
+      { path: 'createdBy', select: 'usr_name usr_email' },
+      { path: 'updatedBy', select: 'usr_name usr_email' },
+    ]);
+    const document = await documentQuery.lean();
+
+    return this.formatDocument(document);
+  }
+
+  async getVariantsByProductId(productId) {
+    return await this.model
+      .find({ prd_id: productId })
+      .populate([
+        { path: 'createdBy', select: 'usr_name usr_email' },
+        { path: 'updatedBy', select: 'usr_name usr_email' },
+      ])
+      .lean()
+      .then((docs) => docs.map(this.formatDocument.bind(this)));
+  }
+
   formatDocument(variant) {
     if (!variant) return null;
 
-    const formattedVariant = {
+    return {
       id: variant._id,
-      productId: variant.prd_id,
+      productId: variant.prd_id?._id || variant.prd_id,
+      product: variant.prd_id
+        ? {
+            name: variant.prd_id.prd_name,
+            code: variant.prd_id.prd_code,
+            slug: variant.prd_id.prd_slug,
+          }
+        : null,
       name: variant.prd_name,
       slug: variant.var_slug,
       tierIndex: variant.var_tier_idx,
@@ -59,13 +89,23 @@ class VariantRepository extends BaseRepository {
       quantity: variant.var_quantity,
       sold: variant.var_sold,
       status: variant.var_status,
-      createdBy: variant.createdBy,
-      updatedBy: variant.updatedBy,
+      createdBy: variant.createdBy
+        ? {
+            id: variant.createdBy._id,
+            name: variant.createdBy.usr_name,
+            email: variant.createdBy.usr_email,
+          }
+        : null,
+      updatedBy: variant.updatedBy
+        ? {
+            id: variant.updatedBy._id,
+            name: variant.updatedBy.usr_name,
+            email: variant.updatedBy.usr_email,
+          }
+        : null,
       createdAt: variant.createdAt,
       updatedAt: variant.updatedAt,
     };
-
-    return formattedVariant;
   }
 }
 

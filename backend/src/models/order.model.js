@@ -2,10 +2,13 @@
 
 const { model, Schema } = require('mongoose');
 const {
-  AvailableOrderStatus,
-  OrderStatus,
   AvailablePaymentMethod,
   PaymentMethod,
+  AvailablePaymentStatuses,
+  PaymentStatus,
+  AvailableOrderStatus,
+  OrderStatus,
+  AvailableReturnReasons,
 } = require('../constants/status');
 
 const DOCUMENT_NAME = 'Order';
@@ -29,8 +32,9 @@ const orderSchema = new Schema(
           prd_img: { type: String, required: true },
           prd_price: { type: Number, required: true },
           prd_quantity: { type: Number, required: true, min: 1 },
-          prd_discount: { type: Number, required: true, default: 0 },
-          prd_coupon_discount: { type: Number, required: true, default: 0 },
+          itm_product_discount: { type: Number, required: true, default: 0 },
+          itm_coupon_discount: { type: Number, required: true, default: 0 },
+          prd_return_days: { type: Number, required: true, default: 7 },
         },
       ],
       required: true,
@@ -56,6 +60,12 @@ const orderSchema = new Schema(
       default: PaymentMethod.COD,
       required: true,
     },
+    ord_payment_status: {
+      type: String,
+      enum: AvailablePaymentStatuses,
+      default: PaymentStatus.PENDING,
+      required: true,
+    },
     ord_delivery_method: {
       type: Schema.Types.ObjectId,
       ref: 'Delivery',
@@ -78,11 +88,23 @@ const orderSchema = new Schema(
       default: OrderStatus.PENDING,
       required: true,
     },
+    ord_return_reason: {
+      type: String,
+      enum: AvailableReturnReasons,
+      default: null,
+    },
+    ord_return_requested_at: { type: Date, default: null },
+    ord_return_approved_at: { type: Date, default: null },
   },
   {
     collection: COLLECTION_NAME,
     timestamps: true,
   }
 );
+
+orderSchema.index({ ord_user_id: 1, ord_status: 1 });
+orderSchema.index({ ord_status: 1 });
+orderSchema.index({ ord_transaction_id: 1 });
+orderSchema.index({ 'ord_shipping_address.shp_phone': 1 });
 
 module.exports = model(DOCUMENT_NAME, orderSchema);

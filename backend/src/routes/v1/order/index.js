@@ -11,52 +11,60 @@ const CONFIG_PERMISSIONS = require('../../../constants/permissions');
 
 const router = express.Router();
 
+// User and Admin routes
 router.get(
-  '/review-order',
+  '/review',
   authentication,
   asyncHandler(OrderController.reviewOrder)
 );
+router.post('/', authentication, asyncHandler(OrderController.createOrder));
 
+// User routes
+router.get(
+  '/user',
+  authentication,
+  asyncHandler(OrderController.getOrdersListForUser)
+);
+router.get(
+  '/user/:orderId',
+  authentication,
+  asyncHandler(OrderController.getOrderDetailsForUser)
+);
 router.patch(
-  '/cancel/:orderId',
+  '/user/:orderId/cancel',
   authentication,
   asyncHandler(OrderController.cancelOrder)
 );
-router.get(
-  '/all',
+router.post(
+  '/user/:orderId/returns',
   authentication,
-  verifyPermission(CONFIG_PERMISSIONS.MANAGE_ORDER.ORDER.VIEW),
-  asyncHandler(OrderController.getAllOrders)
+  asyncHandler(OrderController.requestReturn)
 );
-router.get(
-  '/all/:orderId',
-  authentication,
-  verifyPermission(CONFIG_PERMISSIONS.MANAGE_ORDER.ORDER.VIEW),
-  asyncHandler(OrderController.getOrderDetails)
-);
+
+// Admin routes
 router.get(
   '/',
   authentication,
-  asyncHandler(OrderController.getOrdersByUserId)
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_ORDER.ORDER.VIEW),
+  asyncHandler(OrderController.getOrdersListForAdmin)
 );
 router.get(
   '/:orderId',
   authentication,
-  asyncHandler(OrderController.getOrderDetailsByUser)
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_ORDER.ORDER.VIEW),
+  asyncHandler(OrderController.getOrderDetailsForAdmin)
 );
-router.post('/', authentication, asyncHandler(OrderController.createOrder));
-
 router.patch(
-  '/next-status/:orderId',
+  '/:orderId/status',
   authentication,
   verifyPermission(CONFIG_PERMISSIONS.MANAGE_ORDER.ORDER.UPDATE),
   asyncHandler(OrderController.updateOrderStatus)
 );
-router.get(
-  '/next-status/:orderId',
+router.patch(
+  '/:orderId/returns/approval',
   authentication,
-  verifyPermission(CONFIG_PERMISSIONS.MANAGE_ORDER.ORDER.UPDATE),
-  asyncHandler(OrderController.reviewNextStatus)
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_ORDER.ORDER.RETURN_APPROVE),
+  asyncHandler(OrderController.approveReturn)
 );
 
 module.exports = router;

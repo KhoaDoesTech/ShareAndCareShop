@@ -1,3 +1,5 @@
+'use strict';
+
 const OrderService = require('../services/order.service');
 const {
   CreateSuccess,
@@ -36,7 +38,48 @@ class OrderController {
   updateOrderStatus = async (req, res, next) => {
     new NoContentSuccess({
       message: 'Order updated successfully',
-      metadata: await this.orderService.updateOrderStatus(req.params.orderId),
+      metadata: await this.orderService.updateOrderStatus({
+        orderId: req.params.orderId,
+      }),
+    }).send(res);
+  };
+
+  getOrderDetailsForUser = async (req, res, next) => {
+    const ipAddress =
+      req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    new ActionSuccess({
+      message: 'Order details retrieved successfully',
+      metadata: await this.orderService.getOrderDetailsForUser({
+        userId: req.user.id,
+        orderId: req.params.orderId,
+        ipAddress,
+      }),
+    }).send(res);
+  };
+
+  getOrderDetailsForAdmin = async (req, res, next) => {
+    new ActionSuccess({
+      message: 'Order details retrieved successfully',
+      metadata: await this.orderService.getOrderDetailsForAdmin({
+        orderId: req.params.orderId,
+      }),
+    }).send(res);
+  };
+
+  getOrdersListForUser = async (req, res, next) => {
+    new ActionSuccess({
+      message: 'Orders retrieved successfully',
+      metadata: await this.orderService.getOrdersListForUser({
+        userId: req.user.id,
+        ...req.query,
+      }),
+    }).send(res);
+  };
+
+  getOrdersListForAdmin = async (req, res, next) => {
+    new ActionSuccess({
+      message: 'Orders retrieved successfully',
+      metadata: await this.orderService.getOrdersListForAdmin(req.query),
     }).send(res);
   };
 
@@ -57,37 +100,24 @@ class OrderController {
     }).send(res);
   };
 
-  getAllOrders = async (req, res, next) => {
+  requestReturn = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Orders retrieved successfully',
-      metadata: await this.orderService.getAllOrders(req.query),
-    }).send(res);
-  };
-
-  getOrdersByUserId = async (req, res, next) => {
-    new ActionSuccess({
-      message: 'Orders retrieved successfully',
-      metadata: await this.orderService.getOrdersByUserId({
-        userId: req.user.id,
-        ...req.query,
-      }),
-    }).send(res);
-  };
-
-  getOrderDetailsByUser = async (req, res, next) => {
-    new ActionSuccess({
-      message: 'Order details retrieved successfully',
-      metadata: await this.orderService.getOrderDetailsByUser({
+      message: 'Return request submitted successfully',
+      metadata: await this.orderService.requestReturn({
         userId: req.user.id,
         orderId: req.params.orderId,
+        reason: req.body.reason,
       }),
     }).send(res);
   };
 
-  getOrderDetails = async (req, res, next) => {
+  approveReturn = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Order details retrieved successfully',
-      metadata: await this.orderService.getOrderDetails(req.params.orderId),
+      message: 'Return request approved successfully',
+      metadata: await this.orderService.approveReturn({
+        orderId: req.params.orderId,
+        adminId: req.user.id,
+      }),
     }).send(res);
   };
 }

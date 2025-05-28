@@ -93,7 +93,7 @@ class ProductRepository extends BaseRepository {
       updatedBy: product.updatedBy,
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,
-      returnDays: product.return_days,
+      returnDays: product.prd_return_days,
       variants: (product.prd_variants || []).map((variant) => ({
         name: variant.var_name,
         images: variant.var_images,

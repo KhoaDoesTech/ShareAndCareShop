@@ -85,7 +85,7 @@ const productSchema = new Schema(
     prd_sold: { type: Number, default: 0 },
 
     // Return policy
-    return_days: { type: Number, default: 7 },
+    prd_return_days: { type: Number, default: 7 },
 
     // Product status
     prd_status: {

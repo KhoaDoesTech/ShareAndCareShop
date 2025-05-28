@@ -14,7 +14,7 @@ class CartService {
     if (!foundCart) throw new BadRequestError('Cart not found');
 
     const relatedItems = foundCart.items.filter(
-      (item) => item.productId.toString() === productId.toString()
+      (item) => item.productId?.toString() === productId?.toString()
     );
 
     const newVariantIndex = relatedItems.findIndex(
@@ -69,7 +69,7 @@ class CartService {
 
     const itemIndex = foundCart.items.findIndex(
       (item) =>
-        item.productId.toString() === productId.toString() &&
+        item.productId?.toString() === productId?.toString() &&
         (!item.variantId ||
           item.variantId?.toString() === variantId?.toString())
     );

@@ -3,13 +3,32 @@
 const { OrderStatus } = require('../constants/status');
 const orderModel = require('../models/order.model');
 const APIFeatures = require('../utils/apiFeatures');
-const { convertToObjectIdMongodb } = require('../utils/helpers');
 const BaseRepository = require('./base.repository');
 
 class OrderRepository extends BaseRepository {
   constructor() {
     super(orderModel);
     this.model = orderModel;
+  }
+
+  async getById(id, options = {}) {
+    let query = this.model.findById(id);
+    if (Array.isArray(options.populate)) {
+      query = query.populate(options.populate);
+    } else {
+      query = query
+        .populate('ord_user_id', 'usr_name usr_email')
+        .populate('ord_delivery_method', 'dlv_name dlv_price')
+        .populate({
+          path: 'ord_items',
+          populate: [
+            { path: 'prd_id', select: 'prd_name prd_main_image' },
+            { path: 'var_id', select: 'var_name var_slug' },
+          ],
+        });
+    }
+    const document = await query.lean();
+    return this.formatDocument(document);
   }
 
   async getAllOrder({
@@ -30,59 +49,26 @@ class OrderRepository extends BaseRepository {
       .limitFields()
       .sort();
 
-    const documents = await features.query;
+    const documents = await features.query.lean();
     return documents.map(this.formatDocument.bind(this));
   }
 
-  async getById(orderId) {
-    const order = await this.model
-      .findById(convertToObjectIdMongodb(orderId))
-      .populate([
-        { path: 'ord_user_id', select: 'usr_name usr_email' },
-        { path: 'ord_items.prd_id', select: 'prd_name prd_main_image' },
-        { path: 'ord_items.var_id', select: 'var_name var_slug' },
-        { path: 'ord_delivery_method', select: 'dlv_name dlv_price' },
-      ]);
+  async getByQuery({ filter = {}, projection = '', options = {} }) {
+    let query = this.model.findOne(filter, projection, options);
 
-    return this.formatDocument(order);
-  }
+    query = query
+      .populate('ord_user_id', 'usr_name usr_email')
+      .populate('ord_delivery_method', 'dlv_name dlv_price')
+      .populate({
+        path: 'ord_items',
+        populate: [
+          { path: 'prd_id', select: 'prd_name prd_main_image' },
+          { path: 'var_id', select: 'var_name var_slug' },
+        ],
+      });
 
-  async getByQuery(query) {
-    const order = await this.model.findOne(query).populate([
-      { path: 'ord_user_id', select: 'usr_name usr_email' },
-      { path: 'ord_items.prd_id', select: 'prd_name prd_main_image' },
-      { path: 'ord_items.var_id', select: 'var_name var_slug' },
-      { path: 'ord_delivery_method', select: 'dlv_name dlv_price' },
-    ]);
-
-    return this.formatDocument(order);
-  }
-
-  async create(data) {
-    const order = await this.model.create(data);
-    return this.formatDocument(
-      await order.populate([
-        { path: 'ord_user_id', select: 'usr_name usr_email' },
-        { path: 'ord_items.prd_id', select: 'prd_name prd_main_image' },
-        { path: 'ord_items.var_id', select: 'var_name var_slug' },
-        { path: 'ord_delivery_method', select: 'dlv_name dlv_price' },
-      ])
-    );
-  }
-
-  async updateById(orderId, updateData) {
-    const order = await this.model
-      .findByIdAndUpdate(convertToObjectIdMongodb(orderId), updateData, {
-        new: true,
-      })
-      .populate([
-        { path: 'ord_user_id', select: 'usr_name usr_email' },
-        { path: 'ord_items.prd_id', select: 'prd_name prd_main_image' },
-        { path: 'ord_items.var_id', select: 'var_name var_slug' },
-        { path: 'ord_delivery_method', select: 'dlv_name dlv_price' },
-      ]);
-
-    return this.formatDocument(order);
+    const document = await query.lean();
+    return this.formatDocument(document);
   }
 
   async totalProductsSold() {
@@ -125,11 +111,12 @@ class OrderRepository extends BaseRepository {
         image: item.prd_img,
         price: item.prd_price,
         quantity: item.prd_quantity,
-        productDiscount: item.prd_discount,
-        couponDiscount: item.prd_coupon_discount,
+        returnDays: item.prd_return_days,
+        productDiscount: item.itm_product_discount,
+        couponDiscount: item.itm_coupon_discount,
         total:
           item.prd_price * item.prd_quantity -
-          (item.prd_discount + item.prd_coupon_discount),
+          (item.itm_product_discount + item.itm_coupon_discount),
       })),
       shippingAddress: {
         fullname: order.ord_shipping_address.shp_fullname,
@@ -140,6 +127,7 @@ class OrderRepository extends BaseRepository {
         street: order.ord_shipping_address.shp_street,
       },
       paymentMethod: order.ord_payment_method,
+      paymentStatus: order.ord_payment_status,
       deliveryMethod: order.ord_delivery_method
         ? {
             id: order.ord_delivery_method._id,
@@ -163,6 +151,9 @@ class OrderRepository extends BaseRepository {
       deliveredAt: order.ord_delivered_at,
       transactionId: order.ord_transaction_id,
       status: order.ord_status,
+      returnReason: order.ord_return_reason,
+      returnRequestedAt: order.ord_return_requested_at,
+      returnApprovedAt: order.ord_return_approved_at,
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
     };
