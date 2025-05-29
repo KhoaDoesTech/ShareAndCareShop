@@ -274,13 +274,6 @@ class PaymentService {
   async refundVNPayPayment({ orderId, amount, transId, ipAddress }) {
     const order = await this._validatePaidOrder(orderId);
 
-    // Kiểm tra trạng thái đơn hàng và transId
-    if (order.paymentStatus === PaymentStatus.REFUNDED) {
-      throw new BadRequestError('Order has already been refunded');
-    }
-    if (order.transactionId !== transId) {
-      throw new BadRequestError('Invalid transaction ID for this order');
-    }
     if (order.totalPrice !== amount || amount <= 0) {
       throw new BadRequestError(
         'Refund amount must match order total and be positive'

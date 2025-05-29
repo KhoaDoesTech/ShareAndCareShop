@@ -390,7 +390,7 @@ class OrderService {
     const updates = {
       ord_status: OrderStatus.RETURNED,
       ord_return_approved_at: new Date(),
-      ord_payment_status: PaymentStatus.REFUNDED,
+      ord_payment_status: PaymentStatus.PENDING_REFUND,
     };
 
     const updatedOrder = await this.orderRepository.updateById(
@@ -426,6 +426,9 @@ class OrderService {
           paymentMethod: order.paymentMethod,
           ipAddress,
         });
+      } else {
+        updates.ord_payment_status = PaymentStatus.REFUNDED;
+        await this.orderRepository.updateById(orderId, updates);
       }
     }
 
