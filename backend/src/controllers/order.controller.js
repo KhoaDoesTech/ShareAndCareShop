@@ -91,11 +91,14 @@ class OrderController {
   };
 
   cancelOrder = async (req, res, next) => {
+    const ipAddress =
+      req.headers['x-forwarded-for'] || req.connection.remoteAddress;
     new ActionSuccess({
       message: 'Order canceled successfully',
       metadata: await this.orderService.cancelOrder({
         orderId: req.params.orderId,
         userId: req.user.id,
+        ipAddress,
       }),
     }).send(res);
   };
@@ -112,11 +115,14 @@ class OrderController {
   };
 
   approveReturn = async (req, res, next) => {
+    const ipAddress =
+      req.headers['x-forwarded-for'] || req.connection.remoteAddress;
     new ActionSuccess({
       message: 'Return request approved successfully',
       metadata: await this.orderService.approveReturn({
         orderId: req.params.orderId,
         adminId: req.user.id,
+        ipAddress,
       }),
     }).send(res);
   };

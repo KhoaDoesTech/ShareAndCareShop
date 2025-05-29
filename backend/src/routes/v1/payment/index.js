@@ -23,7 +23,7 @@ router.post(
   '/momo/create_payment_url',
   asyncHandler(PaymentController.createMoMoPaymentUrl)
 );
-router.post(
+router.get(
   '/momo/callback',
   asyncHandler(PaymentController.handleMoMoCallback)
 );

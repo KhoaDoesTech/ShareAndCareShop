@@ -227,7 +227,7 @@ class OrderService {
     };
   }
 
-  async cancelOrder({ userId, orderId }) {
+  async cancelOrder({ userId, orderId, ipAddress }) {
     const order = await this.orderRepository.getByQuery({
       filter: { _id: orderId, ord_user_id: userId },
     });
@@ -269,6 +269,7 @@ class OrderService {
           orderId,
           amount: order.totalPrice,
           transId: order.transactionId,
+          ipAddress,
         });
         updates.ord_status = OrderStatus.PENDING_REFUND;
         updates.ord_payment_status = PaymentStatus.PENDING_REFUND;
@@ -376,7 +377,7 @@ class OrderService {
     return updatedOrder;
   }
 
-  async approveReturn({ orderId, adminId }) {
+  async approveReturn({ orderId, adminId, ipAddress }) {
     const order = await this.orderRepository.getById(orderId);
     if (!order) {
       throw new NotFoundError(`Order ${orderId} not found`);
@@ -423,6 +424,7 @@ class OrderService {
           amount: order.totalPrice,
           transId: order.transactionId,
           paymentMethod: order.paymentMethod,
+          ipAddress,
         });
       }
     }

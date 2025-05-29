@@ -47,7 +47,8 @@ class OrderRepository extends BaseRepository {
     )
       .filter()
       .limitFields()
-      .sort();
+      .sort()
+      .paginate();
 
     const documents = await features.query.lean();
     return documents.map(this.formatDocument.bind(this));

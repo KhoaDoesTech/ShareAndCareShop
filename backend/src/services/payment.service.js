@@ -108,13 +108,14 @@ class PaymentService {
     const orderId = params.vnp_TxnRef;
 
     if (isSuccess) {
-      await this._markOrderAsPaid(orderId, params.vnp_TransactionNo);
+      const paidAt = moment(params.vnp_PayDate, 'YYYYMMDDHHmmss').toDate();
+      await this._markOrderAsPaid(orderId, params.vnp_TransactionNo, paidAt);
       await this.paymentSessionRepository.updateByQuery(
         {
           filter: {
-            orderId: orderId,
-            paymentMethod: PaymentGatewayMethods.VNPAY,
-            status: PaymentSessionStatus.PENDING,
+            pms_order_id: orderId,
+            pms_payment_method: PaymentGatewayMethods.VNPAY,
+            pms_status: PaymentSessionStatus.PENDING,
           },
         },
         {
@@ -130,9 +131,9 @@ class PaymentService {
       await this.paymentSessionRepository.updateByQuery(
         {
           filter: {
-            orderId: orderId,
-            paymentMethod: PaymentGatewayMethods.VNPAY,
-            status: PaymentSessionStatus.PENDING,
+            pms_order_id: orderId,
+            pms_payment_method: PaymentGatewayMethods.VNPAY,
+            pms_status: PaymentSessionStatus.PENDING,
           },
         },
         {
@@ -167,7 +168,7 @@ class PaymentService {
       orderInfo: MOMO_CONFIG.ORDER_INFO,
       redirectUrl:
         redirectUrl ||
-        `${process.env.FRONTEND_URL}/payment/success?orderId=${orderId}`,
+        `${process.env.BACKEND_URL}/api/v1/payment/momo/callback`,
       ipnUrl: this.momoIpnUrl,
       requestType: MOMO_CONFIG.REQUEST_TYPE,
       extraData: '',
@@ -178,7 +179,7 @@ class PaymentService {
     params.signature = this._generateMoMoSignature(params);
 
     const { data } = await axios.post(this.momoApiUrl, params);
-    console.log(data);
+
     if (!data.payUrl) {
       throw new BadRequestError('Failed to create MoMo payment URL');
     }
@@ -199,16 +200,15 @@ class PaymentService {
     }
 
     const isSuccess = resultCode === 0;
-    const baseOrderId = orderId.split('-')[0];
 
     if (isSuccess) {
-      await this._markOrderAsPaid(baseOrderId, transId);
+      await this._markOrderAsPaid(orderId, transId);
       await this.paymentSessionRepository.updateByQuery(
         {
           filter: {
-            orderId: baseOrderId,
-            paymentMethod: PaymentGatewayMethods.MOMO,
-            status: PaymentSessionStatus.PENDING,
+            pms_order_id: orderId,
+            pms_payment_method: PaymentGatewayMethods.MOMO,
+            pms_status: PaymentSessionStatus.PENDING,
           },
         },
         {
@@ -217,16 +217,16 @@ class PaymentService {
         }
       );
     } else {
-      await this.orderRepository.updateById(baseOrderId, {
+      await this.orderRepository.updateById(orderId, {
         ord_payment_status: PaymentStatus.FAILED,
         ord_status: OrderStatus.CANCELLED,
       });
       await this.paymentSessionRepository.updateByQuery(
         {
           filter: {
-            orderId: baseOrderId,
-            paymentMethod: PaymentGatewayMethods.MOMO,
-            status: PaymentSessionStatus.PENDING,
+            pms_order_id: orderId,
+            pms_payment_method: PaymentGatewayMethods.MOMO,
+            pms_status: PaymentSessionStatus.PENDING,
           },
         },
         {
@@ -235,7 +235,7 @@ class PaymentService {
       );
     }
 
-    return { isSuccess, orderId: baseOrderId, amount: params.amount };
+    return { isSuccess, orderId, amount: params.amount };
   }
 
   async refundMoMoPayment({ orderId, amount, transId }) {
@@ -273,49 +273,25 @@ class PaymentService {
 
   async refundVNPayPayment({ orderId, amount, transId, ipAddress }) {
     const order = await this._validatePaidOrder(orderId);
-    if (order.totalPrice !== amount) {
-      throw new BadRequestError('Refund amount does not match order total');
+
+    // Kiểm tra trạng thái đơn hàng và transId
+    if (order.paymentStatus === PaymentStatus.REFUNDED) {
+      throw new BadRequestError('Order has already been refunded');
+    }
+    if (order.transactionId !== transId) {
+      throw new BadRequestError('Invalid transaction ID for this order');
+    }
+    if (order.totalPrice !== amount || amount <= 0) {
+      throw new BadRequestError(
+        'Refund amount must match order total and be positive'
+      );
     }
 
-    const createDate = moment().format('YYYYMMDDHHmmss');
-    const vnp_TransactionType = '02';
-    const vnp_TxnRef = `${orderId}_${Date.now()}`;
-    const vnp_CreateBy = 'System';
-
-    const params = sortObject({
-      vnp_Version: VNPAY_CONFIG.VERSION,
-      vnp_Command: 'refund',
-      vnp_TmnCode: this.vnpTmnCode,
-      vnp_TransactionType,
-      vnp_TxnRef,
-      vnp_Amount: amount * 100,
-      vnp_TransactionNo: transId,
-      vnp_TransactionDate: moment(order.paidAt).format('YYYYMMDDHHmmss'),
-      vnp_CreateBy,
-      vnp_CreateDate: createDate,
-      vnp_IpAddr: ipAddress || '127.0.0.1',
-      vnp_OrderInfo: `Refund for order ${orderId}`,
-    });
-
-    const signData = querystring.stringify(params, { encode: false });
-    params.vnp_SecureHash = generateHmacHash(signData, this.vnpHashSecret);
-
-    const refundUrl =
-      'https://sandbox.vnpayment.vn/merchant_webapi/api/transaction';
-    const { data } = await axios.post(refundUrl, params);
-    if (data.vnp_ResponseCode !== '00') {
-      throw new BadRequestError(`VNPay refund failed: ${data.vnp_Message}`);
-    }
-
+    // Cập nhật trạng thái đơn hàng
     await this.orderRepository.updateById(orderId, {
-      ord_status: OrderStatus.PENDING_REFUND,
-      ord_payment_status: PaymentStatus.PENDING_REFUND,
+      ord_status: OrderStatus.REFUNDED,
+      ord_payment_status: PaymentStatus.REFUNDED,
     });
-
-    return {
-      message: 'VNPay refund successful',
-      transactionId: data.vnp_TransactionNo,
-    };
   }
 
   async resendPaymentUrl({ orderId, userId, ipAddress }) {
@@ -337,9 +313,14 @@ class PaymentService {
     }
   }
 
-  async refundPayment({ orderId, amount, transId, paymentMethod }) {
+  async refundPayment({ orderId, amount, transId, paymentMethod, ipAddress }) {
     if (paymentMethod === PaymentMethod.VNPAY) {
-      return await this.refundVNPayPayment({ orderId, amount, transId });
+      return await this.refundVNPayPayment({
+        orderId,
+        amount,
+        transId,
+        ipAddress,
+      });
     } else if (paymentMethod === PaymentMethod.MOMO) {
       return await this.refundMoMoPayment({ orderId, amount, transId });
     } else {
@@ -369,11 +350,11 @@ class PaymentService {
     return order;
   }
 
-  async _markOrderAsPaid(orderId, transId) {
+  async _markOrderAsPaid(orderId, transId, paidAt = new Date()) {
     const order = await this._validateOrder(orderId);
     const updatedOrder = await this.orderRepository.updateById(order.id, {
       ord_is_paid: true,
-      ord_paid_at: new Date(),
+      ord_paid_at: paidAt,
       ord_status: OrderStatus.PROCESSING,
       ord_payment_status: PaymentStatus.COMPLETED,
       ord_transaction_id: transId,
@@ -467,24 +448,21 @@ class PaymentService {
 
   _verifyMoMoSignature(params) {
     const receivedSignature = params.signature;
-    const fields = [
-      'accessKey',
-      'amount',
-      'extraData',
-      'message',
-      'orderId',
-      'orderInfo',
-      'orderType',
-      'partnerCode',
-      'payType',
-      'requestId',
-      'responseTime',
-      'resultCode',
-      'transId',
-    ];
-    const rawSignature = fields
-      .map((key) => `${key}=${params[key] || ''}`)
-      .join('&');
+    const rawSignature = [
+      `accessKey=${this.momoAccessKey}`,
+      `amount=${params.amount || ''}`,
+      `extraData=${params.extraData || ''}`,
+      `message=${params.message || ''}`,
+      `orderId=${params.orderId || ''}`,
+      `orderInfo=${params.orderInfo || ''}`,
+      `orderType=${params.orderType || ''}`,
+      `partnerCode=${this.momoPartnerCode}`,
+      `payType=${params.payType || ''}`,
+      `requestId=${params.requestId || ''}`,
+      `responseTime=${params.responseTime || ''}`,
+      `resultCode=${params.resultCode || ''}`,
+      `transId=${params.transId || ''}`,
+    ].join('&');
     const expectedSignature = generateHmacSha256(
       rawSignature,
       this.momoSecretKey

@@ -31,7 +31,7 @@ class PaymentController {
 
   handleMoMoCallback = async (req, res) => {
     try {
-      const result = await this.paymentService.verifyMoMoCallback(req.body);
+      const result = await this.paymentService.verifyMoMoCallback(req.query);
       if (result.isSuccess) {
         res.redirect(
           `${process.env.FRONTEND_URL}/payment/success?orderId=${result.orderId}`
