@@ -126,7 +126,7 @@ class PaymentService {
     } else {
       await this.orderRepository.updateById(orderId, {
         ord_payment_status: PaymentStatus.FAILED,
-        ord_status: OrderStatus.CANCELLED,
+        ord_status: OrderStatus.AWAITING_PAYMENT,
       });
       await this.paymentSessionRepository.updateByQuery(
         {
@@ -219,7 +219,7 @@ class PaymentService {
     } else {
       await this.orderRepository.updateById(orderId, {
         ord_payment_status: PaymentStatus.FAILED,
-        ord_status: OrderStatus.CANCELLED,
+        ord_status: OrderStatus.AWAITING_PAYMENT,
       });
       await this.paymentSessionRepository.updateByQuery(
         {
