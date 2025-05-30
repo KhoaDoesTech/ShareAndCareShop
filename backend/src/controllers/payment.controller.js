@@ -34,11 +34,11 @@ class PaymentController {
       const result = await this.paymentService.verifyMoMoCallback(req.query);
       if (result.isSuccess) {
         res.redirect(
-          `${process.env.FRONTEND_URL}/payment/success?orderId=${result.orderId}`
+          `${process.env.FRONTEND_URL}/payment/success?orderId=${result.orderId}&params=${result.params}`
         );
       } else {
         res.redirect(
-          `${process.env.FRONTEND_URL}/payment/failure?orderId=${result.orderId}`
+          `${process.env.FRONTEND_URL}/payment/failure?orderId=${result.orderId}&params=${result.params}`
         );
       }
     } catch (error) {

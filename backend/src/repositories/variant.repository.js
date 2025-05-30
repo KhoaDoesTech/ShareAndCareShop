@@ -57,9 +57,13 @@ class VariantRepository extends BaseRepository {
     return this.formatDocument(document);
   }
 
-  async getVariantsByProductId(productId) {
+  async getVariantsByProductId(productId, status) {
+    const filter = { prd_id: productId };
+    if (status) {
+      filter.var_status = status;
+    }
     return await this.model
-      .find({ prd_id: productId })
+      .find(filter)
       .populate([
         { path: 'createdBy', select: 'usr_name usr_email' },
         { path: 'updatedBy', select: 'usr_name usr_email' },

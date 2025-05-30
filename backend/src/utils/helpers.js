@@ -128,6 +128,71 @@ const listResponse = ({ items, total, page, size }) => {
   };
 };
 
+const calculateProductPrice = (product) => {
+  const {
+    originalPrice,
+    minPrice,
+    maxPrice,
+    discountType,
+    discountValue,
+    discountStart,
+    discountEnd,
+    variants,
+  } = product;
+
+  const hasVariants = variants && variants.length > 0;
+
+  let price;
+  if (hasVariants) {
+    if (minPrice === maxPrice) {
+      price = minPrice;
+    } else {
+      price = { min: minPrice, max: maxPrice };
+    }
+  } else {
+    price = originalPrice;
+  }
+
+  const now = new Date();
+  const isDiscountActive =
+    discountStart != null &&
+    discountEnd != null &&
+    now >= new Date(discountStart) &&
+    now <= new Date(discountEnd);
+
+  let discountedPrice = null;
+  if (isDiscountActive && discountValue > 0) {
+    if (typeof price === 'object') {
+      discountedPrice = {
+        min: calculateDiscountedValue(price.min, discountType, discountValue),
+        max: calculateDiscountedValue(price.max, discountType, discountValue),
+      };
+    } else {
+      discountedPrice = calculateDiscountedValue(
+        price,
+        discountType,
+        discountValue
+      );
+    }
+  }
+
+  return {
+    price,
+    discountedPrice,
+    hasDiscount: isDiscountActive && discountValue > 0,
+  };
+};
+
+const calculateDiscountedValue = (price, discountType, discountValue) => {
+  let finalPrice = price;
+  if (discountType === CouponType.AMOUNT) {
+    finalPrice = price - discountValue;
+  } else if (discountType === CouponType.PERCENT) {
+    finalPrice = price * (1 - discountValue / 100);
+  }
+  return Math.max(0, finalPrice);
+};
+
 module.exports = {
   convertToObjectIdMongodb,
   getRandomNumber,
@@ -143,4 +208,6 @@ module.exports = {
   parseJwt,
   sortObject,
   listResponse,
+  calculateProductPrice,
+  calculateDiscountedValue,
 };

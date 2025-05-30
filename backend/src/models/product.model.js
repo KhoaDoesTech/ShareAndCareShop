@@ -130,29 +130,43 @@ productSchema.index({
   prd_slug: 'text',
 });
 
+// Index for attribute filtering
+productSchema.index({
+  'prd_attributes.id': 1,
+  'prd_attributes.values.id': 1,
+});
+
 productSchema.pre('save', async function (next) {
   if (!this.isModified('prd_name')) return next();
 
-  const baseSlug = slugify(this.prd_name, { lower: true, strict: true });
+  const session = await this.model(DOCUMENT_NAME).startSession();
+  try {
+    await session.withTransaction(async () => {
+      const baseSlug = slugify(this.prd_name, { lower: true, strict: true });
+      const slugRegex = new RegExp(`^${baseSlug}(-\\d+)?$`, 'i');
+      const existingSlugs = await this.model(DOCUMENT_NAME)
+        .find({ prd_slug: slugRegex })
+        .session(session)
+        .select('prd_slug')
+        .lean();
 
-  const slugRegex = new RegExp(`^${baseSlug}(-\\d+)?$`, 'i');
-  const existingSlugs = await model(DOCUMENT_NAME)
-    .find({ prd_slug: slugRegex })
-    .select('prd_slug');
-
-  if (existingSlugs.length === 0) {
-    this.prd_slug = baseSlug;
-  } else {
-    const slugNumbers = existingSlugs.map((doc) => {
-      const match = doc.prd_slug.match(/-(\d+)$/);
-      return match ? parseInt(match[1], 10) : 0;
+      if (existingSlugs.length === 0) {
+        this.prd_slug = baseSlug;
+      } else {
+        const slugNumbers = existingSlugs.map((doc) => {
+          const match = doc.prd_slug.match(/-(\d+)$/);
+          return match ? parseInt(match[1], 10) : 0;
+        });
+        const maxNumber = Math.max(...slugNumbers);
+        this.prd_slug = `${baseSlug}-${maxNumber + 1}`;
+      }
     });
-
-    const maxNumber = Math.max(...slugNumbers);
-    this.prd_slug = `${baseSlug}-${maxNumber + 1}`;
+    next();
+  } catch (error) {
+    next(error);
+  } finally {
+    session.endSession();
   }
-
-  next();
 });
 
 //Export the model

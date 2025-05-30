@@ -95,15 +95,16 @@ class VariantService {
   }
 
   async getPublicVariantByProductId(productId) {
-    const variants = await this.variantRepository.getVariantByFilter({
-      prd_id: productId,
-      var_status: ProductStatus.PUBLISHED,
-    });
+    const variants = await this.variantRepository.getVariantsByProductId(
+      productId,
+      ProductStatus.PUBLISHED
+    );
 
     return {
       skuList: variants.map((sku) =>
         omitFields({
           fields: [
+            'product',
             'createdAt',
             'updatedAt',
             'status',
@@ -120,14 +121,14 @@ class VariantService {
   }
 
   async getVariantByProductId(productId) {
-    const variants = await this.variantRepository.getVariantByFilter({
-      prd_id: productId,
-    });
+    const variants = await this.variantRepository.getVariantsByProductId(
+      productId
+    );
 
     return {
       skuList: variants.map((sku) =>
         omitFields({
-          fields: ['createdAt', 'updatedAt', 'name', 'productId'],
+          fields: ['createdAt', 'updatedAt', 'name', 'productId', 'product'],
           object: sku,
         })
       ),

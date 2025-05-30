@@ -235,7 +235,7 @@ class PaymentService {
       );
     }
 
-    return { isSuccess, orderId, amount: params.amount };
+    return { isSuccess, orderId, amount: params.amount, params };
   }
 
   async refundMoMoPayment({ orderId, amount, transId }) {

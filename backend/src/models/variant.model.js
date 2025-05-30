@@ -1,7 +1,10 @@
 'use strict';
 
 const { model, Schema } = require('mongoose');
-const { ProductStatus } = require('../constants/status');
+const {
+  ProductStatus,
+  AvailableProductStatus,
+} = require('../constants/status');
 
 const DOCUMENT_NAME = 'Variant';
 const COLLECTION_NAME = 'Variants';
@@ -18,7 +21,7 @@ const variantSchema = new Schema(
     var_sold: { type: Number, default: 0 },
     var_status: {
       type: String,
-      enum: ProductStatus,
+      enum: AvailableProductStatus,
       default: ProductStatus.DRAFT,
     },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User' },

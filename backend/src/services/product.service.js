@@ -18,6 +18,7 @@ const {
   convertToObjectIdMongodb,
   generateVariantSlug,
   listResponse,
+  calculateProductPrice,
 } = require('../utils/helpers');
 const UploadService = require('./upload.service');
 const VariantService = require('./variant.service');
@@ -242,62 +243,18 @@ class ProductService {
     size = 10,
     attributes,
   }) {
-    const filter = { prd_status: ProductStatus.PUBLISHED };
     const formatPage = parseInt(page);
     const formatSize = parseInt(size);
 
-    // Search filter
-    if (search) {
-      const keyword = search.trim();
-      const regexOptions = { $regex: keyword, $options: 'i' };
-
-      filter.$or =
-        keyword.length === 1
-          ? [
-              { prd_name: { $regex: `^${keyword}`, $options: 'i' } },
-              { prd_description: regexOptions },
-            ]
-          : [{ prd_name: regexOptions }, { prd_description: regexOptions }];
-    }
-
-    // Category filter
-    if (category) {
-      filter.prd_category = {
-        $elemMatch: { id: convertToObjectIdMongodb(category) },
-      };
-    }
-
-    // Price filter
-    if (minPrice || maxPrice) {
-      filter.prd_price = {};
-      if (minPrice) filter.prd_price.$gte = parseFloat(minPrice);
-      if (maxPrice) filter.prd_price.$lte = parseFloat(maxPrice);
-    }
-
-    if (attributes && attributes.length) {
-      let parsedAttributes;
-      try {
-        parsedAttributes = JSON.parse(attributes);
-      } catch (error) {
-        parsedAttributes = attributes;
-      }
-      console.log(parsedAttributes);
-
-      filter['$or'] = parsedAttributes.map((attr) => ({
-        prd_attributes: {
-          $elemMatch: {
-            id: convertToObjectIdMongodb(attr.id),
-            values: {
-              $elemMatch: {
-                id: {
-                  $in: attr.values.map((val) => convertToObjectIdMongodb(val)),
-                },
-              },
-            },
-          },
-        },
-      }));
-    }
+    // Build filter for public products
+    const filter = this._buildProductFilter({
+      search,
+      category,
+      minPrice,
+      maxPrice,
+      attributes,
+      status: ProductStatus.PUBLISHED,
+    });
 
     // Sort
     const mappedSort = sort
@@ -312,9 +269,9 @@ class ProductService {
       size: formatSize,
     };
 
-    // Fetch products
+    // Fetch products with optimized population
     const products = await this.productRepository.getAll({
-      filter: filter,
+      filter,
       queryOptions: query,
       populateOptions: [
         { path: 'prd_attributes.id', model: 'Attribute' },
@@ -326,8 +283,7 @@ class ProductService {
 
     return listResponse({
       items: products.map((product) => {
-        const priceInfo = this._calculateProductPrice(product);
-
+        const priceInfo = calculateProductPrice(product);
         return {
           ...pickFields({
             fields: [
@@ -366,39 +322,19 @@ class ProductService {
     size = 10,
     attributes,
   }) {
-    const filter = {};
     const formatPage = parseInt(page);
     const formatSize = parseInt(size);
 
-    if (search) {
-      const keyword = search.trim();
-      const regexOptions = { $regex: keyword, $options: 'i' };
+    // Build filter without status restriction
+    const filter = this._buildProductFilter({
+      search,
+      category,
+      minPrice,
+      maxPrice,
+      attributes,
+    });
 
-      filter.$or =
-        keyword.length === 1
-          ? [
-              { prd_name: { $regex: `^${keyword}`, $options: 'i' } },
-              { prd_description: regexOptions },
-            ]
-          : [{ prd_name: regexOptions }, { prd_description: regexOptions }];
-    }
-
-    if (category) {
-      filter.prd_category = {
-        $elemMatch: { id: convertToObjectIdMongodb(category) },
-      };
-    }
-
-    if (minPrice || maxPrice) {
-      filter.prd_price = {};
-      if (minPrice) filter.prd_price.$gte = parseFloat(minPrice);
-      if (maxPrice) filter.prd_price.$lte = parseFloat(maxPrice);
-    }
-
-    if (attributes && attributes.length) {
-      filter.prd_attributes = { $in: attributes };
-    }
-
+    // Sort
     const mappedSort = sort
       ? `${sort.startsWith('-') ? '-' : ''}${
           SortFieldProduct[sort.replace('-', '')] || 'createdAt'
@@ -411,8 +347,9 @@ class ProductService {
       size: formatSize,
     };
 
+    // Fetch products without population
     const products = await this.productRepository.getAll({
-      filter: filter,
+      filter,
       queryOptions: query,
     });
 
@@ -471,7 +408,7 @@ class ProductService {
 
     this._updateProductViews(foundProduct.id);
 
-    const priceInfo = this._calculateProductPrice(foundProduct);
+    const priceInfo = calculateProductPrice(foundProduct);
 
     return {
       product: {
@@ -486,9 +423,10 @@ class ProductService {
             'qrCode',
             'description',
             'video',
-            'returnDays',
             'category',
             'variants',
+            'quantity',
+            'returnDays',
             'rating',
             'ratingCount',
           ],
@@ -523,7 +461,7 @@ class ProductService {
       foundProduct.id
     );
 
-    const priceInfo = this._calculateProductPrice(foundProduct);
+    const priceInfo = calculateProductPrice(foundProduct);
 
     return {
       product: {
@@ -603,14 +541,12 @@ class ProductService {
     for (const item of items) {
       const { productId, variantId, quantity } = item;
 
-      // Validate input
       if (!productId || quantity === undefined || quantity <= 0) {
         throw new BadRequestError(
           `Invalid item: productId and quantity (>0) are required`
         );
       }
 
-      // Fetch product
       const foundProduct = await this.productRepository.getById(productId);
       if (!foundProduct) {
         throw new NotFoundError(`Product ${productId} not found`);
@@ -619,7 +555,6 @@ class ProductService {
       let updateData = { updatedBy: userId };
 
       if (variantId) {
-        // Handle variant stock import
         const variant = await this.variantRepository.getById(variantId);
         if (!variant || variant.productId.toString() !== productId.toString()) {
           throw new NotFoundError(
@@ -627,31 +562,28 @@ class ProductService {
           );
         }
 
-        // Update variant quantity
         const updatedVariant = await this.variantRepository.updateById(
           variantId,
           {
-            $inc: { quantity: quantity },
+            $inc: { var_quantity: quantity },
             updatedBy: userId,
           }
         );
 
-        // Update variant status
         if (
           updatedVariant.status === ProductStatus.OUT_OF_STOCK &&
           updatedVariant.quantity > 0
         ) {
           await this.variantRepository.updateById(variantId, {
-            status: ProductStatus.PUBLISHED,
+            var_status: ProductStatus.PUBLISHED,
             updatedBy: userId,
           });
           updatedVariant.status = ProductStatus.PUBLISHED;
         }
 
-        // If product has variants, update product quantity as sum of variant quantities
         if (foundProduct.variants.length > 0) {
           const variants = await this.variantRepository.getVariantByFilter({
-            productId: productId,
+            prd_id: productId,
           });
           const totalQuantity = variants.reduce(
             (sum, v) => sum + v.quantity,
@@ -660,15 +592,14 @@ class ProductService {
 
           updateData = {
             ...updateData,
-            quantity: totalQuantity,
+            prd_quantity: totalQuantity,
           };
 
-          // Update product status
           if (
             foundProduct.status === ProductStatus.OUT_OF_STOCK &&
             totalQuantity > 0
           ) {
-            updateData.status = ProductStatus.PUBLISHED;
+            updateData.prd_status = ProductStatus.PUBLISHED;
           }
         }
 
@@ -676,40 +607,35 @@ class ProductService {
           productId: foundProduct.id,
           variantId: variant.id,
           quantity: updatedVariant.quantity,
-          productQuantity: updateData.quantity || foundProduct.quantity,
+          productQuantity: updateData.prd_quantity || foundProduct.quantity,
           status: updatedVariant.status,
         });
       } else {
-        // Handle non-variant product stock import
         if (foundProduct.variants.length > 0) {
           throw new BadRequestError(
             `Product ${productId} has variants; variantId is required`
           );
         }
 
+        const newQuantity = foundProduct.quantity + quantity;
         updateData = {
           ...updateData,
-          $inc: { quantity: quantity },
+          prd_quantity: newQuantity,
+          prd_status:
+            newQuantity === 0
+              ? ProductStatus.OUT_OF_STOCK
+              : ProductStatus.PUBLISHED,
         };
-
-        // Update product status
-        if (
-          foundProduct.status === ProductStatus.OUT_OF_STOCK &&
-          foundProduct.quantity + quantity > 0
-        ) {
-          updateData.status = ProductStatus.PUBLISHED;
-        }
 
         updatedData.push({
           productId: foundProduct.id,
           variantId: null,
-          quantity: foundProduct.quantity + quantity,
-          productQuantity: foundProduct.quantity + quantity,
-          status: updateData.status || foundProduct.status,
+          quantity: newQuantity,
+          productQuantity: newQuantity,
+          status: updateData.prd_status || foundProduct.status,
         });
       }
 
-      // Update product
       await this.productRepository.updateById(
         foundProduct.id,
         updateNestedObjectParser(removeUndefinedObject(updateData))
@@ -857,15 +783,20 @@ class ProductService {
     }
 
     const attributeIds = attributes.map((attr) => attr.id);
+    const attributeList = await this._fetchAttributes(attributeIds);
+    this._validateAttributeIds(attributeIds, attributeList);
 
+    return this._buildValidatedAttributes(attributes, attributeList);
+  }
+
+  async _fetchAttributes(attributeIds) {
     const attributeList = await this.attributeRepository.getAll({
       filter: { _id: { $in: attributeIds } },
     });
+    return new Map(attributeList.map((attr) => [attr.id.toString(), attr]));
+  }
 
-    const attributeMap = new Map(
-      attributeList.map((attr) => [attr.id.toString(), attr])
-    );
-
+  _validateAttributeIds(attributeIds, attributeMap) {
     const missingAttributes = attributeIds.filter(
       (id) => !attributeMap.has(id)
     );
@@ -874,10 +805,11 @@ class ProductService {
         `Attributes not found: ${missingAttributes.join(', ')}`
       );
     }
+  }
 
+  _buildValidatedAttributes(attributes, attributeMap) {
     return attributes.map((attr) => {
       const attribute = attributeMap.get(attr.id);
-
       if (!Array.isArray(attr.values) || attr.values.length === 0) {
         throw new BadRequestError(
           `Values for attribute ${attr.id} must be a non-empty array.`
@@ -887,7 +819,6 @@ class ProductService {
       const validValuesSet = new Set(
         attribute.values.map((v) => v.valueId.toString())
       );
-
       const validatedValues = attr.values.filter((val) =>
         validValuesSet.has(val)
       );
@@ -906,6 +837,134 @@ class ProductService {
         values: validatedValues.map((val) => ({ id: val })),
       };
     });
+  }
+
+  _buildProductFilter({
+    search,
+    category,
+    minPrice,
+    maxPrice,
+    attributes,
+    status,
+  }) {
+    const filter = status ? { prd_status: status } : {};
+
+    if (search) {
+      const keyword = search.trim();
+      const regexOptions = { $regex: keyword, $options: 'i' };
+      filter.$or =
+        keyword.length === 1
+          ? [
+              { prd_name: { $regex: `^${keyword}`, $options: 'i' } },
+              { prd_description: regexOptions },
+            ]
+          : [{ prd_name: regexOptions }, { prd_description: regexOptions }];
+    }
+
+    if (category) {
+      filter.prd_category = {
+        $elemMatch: { id: convertToObjectIdMongodb(category) },
+      };
+    }
+
+    if (minPrice || maxPrice) {
+      filter.$or = [
+        {
+          prd_min_price: {
+            $gte: parseFloat(minPrice || 0),
+            $lte: parseFloat(maxPrice || Infinity),
+          },
+        },
+        {
+          prd_max_price: {
+            $gte: parseFloat(minPrice || 0),
+            $lte: parseFloat(maxPrice || Infinity),
+          },
+        },
+      ];
+    }
+
+    if (attributes) {
+      const parsedAttributes = this._parseAttributes(attributes);
+      filter.$or = this._buildAttributeFilter(parsedAttributes);
+    }
+
+    return filter;
+  }
+
+  _parseAttributes(attributes) {
+    if (attributes == null || attributes === '') {
+      return []; // Skip filtering if attributes are null or empty
+    }
+
+    let parsedAttributes;
+
+    // Handle single object by wrapping in array
+    if (typeof attributes === 'object' && !Array.isArray(attributes)) {
+      parsedAttributes = [attributes];
+    } else if (typeof attributes === 'string') {
+      try {
+        parsedAttributes = JSON.parse(attributes);
+        // Ensure parsed result is an array
+        if (!Array.isArray(parsedAttributes)) {
+          parsedAttributes = [parsedAttributes];
+        }
+      } catch (error) {
+        throw new BadRequestError(
+          'Invalid attributes format: must be valid JSON'
+        );
+      }
+    } else if (Array.isArray(attributes)) {
+      parsedAttributes = attributes;
+    } else {
+      throw new BadRequestError(
+        'Attributes must be a string, array, or object'
+      );
+    }
+
+    if (!parsedAttributes.length) {
+      return []; // Skip filtering if empty array
+    }
+
+    // Validate attribute structure
+    parsedAttributes.forEach((attr, index) => {
+      if (
+        !attr ||
+        !attr.id ||
+        !Array.isArray(attr.values) ||
+        !attr.values.length
+      ) {
+        throw new BadRequestError(
+          `Invalid attribute at index ${index}: must have id and non-empty values array`
+        );
+      }
+      attr.values.forEach((val, valIdx) => {
+        if (!val) {
+          throw new BadRequestError(
+            `Invalid value at index ${valIdx} for attribute ${attr.id}`
+          );
+        }
+      });
+    });
+
+    return parsedAttributes;
+  }
+
+  _buildAttributeFilter(attributes) {
+    return attributes.map((attr) => ({
+      prd_attributes: {
+        $elemMatch: {
+          id: convertToObjectIdMongodb(attr.id),
+          values: {
+            $elemMatch: {
+              id: {
+                $in: attr.values.map((val) => convertToObjectIdMongodb(val)),
+              },
+            },
+          },
+        },
+      },
+    }));
   }
 
   async _upsertSku(sku) {
@@ -962,8 +1021,14 @@ class ProductService {
     return updatedSkuList;
   }
 
-  _formatAttributes(attributes) {
-    return attributes.map((attr) => ({
+  _formatAttributes(attributes, requestedAttributeIds = null) {
+    const filteredAttributes = requestedAttributeIds
+      ? attributes.filter((attr) =>
+          requestedAttributeIds.includes(attr.id.toString())
+        )
+      : attributes;
+
+    return filteredAttributes.map((attr) => ({
       type: attr.type,
       name: attr.name,
       values: attr.values.map((val) => ({
@@ -971,79 +1036,6 @@ class ProductService {
         descriptionUrl: val.descriptionUrl,
       })),
     }));
-  }
-
-  _calculateProductPrice(product) {
-    const {
-      originalPrice,
-      minPrice,
-      maxPrice,
-      discountType,
-      discountValue,
-      discountStart,
-      discountEnd,
-      variants,
-    } = product;
-
-    const hasVariants = variants && variants.length > 0;
-
-    let price;
-    if (hasVariants) {
-      if (minPrice === maxPrice) {
-        price = minPrice;
-      } else {
-        price = { min: minPrice, max: maxPrice };
-      }
-    } else {
-      price = originalPrice;
-    }
-
-    const now = new Date();
-    const isDiscountActive =
-      discountStart != null &&
-      discountEnd != null &&
-      now >= new Date(discountStart) &&
-      now <= new Date(discountEnd);
-
-    let discountedPrice = null;
-    if (isDiscountActive && discountValue > 0) {
-      if (typeof price === 'object') {
-        discountedPrice = {
-          min: this._calculateDiscountedValue(
-            price.min,
-            discountType,
-            discountValue
-          ),
-          max: this._calculateDiscountedValue(
-            price.max,
-            discountType,
-            discountValue
-          ),
-        };
-      } else {
-        discountedPrice = this._calculateDiscountedValue(
-          price,
-          discountType,
-          discountValue
-        );
-      }
-    }
-
-    return {
-      price,
-      discountedPrice,
-      hasDiscount: isDiscountActive && discountValue > 0,
-    };
-  }
-
-  _calculateDiscountedValue(price, discountType, discountValue) {
-    let finalPrice = price;
-    if (discountType === 'AMOUNT') {
-      finalPrice = price - discountValue;
-    } else if (discountType === 'PERCENT') {
-      finalPrice = price * (1 - discountValue / 100);
-    }
-    return Math.max(0, finalPrice);
   }
 
   _updateProductViews(productId) {
