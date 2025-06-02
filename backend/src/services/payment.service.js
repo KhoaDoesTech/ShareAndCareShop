@@ -13,9 +13,9 @@ const { sortObject } = require('../utils/helpers');
 const {
   OrderStatus,
   PaymentStatus,
-  PaymentGatewayMethods,
   PaymentSessionStatus,
   PaymentMethod,
+  PaymentGateway,
 } = require('../constants/status');
 const OrderRepository = require('../repositories/order.repository');
 const PaymentSessionRepository = require('../repositories/paymentSession.repository');
@@ -46,7 +46,7 @@ class PaymentService {
     const order = await this._validateOrder(orderId);
     const existingSession = await this._getValidPaymentSession(
       orderId,
-      PaymentGatewayMethods.VNPAY
+      PaymentGateway.VNPAY
     );
 
     if (existingSession) {
@@ -84,7 +84,7 @@ class PaymentService {
     })}`;
     await this._createOrUpdatePaymentSession(
       orderId,
-      PaymentGatewayMethods.VNPAY,
+      PaymentGateway.VNPAY,
       paymentUrl
     );
 
@@ -114,7 +114,7 @@ class PaymentService {
         {
           filter: {
             pms_order_id: orderId,
-            pms_payment_method: PaymentGatewayMethods.VNPAY,
+            pms_payment_method: PaymentGateway.VNPAY,
             pms_status: PaymentSessionStatus.PENDING,
           },
         },
@@ -132,7 +132,7 @@ class PaymentService {
         {
           filter: {
             pms_order_id: orderId,
-            pms_payment_method: PaymentGatewayMethods.VNPAY,
+            pms_payment_method: PaymentGateway.VNPAY,
             pms_status: PaymentSessionStatus.PENDING,
           },
         },
@@ -149,7 +149,7 @@ class PaymentService {
     const order = await this._validateOrder(orderId);
     const existingSession = await this._getValidPaymentSession(
       orderId,
-      PaymentGatewayMethods.MOMO
+      PaymentGateway.MOMO
     );
 
     if (existingSession) {
@@ -186,7 +186,7 @@ class PaymentService {
 
     await this._createOrUpdatePaymentSession(
       orderId,
-      PaymentGatewayMethods.MOMO,
+      PaymentGateway.MOMO,
       data.payUrl,
       uniqueOrderId
     );
@@ -207,7 +207,7 @@ class PaymentService {
         {
           filter: {
             pms_order_id: orderId,
-            pms_payment_method: PaymentGatewayMethods.MOMO,
+            pms_payment_method: PaymentGateway.MOMO,
             pms_status: PaymentSessionStatus.PENDING,
           },
         },
@@ -225,7 +225,7 @@ class PaymentService {
         {
           filter: {
             pms_order_id: orderId,
-            pms_payment_method: PaymentGatewayMethods.MOMO,
+            pms_payment_method: PaymentGateway.MOMO,
             pms_status: PaymentSessionStatus.PENDING,
           },
         },

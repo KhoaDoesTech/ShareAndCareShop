@@ -67,6 +67,7 @@ const OrderStatus = {
   DELIVERED: 'DELIVERED', // Đã giao
   CANCELLED: 'CANCELLED', // Đã hủy
   RETURN_REQUESTED: 'RETURN_REQUESTED', // Yêu cầu trả hàng
+  RETURN_APPROVED: 'RETURN_APPROVED',
   RETURNED: 'RETURNED', // Đã trả hàng
   PENDING_REFUND: 'PENDING_REFUND', // Chờ hoàn tiền
   REFUNDED: 'REFUNDED', // Đã hoàn tiền
@@ -89,6 +90,22 @@ const CartStatus = {
 const AvailableCartStatus = Object.values(CartStatus);
 
 // ======================= Payment =======================
+
+const TransactionType = {
+  PAYMENT: 'PAYMENT',
+  REFUND: 'REFUND',
+};
+
+const AvailableTransactionType = Object.values(TransactionType);
+
+const PaymentMethod = {
+  MOMO: 'MOMO',
+  VNPAY: 'VNPAY',
+  COD: 'COD',
+  MANUAL: 'MANUAL',
+};
+const AvailablePaymentMethod = Object.values(PaymentMethod);
+
 const PaymentStatus = {
   PENDING: 'PENDING',
   COMPLETED: 'COMPLETED',
@@ -98,27 +115,11 @@ const PaymentStatus = {
 };
 const AvailablePaymentStatuses = Object.values(PaymentStatus);
 
-const PaymentMethod = {
-  COD: 'COD',
-  VNPAY: 'VNPAY',
-  MOMO: 'MOMO',
-};
-const AvailablePaymentMethod = Object.values(PaymentMethod);
-
 const PaymentGateway = {
   VNPAY: 'VNPAY',
   MOMO: 'MOMO',
 };
 const AvailablePaymentGateway = Object.values(PaymentGateway);
-
-const PaymentType = {
-  CASH: 'CASH',
-  VNPAY: 'VNPAY',
-  MOMO: 'MOMO',
-  MANUAL: 'MANUAL',
-};
-
-const AvailablePaymentType = Object.values(PaymentType);
 
 const PaymentSessionStatus = {
   PENDING: 'PENDING',
@@ -135,16 +136,6 @@ const RefundStatus = {
   REJECTED: 'REJECTED',
 };
 const AvailableRefundStatus = Object.values(RefundStatus);
-
-const TransactionType = {
-  PAYMENT: 'PAYMENT', // Giao dịch thanh toán
-  REFUND: 'REFUND', // Giao dịch hoàn tiền
-  CASH_RECEIPT: 'CASH_RECEIPT', // Nhận tiền mặt
-  CASH_REFUND: 'CASH_REFUND', // Hoàn tiền mặt
-  MANUAL_REFUND: 'MANUAL_REFUND', // Hoàn tiền thủ công
-};
-
-const AvailableTransactionType = Object.values(TransactionType);
 
 // ======================= Coupon & Attribute =======================
 const CouponType = {
@@ -201,7 +192,6 @@ const RefundReason = {
   NOT_SUITABLE_SIZE: 'NOT_SUITABLE_SIZE', // Kích thước không phù hợp
   NOT_SUITABLE_STYLE: 'NOT_SUITABLE_STYLE', // Kiểu dáng không phù hợp
   BOM_HANG: 'BOM_HANG', // Khách từ chối nhận hàng
-  CANCEL_ORDER: 'CANCEL_ORDER', // Hủy đơn hàng
   OTHER: 'OTHER', // Lý do khác
 };
 const AvailableRefundReasons = Object.values(RefundReason);
@@ -245,8 +235,6 @@ module.exports = {
   AvailablePaymentStatuses,
   PaymentMethod,
   AvailablePaymentMethod,
-  PaymentType,
-  AvailablePaymentType,
   PaymentGateway,
   AvailablePaymentGateway,
   PaymentSessionStatus,

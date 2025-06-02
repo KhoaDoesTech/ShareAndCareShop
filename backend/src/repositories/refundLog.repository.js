@@ -9,48 +9,37 @@ class RefundLogRepository extends BaseRepository {
     this.model = RefundLogModel;
   }
 
-  async getByQuery({ filter = {}, fields = '', options = {} }) {
-    let documentQuery = this.model.findOne(filter, fields, options);
-    documentQuery = documentQuery.populate([
-      {
-        path: 'rfl_order_id',
-        select: 'ord_total_price ord_payment_method ord_status',
-      },
-      { path: 'rfl_admin_id', select: 'usr_name usr_email' },
-    ]);
-    const document = await documentQuery.lean();
-
-    return this.formatDocument(document);
-  }
-
-  formatDocument(log) {
-    if (!log) return null;
+  formatDocument(doc) {
+    if (!doc) return null;
 
     return {
-      id: log._id,
-      orderId: log.rfl_order_id?._id || log.rfl_order_id,
-      order: log.rfl_order_id
+      id: doc._id,
+      orderId: doc.rfl_order_id?._id || doc.rfl_order_id,
+      paymentTransactionId:
+        doc.rfl_payment_transaction_id?._id || doc.rfl_payment_transaction_id,
+      amount: doc.rfl_amount,
+      paymentMethod: doc.rfl_payment_method,
+      status: doc.rfl_status,
+      reason: doc.rfl_reason,
+      description: doc.rfl_description || '',
+      item: {
+        productId: doc.rfl_item.prd_id?._id || doc.rfl_item.prd_id,
+        productName: doc.rfl_item.prd_id?.prd_name || '',
+        variantId: doc.rfl_item.var_id?._id || doc.rfl_item.var_id,
+        variantName: doc.rfl_item.var_id?.var_name || '',
+        quantity: doc.rfl_item.prd_quantity,
+      },
+      adminId: doc.rfl_admin_id?._id || doc.rfl_admin_id,
+      admin: doc.rfl_admin_id
         ? {
-            totalPrice: log.rfl_order_id.ord_total_price,
-            paymentMethod: log.rfl_order_id.ord_payment_method,
-            status: log.rfl_order_id.ord_status,
+            name: doc.rfl_admin_id.usr_name,
+            email: doc.rfl_admin_id.usr_email,
           }
         : null,
-      transactionId: log.rfl_transaction_id,
-      amount: log.rfl_amount,
-      paymentMethod: log.rfl_payment_method,
-      status: log.rfl_status,
-      requestedAt: log.rfl_requested_at,
-      completedAt: log.rfl_completed_at,
-      admin: log.rfl_admin_id
-        ? {
-            id: log.rfl_admin_id._id,
-            name: log.rfl_admin_id.usr_name,
-            email: log.rfl_admin_id.usr_email,
-          }
-        : null,
-      createdAt: log.createdAt,
-      updatedAt: log.updatedAt,
+      requestedAt: doc.rfl_requested_at,
+      completedAt: doc.rfl_completed_at,
+      createdAt: doc.createdAt,
+      updatedAt: doc.updatedAt,
     };
   }
 }

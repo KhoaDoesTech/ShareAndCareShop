@@ -2,7 +2,7 @@
 
 const { model, Schema } = require('mongoose');
 const {
-  AvailablePaymentGatewayMethods,
+  AvailablePaymentGateway,
   PaymentSessionStatus,
   AvailablePaymentSessionStatus,
 } = require('../constants/status');
@@ -16,7 +16,7 @@ const paymentSessionSchema = new Schema(
     pms_payment_method: {
       type: String,
       required: true,
-      enum: AvailablePaymentGatewayMethods,
+      enum: AvailablePaymentGateway,
     },
     pms_payment_url: { type: String, required: true },
     pms_request_id: { type: String }, // MoMo-specific
