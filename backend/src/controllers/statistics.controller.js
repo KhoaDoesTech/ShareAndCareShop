@@ -12,6 +12,13 @@ class StatisticsController {
       metadata: await this.statisticsService.getReportCountRecords(),
     }).send(res);
   };
+
+  getReviewStats = async (req, res, next) => {
+    new ActionSuccess({
+      message: 'Review statistics retrieved successfully',
+      metadata: await this.statisticsService.getReviewStats(req.query),
+    }).send(res);
+  };
 }
 
 module.exports = new StatisticsController();

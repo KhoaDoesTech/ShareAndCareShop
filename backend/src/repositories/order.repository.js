@@ -11,6 +11,16 @@ class OrderRepository extends BaseRepository {
     this.model = orderModel;
   }
 
+  async updateOne(filter, update, options = {}) {
+    const document = await this.model
+      .findOneAndUpdate(filter, update, {
+        new: true,
+        ...options,
+      })
+      .lean();
+    return this.formatDocument(document);
+  }
+
   async getById(id, options = {}) {
     let query = this.model.findById(id);
     if (Array.isArray(options.populate)) {
@@ -115,6 +125,7 @@ class OrderRepository extends BaseRepository {
         returnDays: item.prd_return_days,
         productDiscount: item.itm_product_discount,
         couponDiscount: item.itm_coupon_discount,
+        isReviewed: item.itm_is_reviewed,
         total:
           item.prd_price * item.prd_quantity -
           (item.itm_product_discount + item.itm_coupon_discount),

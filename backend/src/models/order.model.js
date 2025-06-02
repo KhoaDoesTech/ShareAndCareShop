@@ -35,6 +35,7 @@ const orderSchema = new Schema(
           itm_product_discount: { type: Number, required: true, default: 0 },
           itm_coupon_discount: { type: Number, required: true, default: 0 },
           prd_return_days: { type: Number, required: true, default: 7 },
+          itm_is_reviewed: { type: Boolean, default: false },
         },
       ],
       required: true,
@@ -95,6 +96,7 @@ const orderSchema = new Schema(
     },
     ord_return_requested_at: { type: Date, default: null },
     ord_return_approved_at: { type: Date, default: null },
+    ord_return_received_at: { type: Date, default: null },
   },
   {
     collection: COLLECTION_NAME,

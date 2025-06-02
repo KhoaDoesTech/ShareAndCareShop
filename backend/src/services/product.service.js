@@ -354,12 +354,8 @@ class ProductService {
     });
 
     const totalProducts = await this.productRepository.countDocuments(filter);
-    const totalPages = Math.ceil(totalProducts / size);
 
-    return {
-      totalPages,
-      totalProducts,
-      currentPage: formatPage,
+    return listResponse({
       products: products.map((product) =>
         omitFields({
           fields: [
@@ -373,7 +369,10 @@ class ProductService {
           object: product,
         })
       ),
-    };
+      total: totalProducts,
+      page: formatPage,
+      size: formatSize,
+    });
   }
 
   async deleteProduct({ productId }) {
@@ -1128,6 +1127,60 @@ class ProductService {
       name: updatedProduct.name,
       quantity: updatedProduct.quantity,
       status: updatedProduct.status,
+    };
+  }
+
+  async _parseNaturalQuery(query) {
+    const keywords = query.trim().toLowerCase().split(/\s+/);
+
+    const categories = await this.categoryRepository.getAll({});
+    const attributes = await this.attributeRepository.getAll({});
+    const attributeValues = await this.attributeValueRepository.getAll({});
+
+    const categoryMap = new Map(
+      categories.map((c) => [c.name.toLowerCase(), c.id])
+    );
+    const attributeMap = new Map(
+      attributes.map((a) => [a.attr_name.toLowerCase(), a])
+    );
+    const valueMap = new Map(
+      attributeValues.map((v) => [v.value.toLowerCase(), v])
+    );
+
+    let matchedCategory = null;
+    const matchedAttributes = [];
+    const filteredKeywords = [];
+
+    for (const word of keywords) {
+      if (categoryMap.has(word)) {
+        matchedCategory = categoryMap.get(word);
+      } else if (attributeMap.has(word)) {
+        const attr = attributeMap.get(word);
+        matchedAttributes.push({ id: attr.id, values: [] });
+      } else if (valueMap.has(word)) {
+        const value = valueMap.get(word);
+        const attr = attributes.find((a) =>
+          a.values.some((v) => v.valueId.toString() === value.id.toString())
+        );
+        if (attr) {
+          const targetAttr = matchedAttributes.find(
+            (a) => a.id.toString() === attr.id.toString()
+          );
+          if (targetAttr) {
+            targetAttr.values.push(value.id);
+          } else {
+            matchedAttributes.push({ id: attr.id, values: [value.id] });
+          }
+        }
+      } else {
+        filteredKeywords.push(word);
+      }
+    }
+
+    return {
+      keywords: filteredKeywords.join(' '),
+      category: matchedCategory,
+      attributes: matchedAttributes,
     };
   }
 }

@@ -2,6 +2,7 @@
 
 const OrderRepository = require('../repositories/order.repository');
 const ProductRepository = require('../repositories/product.repository');
+const ReviewRepository = require('../repositories/review.repository');
 const UserRepository = require('../repositories/user.repository');
 
 class StatisticsService {
@@ -9,6 +10,7 @@ class StatisticsService {
     this.orderRepository = new OrderRepository();
     this.productRepository = new ProductRepository();
     this.userRepository = new UserRepository();
+    this.reviewRepository = new ReviewRepository();
   }
 
   async getReportCountRecords() {
@@ -25,6 +27,29 @@ class StatisticsService {
     };
   }
 
+  async getReviewStats({ startDate, endDate } = {}) {
+    _validateDateRange(startDate, endDate);
+
+    const reviewStats = await this.reviewRepository.getReviewStats({
+      startDate,
+      endDate,
+    });
+
+    const reportStats = await this.reviewRepository.getReportStats({
+      startDate,
+      endDate,
+    });
+
+    const worstRatedProducts =
+      await this.reviewRepository.getWorstRatedProducts();
+
+    return {
+      reviewStats,
+      reportStats,
+      worstRatedProducts,
+    };
+  }
+
   // async getReportTotalRevenue() {
   //   const totalRevenue = await this.orderRepository.totalRevenue();
 
@@ -36,6 +61,18 @@ class StatisticsService {
 
   //   return orderStatistics;
   // }
+
+  _validateDateRange(startDate, endDate) {
+    if (!startDate || !endDate) {
+      throw new Error('Start date and end date are required');
+    }
+    if (new Date(startDate) >= new Date(endDate)) {
+      throw new Error('Start date must be before end date');
+    }
+    if (new Date(endDate) <= new Date()) {
+      throw new Error('End date must be in the future');
+    }
+  }
 }
 
 module.exports = StatisticsService;

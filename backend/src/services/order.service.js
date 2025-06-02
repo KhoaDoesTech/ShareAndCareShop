@@ -23,6 +23,7 @@ const AddressService = require('./address.service');
 const CouponService = require('./coupon.service');
 const DeliveryService = require('./delivery.service');
 const PaymentService = require('./payment.service');
+const ReviewRepository = require('../repositories/review.repository');
 
 class OrderService {
   constructor() {
@@ -35,6 +36,7 @@ class OrderService {
     this.couponService = new CouponService();
     this.deliveryService = new DeliveryService();
     this.paymentService = new PaymentService();
+    this.reviewRepository = new ReviewRepository();
 
     this.statusUpdateCooldown = 5000; // 5 giây
   }
@@ -293,19 +295,16 @@ class OrderService {
       throw new NotFoundError(`Order ${orderId} not found`);
     }
 
-    // Kiểm tra chống spam
-    if (order.lastStatusUpdatedAt) {
-      const timeSinceLastUpdate =
-        Date.now() - new Date(order.lastStatusUpdatedAt).getTime();
-      if (timeSinceLastUpdate < this.statusUpdateCooldown) {
-        throw new BadRequestError('Please wait before updating status again');
-      }
-    }
-
     const nextStatus = this._getNextStatus(order.status);
     if (!nextStatus) {
       throw new BadRequestError(
         `No valid next status for current status ${order.status}`
+      );
+    }
+
+    if (order.status === OrderStatus.DELIVERED) {
+      throw new BadRequestError(
+        'Cannot update status from DELIVERED to anything other than RETURN_REQUESTED'
       );
     }
 
@@ -462,7 +461,6 @@ class OrderService {
           pms_order_id: order.id,
           pms_payment_method: order.paymentMethod,
           pms_status: PaymentSessionStatus.PENDING,
-          pms_expires_at: { $gt: new Date() },
         },
       });
 
@@ -475,35 +473,61 @@ class OrderService {
         }));
     }
 
+    const reviewedProductIds = await this._getReviewedProductIds(userId);
+
     return {
       order: {
         id: order.id,
-        totalPrice: order.totalPrice,
         status: order.status,
         paymentMethod: order.paymentMethod,
-        paymentStatus: order.paymentStatus,
+        canCancel: this._isOrderCancelable(order.status),
+        pricing: {
+          itemsPrice: order.itemsPrice,
+          productDiscount: order.productDiscount,
+          couponDiscount: order.couponDiscount,
+          shippingPrice: order.shippingPrice,
+          shippingDiscount: order.shippingDiscount,
+          totalSavings: order.totalSavings,
+          totalPrice: order.totalPrice,
+        },
+        timestamps: {
+          createdAt: order.createdAt,
+          updatedAt: order.updatedAt,
+          paidAt: order.paidAt,
+          deliveredAt: order.deliveredAt,
+          requestedAt: order.returnRequestedAt,
+          approvedAt: order.returnApprovedAt,
+        },
         deliveryMethod: order.deliveryMethod?.name || null,
         shippingAddress: pickFields({
-          fields: ['fullname', 'phone', 'city', 'district', 'ward', 'street'],
           object: order.shippingAddress,
+          fields: ['fullname', 'phone', 'city', 'district', 'ward', 'street'],
         }),
         items: order.items.map((item) => ({
-          productId: item.productId,
-          variantId: item.variantId,
-          productName: item.productName,
-          variantSlug: item.variantSlug,
-          image: item.image,
-          price: item.price,
-          quantity: item.quantity,
-          productDiscount: item.productDiscount,
-          couponDiscount: item.couponDiscount,
-          returnDays: item.returnDays,
+          ...pickFields({
+            object: item,
+            fields: [
+              'productId',
+              'variantId',
+              'productName',
+              'variantSlug',
+              'image',
+              'price',
+              'quantity',
+              'productDiscount',
+              'couponDiscount',
+              'returnDays',
+              'isReviewed',
+              'total',
+            ],
+          }),
           canReturn:
             order.status === OrderStatus.DELIVERED &&
             this._isItemReturnable(order.deliveredAt, item.returnDays),
+          canReview:
+            order.status === OrderStatus.DELIVERED &&
+            !reviewedProductIds.has(item.productId.toString()),
         })),
-        createdAt: order.createdAt,
-        deliveredAt: order.deliveredAt,
       },
       paymentUrl,
     };
@@ -519,15 +543,95 @@ class OrderService {
       order: {
         id: order.id,
         userId: order.userId,
-        totalPrice: order.totalPrice,
+        user: order.user,
+        couponCode: order.couponCode,
         status: order.status,
+        nextStatus: this._getNextStatus(order.status),
         paymentMethod: order.paymentMethod,
         paymentStatus: order.paymentStatus,
-        deliveryMethod: order.deliveryMethod?.name || null,
+        pricing: {
+          itemsPrice: order.itemsPrice,
+          productDiscount: order.productDiscount,
+          couponDiscount: order.couponDiscount,
+          shippingPrice: order.shippingPrice,
+          shippingDiscount: order.shippingDiscount,
+          totalSavings: order.totalSavings,
+          totalPrice: order.totalPrice,
+        },
+        timestamps: {
+          createdAt: order.createdAt,
+          updatedAt: order.updatedAt,
+          paidAt: order.paidAt,
+          deliveredAt: order.deliveredAt,
+          requestedAt: order.returnRequestedAt,
+          approvedAt: order.returnApprovedAt,
+        },
+        returnReason: order.returnReason,
+        deliveryMethod: order.deliveryMethod,
         shippingAddress: pickFields({
-          fields: ['fullname', 'phone', 'city', 'district', 'ward', 'street'],
           object: order.shippingAddress,
+          fields: ['fullname', 'phone', 'city', 'district', 'ward', 'street'],
         }),
+        items: order.items.map((item) => ({
+          ...pickFields({
+            object: item,
+            fields: [
+              'productId',
+              'variantId',
+              'productName',
+              'variantSlug',
+              'image',
+              'price',
+              'quantity',
+              'productDiscount',
+              'couponDiscount',
+              'returnDays',
+              'isReviewed',
+              'total',
+            ],
+          }),
+        })),
+      },
+    };
+  }
+
+  async getOrdersListForUser({ userId, page = 1, size = 10, status, sort }) {
+    page = parseInt(page, 10) || 1;
+    size = parseInt(size, 10) || 10;
+    if (page < 1 || size < 1) {
+      throw new BadRequestError('Invalid page or size');
+    }
+
+    const filter = { ord_user_id: userId };
+
+    if (status) filter.ord_status = status;
+
+    const mappedSort = sort
+      ? `${sort.startsWith('-') ? '-' : ''}${
+          SortFieldOrder[sort.replace('-', '')] || 'createdAt'
+        }`
+      : '-createdAt';
+
+    const queryOptions = { sort: mappedSort, page, size };
+    const orders = await this.orderRepository.getAllOrder({
+      filter,
+      queryOptions,
+      populateOptions: [{ path: 'ord_delivery_method', select: 'dlv_name' }],
+    });
+
+    const total = await this.orderRepository.countDocuments(filter);
+    const reviewedProductIds = await this._getReviewedProductIds(userId);
+
+    return listResponse({
+      items: orders.map((order) => ({
+        id: order.id,
+        totalPrice: order.totalPrice,
+        status: order.status,
+        canCancel: this._isOrderCancelable(order.status),
+        deliveryMethod: order.deliveryMethod?.name || null,
+        deliveredAt: order.updatedAt,
+        returnAt: order.returnApprovedAt,
+        updateAt: order.updatedAt,
         items: order.items.map((item) => ({
           productId: item.productId,
           variantId: item.variantId,
@@ -536,50 +640,14 @@ class OrderService {
           image: item.image,
           price: item.price,
           quantity: item.quantity,
-          productDiscount: item.productDiscount,
-          couponDiscount: item.couponDiscount,
-          returnDays: item.returnDays,
+          isReviewed: item.isReviewed,
+          canReturn:
+            order.status === OrderStatus.DELIVERED &&
+            this._isItemReturnable(order.deliveredAt, item.returnDays),
+          canReview:
+            order.status === OrderStatus.DELIVERED &&
+            !reviewedProductIds.has(item.productId.toString()),
         })),
-        returnReason: order.returnReason,
-        createdAt: order.createdAt,
-        updatedAt: order.updatedAt,
-        deliveredAt: order.deliveredAt,
-        nextStatus: this._getNextStatus(order.status),
-      },
-    };
-  }
-
-  async getOrdersListForUser({ userId, page = 1, size = 10 }) {
-    page = parseInt(page, 10) || 1;
-    size = parseInt(size, 10) || 10;
-    if (page < 1 || size < 1) {
-      throw new BadRequestError('Invalid page or size');
-    }
-
-    const filter = { ord_user_id: userId };
-    const queryOptions = { sort: '-createdAt', page, size };
-    const orders = await this.orderRepository.getAllOrder({
-      filter,
-      queryOptions,
-      populateOptions: [{ path: 'ord_delivery_method', select: 'dlv_name' }],
-    });
-
-    const total = await this.orderRepository.countDocuments(filter);
-
-    return listResponse({
-      items: orders.map((order) => ({
-        id: order.id,
-        totalPrice: order.totalPrice,
-        status: order.status,
-        paymentMethod: order.paymentMethod,
-        paymentStatus: order.paymentStatus,
-        deliveryMethod: order.deliveryMethod?.name || null,
-        items: order.items.map((item) => ({
-          productName: item.productName,
-          image: item.image,
-          quantity: item.quantity,
-        })),
-        createdAt: order.createdAt,
       })),
       total,
       page,
@@ -648,6 +716,7 @@ class OrderService {
         userId: order.userId,
         totalPrice: order.totalPrice,
         status: order.status,
+        nextStatus: this._getNextStatus(order.status),
         paymentMethod: order.paymentMethod,
         paymentStatus: order.paymentStatus,
         deliveryMethod: order.deliveryMethod?.name || null,
@@ -662,7 +731,6 @@ class OrderService {
         },
         createdAt: order.createdAt,
         updatedAt: order.updatedAt,
-        nextStatus: this._getNextStatus(order.status),
       })),
       total,
       page,
@@ -853,6 +921,21 @@ class OrderService {
     const now = new Date();
     const deliveredDate = new Date(deliveredAt);
     return (now - deliveredDate) / (1000 * 60 * 60 * 24) <= returnDays;
+  }
+
+  async _getReviewedProductIds(userId) {
+    const reviews = await this.reviewRepository.getAll({
+      filter: { rvw_user_id: userId, rvw_is_hidden: false },
+    });
+    return new Set(reviews.map((review) => review.productId.toString()));
+  }
+
+  _isOrderCancelable(status) {
+    return [
+      OrderStatus.AWAITING_PAYMENT,
+      OrderStatus.PENDING,
+      OrderStatus.PROCESSING,
+    ].includes(status);
   }
 }
 

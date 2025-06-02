@@ -99,17 +99,18 @@ const PaymentStatus = {
 const AvailablePaymentStatuses = Object.values(PaymentStatus);
 
 const PaymentMethod = {
-  COD: 'COD',
+  CASH: 'CASH',
   VNPAY: 'VNPAY',
   MOMO: 'MOMO',
+  MANUAL: 'MANUAL',
 };
 const AvailablePaymentMethod = Object.values(PaymentMethod);
 
-const PaymentGatewayMethods = {
+const PaymentGateway = {
   VNPAY: 'VNPAY',
   MOMO: 'MOMO',
 };
-const AvailablePaymentGatewayMethods = Object.values(PaymentGatewayMethods);
+const AvailablePaymentGateway = Object.values(PaymentGateway);
 
 const PaymentSessionStatus = {
   PENDING: 'PENDING',
@@ -123,8 +124,19 @@ const RefundStatus = {
   PENDING: 'PENDING',
   COMPLETED: 'COMPLETED',
   FAILED: 'FAILED',
+  REJECTED: 'REJECTED',
 };
 const AvailableRefundStatus = Object.values(RefundStatus);
+
+const TransactionType = {
+  PAYMENT: 'PAYMENT', // Giao dịch thanh toán
+  REFUND: 'REFUND', // Giao dịch hoàn tiền
+  CASH_RECEIPT: 'CASH_RECEIPT', // Nhận tiền mặt
+  CASH_REFUND: 'CASH_REFUND', // Hoàn tiền mặt
+  MANUAL_REFUND: 'MANUAL_REFUND', // Hoàn tiền thủ công
+};
+
+const AvailableTransactionType = Object.values(TransactionType);
 
 // ======================= Coupon & Attribute =======================
 const CouponType = {
@@ -173,13 +185,24 @@ const ChatRoles = {
 const AvailableChatRoles = Object.values(ChatRoles);
 
 // ======================= Return =======================
-const ReturnReason = {
+const RefundReason = {
   DEFECTIVE: 'DEFECTIVE', // Sản phẩm lỗi
   WRONG_ITEM: 'WRONG_ITEM', // Giao sai sản phẩm
   NOT_AS_DESCRIBED: 'NOT_AS_DESCRIBED', // Không đúng mô tả
   CHANGE_MIND: 'CHANGE_MIND', // Thay đổi ý định
+  NOT_SUITABLE_SIZE: 'NOT_SUITABLE_SIZE', // Kích thước không phù hợp
+  NOT_SUITABLE_STYLE: 'NOT_SUITABLE_STYLE', // Kiểu dáng không phù hợp
+  BOM_HANG: 'BOM_HANG', // Khách từ chối nhận hàng
+  CANCEL_ORDER: 'CANCEL_ORDER', // Hủy đơn hàng
+  OTHER: 'OTHER', // Lý do khác
 };
-const AvailableReturnReasons = Object.values(ReturnReason);
+const AvailableRefundReasons = Object.values(RefundReason);
+
+const SortFieldReview = {
+  CREATED_AT: 'createdAt',
+  UPDATED_AT: 'updatedAt',
+  STAR: 'rvw_star',
+};
 
 module.exports = {
   // Auth
@@ -214,12 +237,14 @@ module.exports = {
   AvailablePaymentStatuses,
   PaymentMethod,
   AvailablePaymentMethod,
-  PaymentGatewayMethods,
-  AvailablePaymentGatewayMethods,
+  PaymentGateway,
+  AvailablePaymentGateway,
   PaymentSessionStatus,
   AvailablePaymentSessionStatus,
   RefundStatus,
   AvailableRefundStatus,
+  TransactionType,
+  AvailableTransactionType,
 
   // Coupon & Attribute
   CouponType,
@@ -240,6 +265,8 @@ module.exports = {
   AvailableChatRoles,
 
   // Return
-  ReturnReason,
-  AvailableReturnReasons,
+  RefundReason,
+  AvailableRefundReasons,
+
+  SortFieldReview,
 };

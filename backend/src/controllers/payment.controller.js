@@ -32,13 +32,14 @@ class PaymentController {
   handleMoMoCallback = async (req, res) => {
     try {
       const result = await this.paymentService.verifyMoMoCallback(req.query);
+      const paramsString = encodeURIComponent(JSON.stringify(result.params));
       if (result.isSuccess) {
         res.redirect(
-          `${process.env.FRONTEND_URL}/payment/success?orderId=${result.orderId}&params=${result.params}`
+          `${process.env.FRONTEND_URL}/payment/success?orderId=${result.orderId}&params=${paramsString}`
         );
       } else {
         res.redirect(
-          `${process.env.FRONTEND_URL}/payment/failure?orderId=${result.orderId}&params=${result.params}`
+          `${process.env.FRONTEND_URL}/payment/failure?orderId=${result.orderId}&params=${paramsString}`
         );
       }
     } catch (error) {
