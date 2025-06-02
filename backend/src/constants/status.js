@@ -99,10 +99,9 @@ const PaymentStatus = {
 const AvailablePaymentStatuses = Object.values(PaymentStatus);
 
 const PaymentMethod = {
-  CASH: 'CASH',
+  COD: 'COD',
   VNPAY: 'VNPAY',
   MOMO: 'MOMO',
-  MANUAL: 'MANUAL',
 };
 const AvailablePaymentMethod = Object.values(PaymentMethod);
 
@@ -111,6 +110,15 @@ const PaymentGateway = {
   MOMO: 'MOMO',
 };
 const AvailablePaymentGateway = Object.values(PaymentGateway);
+
+const PaymentType = {
+  CASH: 'CASH',
+  VNPAY: 'VNPAY',
+  MOMO: 'MOMO',
+  MANUAL: 'MANUAL',
+};
+
+const AvailablePaymentType = Object.values(PaymentType);
 
 const PaymentSessionStatus = {
   PENDING: 'PENDING',
@@ -237,6 +245,8 @@ module.exports = {
   AvailablePaymentStatuses,
   PaymentMethod,
   AvailablePaymentMethod,
+  PaymentType,
+  AvailablePaymentType,
   PaymentGateway,
   AvailablePaymentGateway,
   PaymentSessionStatus,

@@ -356,7 +356,7 @@ class ProductService {
     const totalProducts = await this.productRepository.countDocuments(filter);
 
     return listResponse({
-      products: products.map((product) =>
+      items: products.map((product) =>
         omitFields({
           fields: [
             'subImages',

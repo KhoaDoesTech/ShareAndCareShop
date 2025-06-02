@@ -629,9 +629,9 @@ class OrderService {
         status: order.status,
         canCancel: this._isOrderCancelable(order.status),
         deliveryMethod: order.deliveryMethod?.name || null,
-        deliveredAt: order.updatedAt,
+        deliveredAt: order.deliveredAt,
         returnAt: order.returnApprovedAt,
-        updateAt: order.updatedAt,
+        createAt: order.createdAt,
         items: order.items.map((item) => ({
           productId: item.productId,
           variantId: item.variantId,
