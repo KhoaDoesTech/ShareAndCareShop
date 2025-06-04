@@ -255,6 +255,7 @@ class RefundService {
   }
 
   async confirmReturnReceived({ refundLogIds, adminId, ipAddress }) {
+    // Validate inputs
     if (
       !refundLogIds ||
       !Array.isArray(refundLogIds) ||
@@ -263,10 +264,10 @@ class RefundService {
       throw new BadRequestError('At least one refundLogId is required');
     }
 
-    let totalRefundAmount = 0;
+    // Validate refund logs and ensure they belong to the same order
     let orderId = null;
+    let totalRefundAmount = 0;
     const refundLogs = [];
-
     for (const refundLogId of refundLogIds) {
       const refundLog = await this.refundLogRepository.getById(
         convertToObjectIdMongodb(refundLogId)
@@ -274,21 +275,18 @@ class RefundService {
       if (!refundLog) {
         throw new NotFoundError(`Refund request ${refundLogId} not found`);
       }
-
-      if (refundLog.status !== 'APPROVED') {
+      if (refundLog.rfl_status !== RefundStatus.APPROVED) {
         throw new BadRequestError(
           `Refund request ${refundLogId} must be APPROVED`
         );
       }
-
       if (!orderId) {
         orderId = refundLog.rfl_order_id;
-      } else if (orderId.toString() !== refundLog.rfl_order_id.toString()) {
+      } else if (refundLog.rfl_order_id.toString() !== orderId.toString()) {
         throw new BadRequestError(
           'All refund requests must belong to the same order'
         );
       }
-
       refundLogs.push(refundLog);
       totalRefundAmount += refundLog.rfl_amount;
     }
@@ -298,58 +296,216 @@ class RefundService {
       throw new NotFoundError(`Order ${orderId} not found`);
     }
 
-    // ĐIỂM KHÁC BIỆT: Sử dụng processRefund từ PaymentService
-    const { refundResult, paymentStatus } =
-      await this.paymentService.processRefund({
-        orderId,
-        totalRefundAmount,
-        refundLogIds,
-        adminId,
-        ipAddress,
-        paymentMethod: order.paymentMethod,
-      });
-
-    // Cập nhật ord_status và ord_payment_status
-    const newOrderStatus = await this._determineOrderStatus(orderId);
-    await this.orderRepository.updateById(orderId, {
-      ord_status: newOrderStatus,
-      ord_payment_status: paymentStatus,
+    // Process refund
+    const { refundResult, paymentStatus } = await this.processRefund({
+      orderId,
+      totalRefundAmount,
+      refundLogIds,
+      adminId,
+      ipAddress,
+      paymentMethod: order.ord_payment_method,
     });
 
-    // Hoàn stock
-    const itemsToRestock = refundLogs.map((log) => ({
-      productId: log.rfl_item.prd_id,
-      variantId: log.rfl_item.var_id,
-      quantity: log.rfl_item.prd_quantity,
-    }));
-    await this.orderService._reverseStock(itemsToRestock);
+    // Update product and variant stats (already handled in processRefund for COMPLETED status)
 
     return {
       orderId,
       totalRefundAmount,
-      status: refundResult?.status || 'COMPLETED',
+      status: refundResult.status,
       refundLogIds,
     };
   }
 
-  async getRefundStatus(refundLogId) {
-    const refundLog = await this.refundLogRepository.getById(refundLogId);
+  async processRefund({
+    orderId,
+    totalRefundAmount,
+    refundLogIds,
+    adminId,
+    ipAddress,
+    paymentMethod,
+    isCashRefund = false,
+  }) {
+    // Validate inputs
+    if (
+      !refundLogIds ||
+      !Array.isArray(refundLogIds) ||
+      refundLogIds.length === 0
+    ) {
+      throw new BadRequestError('At least one refundLogId is required');
+    }
+
+    // Validate refund logs and ensure they belong to the same order
+    let order = null;
+    const refundLogs = [];
+    for (const refundLogId of refundLogIds) {
+      const refundLog = await this.refundLogRepository.getById(
+        convertToObjectIdMongodb(refundLogId)
+      );
+      if (!refundLog) {
+        throw new NotFoundError(`Refund request ${refundLogId} not found`);
+      }
+      if (refundLog.rfl_status !== RefundStatus.APPROVED) {
+        throw new BadRequestError(
+          `Refund request ${refundLogId} must be APPROVED`
+        );
+      }
+      if (!order) {
+        order = await this.orderRepository.getById(refundLog.rfl_order_id);
+        if (!order || order.id.toString() !== orderId.toString()) {
+          throw new NotFoundError(`Order ${orderId} not found or mismatch`);
+        }
+      } else if (refundLog.rfl_order_id.toString() !== order.id.toString()) {
+        throw new BadRequestError(
+          'All refund requests must belong to the same order'
+        );
+      }
+      refundLogs.push(refundLog);
+    }
+
+    // Validate payment method
+    if (
+      !paymentMethod ||
+      !Object.values(PaymentMethod).includes(paymentMethod)
+    ) {
+      throw new BadRequestError('Invalid payment method');
+    }
+
+    // Process refund
+    let refundResult;
+    if (paymentMethod === PaymentMethod.COD) {
+      refundResult = await this.paymentService.processCODRefund({
+        orderId,
+        totalRefundAmount,
+        adminId,
+        isCashRefund,
+      });
+    } else if (paymentMethod === PaymentMethod.MOMO) {
+      refundResult = await this.paymentService.refundMoMoPayment({
+        orderId,
+        totalRefundAmount,
+        adminId,
+      });
+    } else if (paymentMethod === PaymentMethod.VNPAY) {
+      refundResult = await this.paymentService.refundVNPayPayment({
+        orderId,
+        totalRefundAmount,
+        adminId,
+        ipAddress,
+      });
+    } else {
+      throw new BadRequestError('Unsupported payment method');
+    }
+
+    // Update refund logs based on refund result
+    if (refundResult.status === 'MANUAL_REQUIRED') {
+      for (const refundLogId of refundLogIds) {
+        await this.refundLogRepository.updateById(
+          convertToObjectIdMongodb(refundLogId),
+          {
+            rfl_manual_required: true,
+            rfl_payment_transaction_id: refundResult.refundTransaction.id,
+          }
+        );
+      }
+    } else if (refundResult.status === 'COMPLETED') {
+      for (const refundLogId of refundLogIds) {
+        await this.refundLogRepository.updateById(
+          convertToObjectIdMongodb(refundLogId),
+          {
+            rfl_status: RefundStatus.COMPLETED,
+            rfl_payment_transaction_id: refundResult.refundTransaction.id,
+            rfl_completed_at: new Date(),
+          }
+        );
+      }
+      // Update product and variant stats
+      for (const refundLog of refundLogs) {
+        await this._updateProductAndVariantOnRefund({
+          productId: refundLog.rfl_item.prd_id,
+          variantId: refundLog.rfl_item.var_id,
+          quantity: refundLog.rfl_item.prd_quantity,
+        });
+      }
+    } else {
+      throw new InternalServerError(
+        `Unexpected refund status: ${refundResult.status}`
+      );
+    }
+
+    // Update order status
+    const newOrderStatus = await this._determineOrderStatus(orderId);
+    await this.orderRepository.updateById(orderId, {
+      ord_status: newOrderStatus,
+      ord_payment_status:
+        refundResult.status === 'COMPLETED'
+          ? PaymentStatus.REFUNDED
+          : PaymentStatus.PENDING_REFUND,
+    });
+
+    return {
+      refundResult,
+      paymentStatus:
+        refundResult.status === 'COMPLETED'
+          ? PaymentStatus.REFUNDED
+          : PaymentStatus.PENDING_REFUND,
+    };
+  }
+
+  async getRefundDetails(refundLogId) {
+    const refundLog = await this.refundLogRepository.getById(
+      convertToObjectIdMongodb(refundLogId),
+      [
+        {
+          path: 'rfl_order_id',
+          select: 'ord_user_id ord_status ord_payment_method',
+        },
+        { path: 'rfl_admin_id', select: 'usr_name usr_email' },
+        { path: 'rfl_item.prd_id', select: 'prd_name prd_main_image' },
+        { path: 'rfl_item.var_id', select: 'var_name var_slug' },
+      ]
+    );
     if (!refundLog) {
       throw new NotFoundError(`Refund log ${refundLogId} not found`);
     }
 
-    return {
-      refundLogId: refundLog.id,
-      orderId: refundLog.orderId,
-      amount: refundLog.amount,
-      status: refundLog.status,
-      paymentTransactionId: refundLog.paymentTransactionId || null,
-      item: refundLog.item,
-      reason: refundLog.reason,
-      description: refundLog.description,
-      requestedAt: refundLog.requestedAt,
-      completedAt: refundLog.completedAt,
-    };
+    const SAFE_FIELDS = [
+      'id',
+      'orderId',
+      'amount',
+      'status',
+      'paymentTransactionId',
+      'item',
+      'reason',
+      'description',
+      'requestedAt',
+      'approvedAt',
+      'completedAt',
+      'admin',
+    ];
+
+    return pickFields({
+      fields: SAFE_FIELDS,
+      object: {
+        id: refundLog.id,
+        orderId: refundLog.orderId,
+        amount: refundLog.amount,
+        status: refundLog.status,
+        paymentTransactionId: refundLog.paymentTransactionId || null,
+        item: {
+          productId: refundLog.item.prd_id,
+          productName: refundLog.item.prd_id?.prd_name || '',
+          variantId: refundLog.item.var_id,
+          variantName: refundLog.item.var_id?.var_name || '',
+          quantity: refundLog.item.prd_quantity,
+        },
+        reason: refundLog.reason,
+        description: refundLog.description,
+        requestedAt: refundLog.requestedAt,
+        approvedAt: refundLog.approvedAt,
+        completedAt: refundLog.completedAt,
+        admin: refundLog.admin,
+      },
+    });
   }
 
   async getRefundRequestsForAdmin({ page = 1, size = 10, status, orderId }) {
@@ -363,9 +519,15 @@ class RefundService {
     if (status) filter.rfl_status = status;
     if (orderId) filter.rfl_order_id = convertToObjectIdMongodb(orderId);
 
+    const queryOptions = {
+      sort: '-createdAt',
+      page,
+      size,
+    };
+
     const refundLogs = await this.refundLogRepository.getAll({
       filter,
-      queryOptions: { sort: '-createdAt' }, // Không phân trang ở đây để nhóm
+      queryOptions,
       populateOptions: [
         {
           path: 'rfl_order_id',
@@ -377,7 +539,9 @@ class RefundService {
       ],
     });
 
-    // ĐIỂM KHÁC BIỆT: Nhóm theo orderId
+    const total = await this.refundLogRepository.countDocuments(filter);
+
+    // Group by orderId
     const groupedByOrder = refundLogs.reduce((acc, log) => {
       const orderIdStr = log.rfl_order_id._id.toString();
       if (!acc[orderIdStr]) {
@@ -386,9 +550,11 @@ class RefundService {
           userId: log.rfl_order_id.ord_user_id?._id,
           orderStatus: log.rfl_order_id.ord_status,
           paymentMethod: log.rfl_order_id.ord_payment_method,
+          totalRefundAmount: 0,
           refundRequests: [],
         };
       }
+      acc[orderIdStr].totalRefundAmount += log.rfl_amount;
       acc[orderIdStr].refundRequests.push({
         id: log.id,
         amount: log.rfl_amount,
@@ -414,18 +580,14 @@ class RefundService {
       return acc;
     }, {});
 
-    // Chuyển object thành mảng và phân trang
-    const orders = Object.values(groupedByOrder);
-    const total = orders.length;
-    const start = (page - 1) * size;
-    const paginatedOrders = orders.slice(start, start + size);
+    const paginatedOrders = Object.values(groupedByOrder);
 
-    return listResponse({
+    return {
       items: paginatedOrders,
       total,
       page,
       size,
-    });
+    };
   }
 
   async getRefundLogByUser({ userId, page = 1, size = 10, orderId }) {
@@ -439,19 +601,21 @@ class RefundService {
     }
 
     const filter = {
-      rfl_order_id: {
-        $in: await this.orderRepository
-          .getAll({ filter: { ord_user_id: convertToObjectIdMongodb(userId) } })
-          .then((orders) => orders.map((order) => order.id)),
-      },
+      'rfl_order_id.ord_user_id': convertToObjectIdMongodb(userId),
     };
     if (orderId) {
       filter.rfl_order_id = convertToObjectIdMongodb(orderId);
     }
 
+    const queryOptions = {
+      sort: '-rfl_requested_at',
+      page,
+      size,
+    };
+
     const refundLogs = await this.refundLogRepository.getAll({
       filter,
-      queryOptions: { sort: '-rfl_requested_at' },
+      queryOptions,
       populateOptions: [
         {
           path: 'rfl_order_id',
@@ -462,6 +626,8 @@ class RefundService {
       ],
     });
 
+    const total = await this.refundLogRepository.countDocuments(filter);
+
     const groupedByOrder = refundLogs.reduce((acc, log) => {
       const orderIdStr = log.rfl_order_id._id.toString();
       if (!acc[orderIdStr]) {
@@ -469,19 +635,25 @@ class RefundService {
           orderId: log.rfl_order_id._id,
           orderStatus: log.rfl_order_id.ord_status,
           paymentMethod: log.rfl_order_id.ord_payment_method,
+          totalRefundAmount: 0,
           refundRequests: [],
         };
       }
+      acc[orderIdStr].totalRefundAmount += log.rfl_amount;
 
       let userFriendlyStatus;
-      if (log.rfl_status === 'COMPLETED') {
-        userFriendlyStatus = 'Refunded';
-      } else if (log.rfl_status === 'REJECTED') {
-        userFriendlyStatus = 'Rejected';
-      } else if (log.rfl_status === 'NOT_RETURNED') {
-        userFriendlyStatus = 'Not Returned';
-      } else {
-        userFriendlyStatus = 'Return In Progress';
+      switch (log.rfl_status) {
+        case RefundStatus.COMPLETED:
+          userFriendlyStatus = 'Refunded';
+          break;
+        case RefundStatus.REJECTED:
+          userFriendlyStatus = 'Rejected';
+          break;
+        case RefundStatus.NOT_RETURNED:
+          userFriendlyStatus = 'Not Returned';
+          break;
+        default:
+          userFriendlyStatus = 'Return In Progress';
       }
 
       acc[orderIdStr].refundRequests.push({
@@ -504,92 +676,14 @@ class RefundService {
       return acc;
     }, {});
 
-    const orders = Object.values(groupedByOrder);
-    const total = orders.length;
-    const start = (page - 1) * size;
-    const paginatedOrders = orders.slice(start, start + size);
+    const paginatedOrders = Object.values(groupedByOrder);
 
-    return listResponse({
+    return {
       items: paginatedOrders,
       total,
       page,
       size,
-    });
-  }
-
-  async getManualRequiredRefunds({ page = 1, size = 10, orderId }) {
-    page = parseInt(page, 10) || 1;
-    size = parseInt(size, 10) || 10;
-    if (page < 1 || size < 1) {
-      throw new BadRequestError('Invalid page or size');
-    }
-
-    // ĐIỂM KHÁC BIỆT: Lọc từ PaymentTransaction thay vì RefundLog
-    const filter = {
-      pmt_method: PaymentMethod.MANUAL,
-      pmt_status: PaymentStatus.PENDING,
-      pmt_type: TransactionType.REFUND,
     };
-    if (orderId) filter.pmt_order_id = convertToObjectIdMongodb(orderId);
-
-    const queryOptions = { sort: '-createdAt', page, size };
-    const transactions = await this.paymentTransactionRepository.getAll({
-      filter,
-      queryOptions,
-      populateOptions: [
-        {
-          path: 'pmt_order_id',
-          select: 'ord_user_id ord_status ord_payment_method',
-        },
-        { path: 'pmt_admin_id', select: 'usr_name usr_email' },
-      ],
-    });
-
-    const total = await this.paymentTransactionRepository.countDocuments(
-      filter
-    );
-
-    // Lấy RefundLog liên quan (nếu có)
-    const results = await Promise.all(
-      transactions.map(async (transaction) => {
-        const refundLogs = await this.refundLogRepository.getAll({
-          filter: { rfl_payment_transaction_id: transaction.id },
-          populateOptions: [
-            { path: 'rfl_item.prd_id', select: 'prd_name prd_main_image' },
-            { path: 'rfl_item.var_id', select: 'var_name var_slug' },
-          ],
-        });
-
-        return {
-          transactionId: transaction.id,
-          orderId: transaction.orderId,
-          userId: transaction.orderId?.ord_user_id?._id,
-          amount: transaction.amount,
-          paymentMethod: transaction.method,
-          createdAt: transaction.createdAt,
-          refundLogs: refundLogs.map((log) => ({
-            id: log.id,
-            status: log.status,
-            reason: log.reason,
-            description: log.description,
-            item: {
-              productId: log.item.prd_id,
-              productName: log.item.prd_id?.prd_name,
-              variantId: log.item.var_id,
-              variantName: log.item.var_id?.var_name,
-              quantity: log.item.prd_quantity,
-            },
-          })),
-        };
-      })
-    );
-
-    return listResponse({
-      items: results,
-      total,
-      page,
-      size,
-    });
   }
 
   async _updateProductAndVariantOnRefund({ productId, variantId, quantity }) {

@@ -8,6 +8,7 @@ const xssClean = require('xss-clean');
 const hpp = require('hpp');
 const cors = require('cors');
 const session = require('express-session');
+const MongoStore = require('connect-mongo');
 const requestIp = require('request-ip');
 const passport = require('./helpers/passport.helper');
 const corsOptions = require('./configs/cors.config');
@@ -61,6 +62,11 @@ class App {
         secret: process.env.EXPRESS_SESSION_SECRET,
         resave: false,
         saveUninitialized: true,
+        store: MongoStore.create({
+          mongoUrl: process.env.DB_URL,
+          collectionName: 'sessions',
+          ttl: 14 * 24 * 60 * 60, // session sống 14 ngày
+        }),
       })
     );
     this.app.use(passport.initialize());

@@ -29,16 +29,32 @@ router.get(
 );
 
 router.post(
-  '/payment/cod/:orderId/confirm',
+  '/cod/:orderId/confirm',
   authentication,
   verifyPermission(CONFIG_PERMISSIONS.MANAGE_ORDER.PAYMENT.CONFIRM),
   asyncHandler(PaymentController.confirmCODPayment)
 );
+
 router.post(
-  '/payment/manual-refund/:orderId',
+  '/manual/:paymentTransactionId/refund',
   authentication,
   verifyPermission(CONFIG_PERMISSIONS.MANAGE_ORDER.PAYMENT.REFUND),
   asyncHandler(PaymentController.processManualRefund)
+);
+
+// --- Transaction Management for Admin ---
+router.get(
+  '/admin/transactions',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_ORDER.PAYMENT.VIEW),
+  asyncHandler(PaymentController.getTransactionsByAdmin)
+);
+
+router.get(
+  '/admin/transactions/:transactionId',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_ORDER.PAYMENT.VIEW),
+  asyncHandler(PaymentController.getTransactionDetail)
 );
 
 module.exports = router;

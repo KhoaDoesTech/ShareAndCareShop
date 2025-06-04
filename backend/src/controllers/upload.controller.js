@@ -16,19 +16,33 @@ class UploadController {
     }).send(res);
   };
 
-  uploadChatImages = async (req, res, next) => {
+  uploadChatImage = async (req, res, next) => {
     new CreateSuccess({
-      message: 'Images uploaded successfully',
-      metadata: await this.uploadService.uploadChatImages({
-        files: req.files,
+      message: 'Chat image uploaded successfully',
+      metadata: await this.uploadService.uploadChatImage({ file: req.file }),
+    }).send(res);
+  };
+
+  uploadReviewImage = async (req, res, next) => {
+    new CreateSuccess({
+      message: 'Review image uploaded successfully',
+      metadata: await this.uploadService.uploadReviewImage({ file: req.file }),
+    }).send(res);
+  };
+
+  uploadTransferImage = async (req, res, next) => {
+    new CreateSuccess({
+      message: 'Transfer image uploaded successfully',
+      metadata: await this.uploadService.uploadTransferImage({
+        file: req.file,
       }),
     }).send(res);
   };
 
   deleteImageByUrl = async (req, res, next) => {
+    await this.uploadService.deleteImageByUrl(req.body.url);
     new NoContentSuccess({
       message: 'Image deleted successfully',
-      metadata: await this.uploadService.deleteImageByUrl(req.body.url),
     }).send(res);
   };
 }

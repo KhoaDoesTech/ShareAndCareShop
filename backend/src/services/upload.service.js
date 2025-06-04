@@ -45,54 +45,82 @@ class UploadService {
     }
   }
 
-  async uploadChatImages({ files, temporary = true }) {
-    if (!files || !Array.isArray(files) || files.length === 0) {
-      throw new BadRequestError('Please upload at least one valid file');
+  async uploadChatImage({ file }) {
+    if (!file) {
+      throw new BadRequestError('Please upload a valid file');
     }
 
-    const uploadPromises = files.map(async (file) => {
-      try {
-        const uniqueFileName = `${uuidv4()}`;
-
-        const result = await cloudinary.uploader.upload(file.path, {
-          public_id: uniqueFileName,
-          folder: `shareandcare/chat${temporary ? '_temp' : ''}`,
-          transformation: [
-            { width: 750, height: 1000, crop: 'fill' },
-            { quality: 'auto:good', fetch_format: 'auto' },
-          ],
-          resource_type: 'image',
-        });
-
-        if (temporary) {
-          await this.uploadRepository.create({
-            upl_public_id: result.public_id,
-            upl_url: result.secure_url,
-          });
-        }
-
-        return result.secure_url;
-      } catch (error) {
-        throw new InternalServerError(
-          `Failed to upload image: ${error.message}`
-        );
-      } finally {
-        fs.unlink(file.path, (err) => {
-          if (err)
-            console.error(`Failed to remove local file ${file.path}:`, err);
-        });
-      }
-    });
-
     try {
-      const imageUrls = await Promise.all(uploadPromises);
-      return imageUrls;
+      const uniqueFileName = `${uuidv4()}`;
+      const result = await cloudinary.uploader.upload(file.path, {
+        public_id: uniqueFileName,
+        folder: `shareandcare/chat`,
+        transformation: [
+          { width: 750, height: 1000, crop: 'fill' },
+          { quality: 'auto:good', fetch_format: 'auto' },
+        ],
+        resource_type: 'image',
+      });
+
+      return result.secure_url;
     } catch (error) {
-      throw new InternalServerError(`Upload failed: ${error.message}`);
+      throw new InternalServerError('Failed to upload chat image');
+    } finally {
+      removeLocalFile(file.path);
     }
   }
 
-  async uploadQRCode({ text, temporary = true }) {
+  async uploadReviewImage({ file }) {
+    if (!file) {
+      throw new BadRequestError('Please upload a valid file');
+    }
+
+    try {
+      const uniqueFileName = `${uuidv4()}`;
+      const result = await cloudinary.uploader.upload(file.path, {
+        public_id: uniqueFileName,
+        folder: `shareandcare/reviews`,
+        transformation: [
+          { width: 750, height: 750, crop: 'fill' },
+          { quality: 'auto:good', fetch_format: 'auto' },
+        ],
+        resource_type: 'image',
+      });
+
+      return result.secure_url;
+    } catch (error) {
+      throw new InternalServerError('Failed to upload review image');
+    } finally {
+      removeLocalFile(file.path);
+    }
+  }
+
+  async uploadTransferImage({ file }) {
+    if (!file) {
+      throw new BadRequestError('Please upload a valid file');
+    }
+
+    try {
+      const uniqueFileName = `${uuidv4()}`;
+      const result = await cloudinary.uploader.upload(file.path, {
+        public_id: uniqueFileName,
+        folder: `shareandcare/transfers`,
+        transformation: [
+          { width: 1000, height: 1000, crop: 'fill' },
+          { quality: 'auto:good', fetch_format: 'auto' },
+        ],
+        resource_type: 'image',
+      });
+
+      return result.secure_url;
+    } catch (error) {
+      throw new InternalServerError('Failed to upload transfer image');
+    } finally {
+      removeLocalFile(file.path);
+    }
+  }
+
+  async uploadQRCode({ text, temporary = false }) {
     if (!text) {
       throw new Error('Please provide valid text for QR code');
     }

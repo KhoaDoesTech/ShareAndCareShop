@@ -279,14 +279,12 @@ class OrderService {
           refundResult = await this.paymentService.refundMoMoPayment({
             orderId,
             totalRefundAmount: order.totalPrice,
-            refundLogIds: [],
             adminId: null,
           });
         } else if (order.paymentMethod === PaymentMethod.VNPAY) {
           refundResult = await this.paymentService.refundVNPayPayment({
             orderId,
             totalRefundAmount: order.totalPrice,
-            refundLogIds: [],
             adminId: null,
             ipAddress,
           });
@@ -300,16 +298,13 @@ class OrderService {
           updates.ord_payment_status = PaymentStatus.PENDING_REFUND;
         } else {
           refundStatus = 'SUCCESS';
-          updates.ord_payment_status = PaymentStatus.REFUNDED;
+          refundMessage = 'Refund processed successfully';
         }
       } catch (error) {
         refundStatus = 'FAILED';
         refundMessage = 'Refund processing error, please contact support';
         updates.ord_payment_status = PaymentStatus.PENDING_REFUND;
       }
-    } else if (order.paymentMethod === PaymentMethod.COD) {
-      updates.ord_payment_status = PaymentStatus.PENDING;
-      refundStatus = 'NOT_REQUIRED';
     }
 
     await this.orderRepository.updateById(orderId, updates);
@@ -372,7 +367,6 @@ class OrderService {
 
     const updates = {
       ord_status: nextStatus,
-      ord_last_status_updated_at: new Date(),
     };
 
     if (nextStatus === OrderStatus.DELIVERED) {
@@ -386,103 +380,6 @@ class OrderService {
     );
     if (!updatedOrder) {
       throw new InternalServerError('Failed to update order status');
-    }
-
-    return updatedOrder;
-  }
-
-  async requestReturn({ userId, orderId, reason }) {
-    const order = await this.orderRepository.getByQuery({
-      filter: { _id: orderId, ord_user_id: userId },
-    });
-    if (!order) {
-      throw new NotFoundError(`Order ${orderId} not found`);
-    }
-
-    if (order.status !== OrderStatus.DELIVERED) {
-      throw new BadRequestError('Only delivered orders can be returned');
-    }
-
-    if (!this._canOrderBeReturned(order)) {
-      throw new BadRequestError('Return period has expired');
-    }
-
-    const updates = {
-      ord_status: OrderStatus.RETURN_REQUESTED,
-      ord_return_reason: reason,
-      ord_return_requested_at: new Date(),
-      ord_payment_status: PaymentStatus.PENDING_REFUND,
-    };
-
-    const updatedOrder = await this.orderRepository.updateById(
-      orderId,
-      updates
-    );
-    if (!updatedOrder) {
-      throw new InternalServerError('Failed to request return');
-    }
-
-    return updatedOrder;
-  }
-
-  async approveReturn({ orderId, adminId, ipAddress }) {
-    const order = await this.orderRepository.getById(orderId);
-    if (!order) {
-      throw new NotFoundError(`Order ${orderId} not found`);
-    }
-
-    if (order.status !== OrderStatus.RETURN_REQUESTED) {
-      throw new BadRequestError('Order is not in return requested state');
-    }
-
-    const updates = {
-      ord_status: OrderStatus.RETURNED,
-      ord_return_approved_at: new Date(),
-      ord_payment_status: PaymentStatus.PENDING_REFUND,
-    };
-
-    const updatedOrder = await this.orderRepository.updateById(
-      orderId,
-      updates
-    );
-    if (!updatedOrder) {
-      throw new InternalServerError('Failed to approve return');
-    }
-
-    if (order.isPaid) {
-      const refundLog = {
-        rfl_order_id: orderId,
-        rfl_transaction_id:
-          order.paymentMethod === PaymentMethod.COD
-            ? `COD_REFUND_${orderId}_${Date.now()}`
-            : order.transactionId,
-        rfl_amount: order.totalPrice,
-        rfl_payment_method: order.paymentMethod,
-        rfl_status: 'COMPLETED',
-        rfl_admin_id: adminId,
-        rfl_requested_at: new Date(),
-        rfl_completed_at: new Date(),
-      };
-
-      await this.refundLogRepository.create(refundLog);
-
-      if (order.paymentMethod !== PaymentMethod.COD) {
-        await this.paymentService.refundPayment({
-          orderId,
-          amount: order.totalPrice,
-          transId: order.transactionId,
-          paymentMethod: order.paymentMethod,
-          ipAddress,
-        });
-      } else {
-        updates.ord_payment_status = PaymentStatus.REFUNDED;
-        await this.orderRepository.updateById(orderId, updates);
-      }
-    }
-
-    await this._reverseStock(order.items);
-    if (order.couponCode) {
-      await this.couponService.revokeCoupon(order.couponCode, order.userId);
     }
 
     return updatedOrder;

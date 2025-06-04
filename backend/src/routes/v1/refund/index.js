@@ -59,11 +59,5 @@ router.patch(
   verifyPermission(CONFIG_PERMISSIONS.MANAGE_ORDER.REFUND.APPROVE),
   asyncHandler(refundController.rejectRefundRequest)
 );
-router.post(
-  '/process',
-  authentication,
-  verifyPermission(CONFIG_PERMISSIONS.MANAGE_ORDER.REFUND.PROCESS),
-  asyncHandler(refundController.processRefund)
-);
 
 module.exports = router;

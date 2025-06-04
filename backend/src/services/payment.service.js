@@ -22,12 +22,14 @@ const {
 const OrderRepository = require('../repositories/order.repository');
 const PaymentSessionRepository = require('../repositories/paymentSession.repository');
 const PaymentTransactionRepository = require('../repositories/paymentTransaction.repository');
+const RefundLogRepository = require('../repositories/refundLog.repository');
 
 class PaymentService {
   constructor() {
     this.orderRepository = new OrderRepository();
     this.paymentSessionRepository = new PaymentSessionRepository();
     this.paymentTransactionRepository = new PaymentTransactionRepository();
+    this.refundLogRepository = new RefundLogRepository();
 
     this.paymentSessionExpiry = 15 * 60 * 1000; // 15 minutes
   }
@@ -248,12 +250,7 @@ class PaymentService {
   }
 
   // Refund methods
-  async refundMoMoPayment({
-    orderId,
-    totalRefundAmount,
-    refundLogIds,
-    adminId,
-  }) {
+  async refundMoMoPayment({ orderId, totalRefundAmount, adminId }) {
     const order = await this.orderRepository.getById(orderId);
     if (!order) {
       throw new NotFoundError(`Order ${orderId} not found`);
@@ -264,12 +261,10 @@ class PaymentService {
 
     const paymentTransaction =
       await this.paymentTransactionRepository.getByQuery({
-        filter: {
-          pmt_order_id: orderId,
-          pmt_type: TransactionType.PAYMENT,
-          pmt_method: PaymentMethod.MOMO,
-          pmt_status: PaymentStatus.COMPLETED,
-        },
+        pmt_order_id: orderId,
+        pmt_type: TransactionType.PAYMENT,
+        pmt_method: PaymentMethod.MOMO,
+        pmt_status: PaymentStatus.COMPLETED,
       });
 
     if (!paymentTransaction) {
@@ -291,48 +286,27 @@ class PaymentService {
         orderId,
         refundTransactionId,
         totalRefundAmount,
-        refundLogIds,
         adminId,
       });
     } catch (error) {
-      const manualRefundTransaction =
-        await this.paymentTransactionRepository.create({
-          pmt_order_id: orderId,
-          pmt_transaction_id: `MANUAL_REFUND_${orderId}_${Date.now()}`,
-          pmt_type: TransactionType.REFUND,
-          pmt_method: PaymentMethod.MANUAL,
-          pmt_amount: totalRefundAmount,
-          pmt_status: PaymentStatus.PENDING,
-          pmt_admin_id: adminId || null,
-        });
-
-      // Mark RefundLogs as MANUAL_REQUIRED (if refundLogIds provided)
-      if (refundLogIds.length > 0) {
-        for (const refundLogId of refundLogIds) {
-          await this.refundLogRepository.updateById(refundLogId, {
-            rfl_manual_required: true,
-            rfl_payment_transaction_id: manualRefundTransaction.id,
-          });
+      const manualRefundTransaction = await this._createManualRefundTransaction(
+        {
+          orderId,
+          totalRefundAmount,
+          adminId,
         }
-      }
+      );
 
       return {
         status: 'MANUAL_REQUIRED',
         message:
           'MoMo refund failed. Please process refund manually by providing bank details.',
         refundTransaction: manualRefundTransaction,
-        refundLogIds,
       };
     }
   }
 
-  async refundVNPayPayment({
-    orderId,
-    totalRefundAmount,
-    refundLogIds,
-    adminId,
-    ipAddress,
-  }) {
+  async refundVNPayPayment({ orderId, totalRefundAmount, adminId, ipAddress }) {
     const order = await this.orderRepository.getById(orderId);
     if (!order) {
       throw new NotFoundError(`Order ${orderId} not found`);
@@ -373,52 +347,100 @@ class PaymentService {
         orderId,
         refundTransactionId,
         totalRefundAmount,
-        refundLogIds,
         adminId,
       });
     } catch (error) {
-      const manualRefundTransaction =
-        await this.paymentTransactionRepository.create({
-          pmt_order_id: orderId,
-          pmt_transaction_id: `MANUAL_REFUND_${orderId}_${Date.now()}`,
-          pmt_type: TransactionType.REFUND,
-          pmt_method: PaymentMethod.MANUAL,
-          pmt_amount: totalRefundAmount,
-          pmt_status: PaymentStatus.PENDING,
-          pmt_admin_id: adminId || null,
-        });
-
-      // Mark RefundLogs as MANUAL_REQUIRED (if refundLogIds provided)
-      if (refundLogIds.length > 0) {
-        for (const refundLogId of refundLogIds) {
-          await this.refundLogRepository.updateById(refundLogId, {
-            rfl_manual_required: true,
-            rfl_payment_transaction_id: manualRefundTransaction.id,
-          });
+      const manualRefundTransaction = await this._createManualRefundTransaction(
+        {
+          orderId,
+          totalRefundAmount,
+          adminId,
         }
-      }
+      );
 
       return {
         status: 'MANUAL_REQUIRED',
         message:
           'VNPay refund failed. Please process refund manually by providing bank details.',
         refundTransaction: manualRefundTransaction,
-        refundLogIds,
+      };
+    }
+  }
+
+  async processCODRefund({
+    orderId,
+    totalRefundAmount,
+    adminId,
+    isCashRefund = false,
+  }) {
+    const order = await this.orderRepository.getById(
+      convertToObjectIdMongodb(orderId)
+    );
+    if (!order) {
+      throw new NotFoundError(`Order ${orderId} not found`);
+    }
+    if (!order.isPaid) {
+      throw new BadRequestError('Order is not paid');
+    }
+
+    const paymentTransaction =
+      await this.paymentTransactionRepository.getByQuery({
+        pmt_order_id: convertToObjectIdMongodb(orderId),
+        pmt_type: TransactionType.PAYMENT,
+        pmt_method: PaymentMethod.COD,
+        pmt_status: PaymentStatus.COMPLETED,
+      });
+
+    if (!paymentTransaction) {
+      throw new NotFoundError('No completed COD transaction found');
+    }
+
+    if (isCashRefund) {
+      const refundTransactionId = `COD_REFUND_${orderId}_${Date.now()}`;
+      const refundTransaction = await this.paymentTransactionRepository.create({
+        pmt_order_id: orderId,
+        pmt_transaction_id: refundTransactionId,
+        pmt_type: TransactionType.REFUND,
+        pmt_method: PaymentMethod.COD,
+        pmt_amount: totalRefundAmount,
+        pmt_status: PaymentStatus.REFUNDED,
+        pmt_admin_id: adminId,
+        pmt_completed_at: new Date(),
+      });
+
+      await this._markOrderAsRefunded(orderId);
+
+      return {
+        status: 'COMPLETED',
+        refundTransaction,
+      };
+    } else {
+      const manualRefundTransaction = await this._createManualRefundTransaction(
+        {
+          orderId,
+          totalRefundAmount,
+          adminId,
+        }
+      );
+
+      return {
+        status: 'MANUAL_REQUIRED',
+        message:
+          'COD refund requires manual processing. Please provide bank details for refund.',
+        refundTransaction: manualRefundTransaction,
       };
     }
   }
 
   async processManualRefund({
     paymentTransactionId,
-    refundIds,
     adminId,
     bankName,
     accountNumber,
     accountHolder,
     transferImage,
-    isCashRefund = false,
   }) {
-    const transaction = await this.paymentTransactionRepository.findById(
+    const transaction = await this.paymentTransactionRepository.getById(
       convertToObjectId(paymentTransactionId)
     );
 
@@ -435,7 +457,7 @@ class PaymentService {
 
     const order = await this.orderRepository.findById(transaction.orderId);
     if (!order) {
-      throw new NotFoundException(`Order ${transaction.order_id} not found`);
+      throw new NotFoundException(`Order ${transaction.orderId} not found`);
     }
 
     // Update PaymentTransaction
@@ -443,7 +465,6 @@ class PaymentService {
       await this.paymentTransactionRepository.updateById(paymentTransactionId, {
         pmt_status: PaymentStatus.COMPLETED,
         pmt_admin_id: convertToObjectId(adminId),
-        pmt_method: isCashRefund ? PaymentMethod.COD : PaymentMethod.MANUAL,
         pmt_bank_name: bankName,
         pmt_account_number: accountNumber,
         pmt_account_holder: accountHolder,
@@ -455,125 +476,141 @@ class PaymentService {
       throw new InternalServerException('Failed to update payment transaction');
     }
 
+    const refundIds =
+      await this.refundLogRepository.getRefundLogByTransactionId(
+        updatedTransaction.id
+      );
+
     // Update RefundLogs for product returns (if provided)
     if (refundIds && refundIds.length > 0) {
       for (const refundId of refundIds) {
-        const refundLog = await this.refundLogRepository.findById(
-          convertToObjectId(refundId)
-        );
-        if (!refundLog) {
-          throw new NotFoundException(`RefundLog ${refundId} not found`);
-        }
-        if (refundLog.order_id.toString() !== order._id.toString()) {
-          throw new BadRequestException(
-            `RefundLog ${refundId} does not belong to order ${order._id}`
-          );
-        }
+        console.log(refundId);
         await this.refundLogRepository.updateById(refundId, {
-          status: RefundStatus.COMPLETED,
-          manual_required: false,
-          payment_transaction_id: updatedTransaction._id,
-          updated_at: new Date(),
+          rfl_status: RefundStatus.COMPLETED,
+          rfl_manual_required: false,
+          rfl_completed_at: new Date(),
         });
       }
     }
 
     // Update order payment refundStatus
-    await this.orderRepository.updateById(order._id, {
+    await this.orderRepository.updateById(order.id, {
       payment_status: PaymentStatus.COMPLETED,
-      updated_at: new Date(),
     });
 
-    console.info(
-      `Manual refund processed: orderId=${order._id}, paymentTransactionId=${paymentTransactionId}`
-    );
-
     return {
-      orderId: order._id,
+      orderId: order.id,
       totalRefundAmount: transaction.amount,
       refundStatus: updatedTransaction.status,
-      paymentTransactionId: updatedTransaction._id,
+      paymentTransactionId: updatedTransaction.id,
     };
   }
 
-  async processCODRefund({
-    orderId,
-    totalRefundAmount,
-    refundLogIds,
-    adminId,
-    isCashRefund = false,
-  }) {
-    const order = await this.orderRepository.getById(orderId);
-    if (!order) {
-      throw new NotFoundError(`Order ${orderId} not found`);
-    }
-    if (!order.isPaid) {
-      throw new BadRequestError('Order is not paid');
-    }
+  async getTransactionDetails(transactionId) {
+    try {
+      const transaction = await this.paymentTransactionRepository.getById(
+        transactionId,
+        [
+          {
+            path: 'pmt_order_id',
+            select: 'ord_user_id ord_status ord_payment_method ord_total_price',
+          },
+          { path: 'pmt_admin_id', select: 'usr_name usr_email' },
+        ]
+      );
 
-    const paymentTransaction =
-      await this.paymentTransactionRepository.getByQuery({
-        filter: {
-          pmt_order_id: orderId,
-          pmt_type: TransactionType.PAYMENT,
-          pmt_method: PaymentMethod.COD,
-          pmt_status: PaymentStatus.COMPLETED,
-        },
+      if (!transaction) {
+        throw new NotFoundError(`Transaction ${transactionId} not found`);
+      }
+
+      // Lấy các refund log liên quan (nếu có)
+      const refundLogs = await this.refundLogRepository.getAll({
+        filter: { rfl_payment_transaction_id: transactionId },
+        populateOptions: [
+          { path: 'rfl_item.prd_id', select: 'prd_name prd_main_image' },
+          { path: 'rfl_item.var_id', select: 'var_name var_slug' },
+        ],
       });
 
-    if (!paymentTransaction) {
-      throw new NotFoundError('No completed COD transaction found');
+      return {
+        transactionId: transaction.id,
+        orderId: transaction.orderId,
+        userId: transaction.orderId?.ord_user_id?._id || null,
+        amount: transaction.amount,
+        paymentMethod: transaction.method,
+        status: transaction.status,
+        type: transaction.type,
+        bankDetails: transaction.bankDetails,
+        admin: transaction.admin,
+        completedAt: transaction.completedAt,
+        createdAt: transaction.createdAt,
+        updatedAt: transaction.updatedAt,
+        refundLogs: refundLogs.map((log) => ({
+          id: log.id,
+          status: log.status,
+          reason: log.reason,
+          description: log.description,
+          amount: log.amount,
+          item: {
+            productId: log.item.prd_id,
+            productName: log.item.prd_id?.prd_name || '',
+            variantId: log.item.var_id,
+            variantName: log.item.var_id?.var_name || '',
+            quantity: log.item.prd_quantity,
+          },
+        })),
+      };
+    } catch (error) {
+      throw new BadRequestError(
+        `Failed to get transaction details: ${error.message}`
+      );
+    }
+  }
+
+  async getTransactionByAdmin({
+    page = 1,
+    size = 10,
+    orderId,
+    method,
+    status,
+    type,
+  }) {
+    page = parseInt(page, 10) || 1;
+    size = parseInt(size, 10) || 10;
+    if (page < 1 || size < 1) {
+      throw new BadRequestError('Invalid page or size');
     }
 
-    const refundTransactionId = `COD_REFUND_${orderId}_${Date.now()}`;
-    const manualRefundTransaction = await this._createManualRefundTransaction({
-      orderId,
-      totalRefundAmount,
-      adminId,
+    const filter = {};
+
+    if (method) filter.pmt_method = method;
+    if (status) filter.pmt_status = status;
+    if (type) filter.pmt_type = type;
+    if (orderId) filter.pmt_order_id = convertToObjectIdMongodb(orderId);
+
+    const queryOptions = { sort: '-createdAt', page, size };
+    const transactions = await this.paymentTransactionRepository.getAll({
+      filter,
+      queryOptions,
+      populateOptions: [
+        {
+          path: 'pmt_order_id',
+          select: 'ord_user_id ord_status ord_payment_method',
+        },
+        { path: 'pmt_admin_id', select: 'usr_name usr_email' },
+      ],
     });
 
-    if (isCashRefund) {
-      // If cash refund, we just mark the transaction as refunded
-      await this.paymentTransactionRepository.updateById(
-        paymentTransaction.id,
-        {
-          pmt_status: PaymentStatus.REFUNDED,
-          pmt_completed_at: new Date(),
-        }
-      );
-      await this._markOrderAsRefunded(orderId);
-      return {
-        status: 'COMPLETED',
-        orderId,
-        amount: totalRefundAmount,
-        refundTransaction: manualRefundTransaction,
-      };
-    } else {
-      // If bank transfer refund, we need to create a manual refund transaction
-      await this.paymentTransactionRepository.updateById(
-        paymentTransaction.id,
-        {
-          pmt_status: PaymentStatus.PENDING_REFUND,
-          pmt_completed_at: null,
-        }
-      );
-      await this._markOrderAsPendingRefund(orderId);
-      // Mark RefundLogs as MANUAL_REQUIRED (if refundLogIds provided)
-      if (refundLogIds && refundLogIds.length > 0) {
-        for (const refundLogId of refundLogIds) {
-          await this.refundLogRepository.updateById(refundLogId, {
-            rfl_manual_required: true,
-            rfl_payment_transaction_id: manualRefundTransaction.id,
-          });
-        }
-      }
-      return {
-        status: 'MANUAL_REQUIRED',
-        message:
-          'COD refund requires manual processing. Please provide bank details for refund.',
-        refundTransaction: manualRefundTransaction,
-      };
-    }
+    const total = await this.paymentTransactionRepository.countDocuments(
+      filter
+    );
+
+    return listResponse({
+      items: transactions,
+      total,
+      page,
+      size,
+    });
   }
 
   // Handle MoMo refund IPN
@@ -721,12 +758,10 @@ class PaymentService {
     }
 
     const transaction = await this.paymentTransactionRepository.getByQuery({
-      filter: {
-        pmt_order_id: orderId,
-        pmt_type: TransactionType.PAYMENT,
-        pmt_method: PaymentMethod.COD,
-        pmt_status: PaymentStatus.PENDING,
-      },
+      pmt_order_id: orderId,
+      pmt_type: TransactionType.PAYMENT,
+      pmt_method: PaymentMethod.COD,
+      pmt_status: PaymentStatus.PENDING,
     });
 
     if (!transaction) {
@@ -802,83 +837,6 @@ class PaymentService {
     }
   }
 
-  async processRefund({
-    orderId,
-    totalRefundAmount,
-    refundLogIds,
-    adminId,
-    ipAddress,
-    paymentMethod,
-    isCashRefund = false,
-  }) {
-    let refundResult = null;
-    let paymentStatus = PaymentStatus.PENDING_REFUND;
-
-    if (paymentMethod === PaymentMethod.COD) {
-      refundResult = await this.processCODRefund({
-        orderId,
-        totalRefundAmount,
-        refundLogIds,
-        adminId,
-        isCashRefund,
-      });
-    } else {
-      try {
-        if (paymentMethod === PaymentMethod.MOMO) {
-          refundResult = await this.refundMoMoPayment({
-            orderId,
-            totalRefundAmount,
-            refundLogIds,
-            adminId,
-          });
-        } else if (paymentMethod === PaymentMethod.VNPAY) {
-          refundResult = await this.refundVNPayPayment({
-            orderId,
-            totalRefundAmount,
-            refundLogIds,
-            adminId,
-            ipAddress,
-          });
-        }
-
-        if (refundResult.status === 'MANUAL_REQUIRED') {
-          for (const refundLogId of refundLogIds) {
-            await this.refundLogRepository.updateById(
-              convertToObjectIdMongodb(refundLogId),
-              {
-                rfl_manual_required: true,
-                rfl_payment_transaction_id: refundResult.refundTransaction.id,
-              }
-            );
-          }
-        } else {
-          paymentStatus = PaymentStatus.REFUNDED;
-          for (const refundLogId of refundLogIds) {
-            await this.refundLogRepository.updateById(
-              convertToObjectIdMongodb(refundLogId),
-              {
-                rfl_status: RefundStatus.COMPLETED,
-                rfl_payment_transaction_id: refundResult.refundTransaction.id,
-                rfl_completed_at: new Date(),
-              }
-            );
-          }
-        }
-      } catch (error) {
-        for (const refundLogId of refundLogIds) {
-          await this.refundLogRepository.updateById(
-            convertToObjectIdMongodb(refundLogId),
-            {
-              rfl_manual_required: true,
-            }
-          );
-        }
-      }
-    }
-
-    return { refundResult, paymentStatus };
-  }
-
   // Helper methods
 
   async _updateOrderAndTransaction({
@@ -926,37 +884,6 @@ class PaymentService {
         },
         { pms_status: PaymentSessionStatus.FAILED }
       );
-    }
-  }
-
-  async _createManualRefundTransaction({
-    orderId,
-    totalRefundAmount,
-    adminId,
-  }) {
-    return await this.paymentTransactionRepository.create({
-      pmt_order_id: orderId,
-      pmt_transaction_id: `MANUAL_REFUNDED_${orderId}_${Date.now()}`,
-      pmt_type: TransactionType.REFUND,
-      pmt_method: PaymentMethod.MANUAL,
-      pmt_amount: totalRefundAmount,
-      pmt_status: PaymentStatus.PENDING,
-      pmt_admin_id: adminId,
-    });
-  }
-
-  async refundPayment({ orderId, amount, transId, paymentMethod, ipAddress }) {
-    if (paymentMethod === PaymentMethod.VNPAY) {
-      return await this.refundVNPayPayment({
-        orderId,
-        amount,
-        transId,
-        ipAddress,
-      });
-    } else if (paymentMethod === PaymentMethod.MOMO) {
-      return await this.refundMoMoPayment({ orderId, amount, transId });
-    } else {
-      throw new BadRequestError('Unsupported payment method for refund');
     }
   }
 
@@ -1187,7 +1114,6 @@ class PaymentService {
     orderId,
     refundTransactionId,
     totalRefundAmount,
-    refundLogIds,
     adminId,
   }) {
     if ([7000, 7002, 9000].includes(data.resultCode)) {
@@ -1202,7 +1128,6 @@ class PaymentService {
       return {
         status: 'PENDING_REFUSED',
         refundTransaction: manualRefundTransaction.id,
-        refundLogIds: refundLogIds,
       };
     }
 
@@ -1216,9 +1141,8 @@ class PaymentService {
       );
 
       return {
-        status: 'MANUAL_REFUNDED_REQUIRED',
+        status: 'MANUAL_REQUIRED',
         refundTransaction: manualRefundTransaction,
-        refundLogIds,
       };
     }
 
@@ -1238,7 +1162,6 @@ class PaymentService {
     return {
       status: 'COMPLETED',
       refundTransaction,
-      refundLogIds,
     };
   }
 
@@ -1247,7 +1170,6 @@ class PaymentService {
     orderId,
     refundTransactionId,
     totalRefundAmount,
-    refundLogIds,
     adminId,
   }) {
     if (data.vnp_ResponseCode !== '00') {
@@ -1262,7 +1184,6 @@ class PaymentService {
       return {
         status: 'MANUAL_REQUIRED',
         refundTransaction: manualRefundTransaction,
-        refundLogIds,
       };
     }
     const refundTransaction = await this.paymentTransactionRepository.create({
@@ -1275,18 +1196,45 @@ class PaymentService {
       pmt_admin_id: adminId,
       pmt_completed_at: new Date(),
     });
+
     await this._markOrderAsRefunded(orderId);
+
     return {
       status: 'COMPLETED',
       refundTransaction,
-      refundLogIds,
     };
   }
 
   async _markOrderAsRefunded(orderId) {
     await this.orderRepository.updateById(orderId, {
-      ord_status: OrderStatus.REFUNDED,
       ord_payment_status: PaymentStatus.REFUNDED,
+    });
+  }
+
+  async _createManualRefundTransaction({
+    orderId,
+    totalRefundAmount,
+    adminId,
+  }) {
+    const existingTransaction =
+      await this.paymentTransactionRepository.getByQuery({
+        pmt_order_id: convertToObjectIdMongodb(orderId),
+        pmt_status: PaymentStatus.PENDING,
+      });
+
+    if (existingTransaction) {
+      return existingTransaction;
+    }
+
+    const refundTransactionId = `MANUAL_REFUND_${orderId}_${Date.now()}`;
+    return await this.paymentTransactionRepository.create({
+      pmt_order_id: convertToObjectIdMongodb(orderId),
+      pmt_transaction_id: refundTransactionId,
+      pmt_type: TransactionType.REFUND,
+      pmt_method: PaymentMethod.MANUAL,
+      pmt_amount: totalRefundAmount,
+      pmt_status: PaymentStatus.PENDING,
+      pmt_admin_id: convertToObjectIdMongodb(adminId) || null,
     });
   }
 }

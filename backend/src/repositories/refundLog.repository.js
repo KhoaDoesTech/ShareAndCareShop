@@ -9,6 +9,14 @@ class RefundLogRepository extends BaseRepository {
     this.model = RefundLogModel;
   }
 
+  async getRefundLogByTransactionId(transactionId) {
+    const refundLogs = await this.model.find({
+      rfl_payment_transaction_id: transactionId,
+    });
+
+    return refundLogs.map((doc) => this.formatDocument(doc));
+  }
+
   formatDocument(doc) {
     if (!doc) return null;
 

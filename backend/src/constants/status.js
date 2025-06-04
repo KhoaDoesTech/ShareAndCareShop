@@ -66,10 +66,9 @@ const OrderStatus = {
   SHIPPED: 'SHIPPED', // Đã vận chuyển
   DELIVERED: 'DELIVERED', // Đã giao
   CANCELLED: 'CANCELLED', // Đã hủy
+  NOT_DELIVERED: 'NOT_DELIVERED', // Không giao được
   RETURN_REQUESTED: 'RETURN_REQUESTED', // Yêu cầu trả hàng
   RETURNED: 'RETURNED', // Đã trả hàng
-  PENDING_REFUND: 'PENDING_REFUND', // Chờ hoàn tiền
-  REFUNDED: 'REFUNDED', // Đã hoàn tiền
 };
 const AvailableOrderStatus = Object.values(OrderStatus);
 
@@ -135,6 +134,7 @@ const RefundStatus = {
   APPROVED: 'APPROVED',
   FAILED: 'FAILED',
   REJECTED: 'REJECTED',
+  NOT_RETURNED: 'NOT_RETURNED',
 };
 const AvailableRefundStatus = Object.values(RefundStatus);
 

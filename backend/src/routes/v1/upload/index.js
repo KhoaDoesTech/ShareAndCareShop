@@ -20,10 +20,29 @@ router.post(
   asyncHandler(UploadController.uploadProductImage)
 );
 
-router.delete(
-  '/products',
+router.post(
+  '/chat',
+  upload.single('chat'),
+  asyncHandler(UploadController.uploadChatImage)
+);
+
+router.post(
+  '/reviews',
   authentication,
-  verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.UPLOAD.DELETE),
+  upload.single('review'),
+  asyncHandler(UploadController.uploadReviewImage)
+);
+
+router.post(
+  '/transfers',
+  authentication,
+  upload.single('transfer'),
+  asyncHandler(UploadController.uploadTransferImage)
+);
+
+router.delete(
+  '/',
+  authentication,
   asyncHandler(UploadController.deleteImageByUrl)
 );
 

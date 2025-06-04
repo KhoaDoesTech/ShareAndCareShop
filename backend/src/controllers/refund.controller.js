@@ -36,20 +36,6 @@ class RefundController {
     }).send(res);
   };
 
-  confirmReturnReceived = async (req, res, next) => {
-    const ipAddress =
-      req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-    const metadata = await this.refundService.confirmReturnReceived({
-      refundLogId: req.params.refundLogId,
-      adminId: req.user.id,
-      ipAddress,
-    });
-    new ActionSuccess({
-      message: 'Return confirmed successfully',
-      metadata,
-    }).send(res);
-  };
-
   rejectRefundRequest = async (req, res, next) => {
     new ActionSuccess({
       message: 'Refund request rejected successfully',
@@ -57,24 +43,6 @@ class RefundController {
         refundLogId: req.params.refundLogId,
         adminId: req.user.id,
         rejectReason: req.body.rejectReason,
-      }),
-    }).send(res);
-  };
-
-  processRefund = async (req, res, next) => {
-    const ipAddress =
-      req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-    new ActionSuccess({
-      message: 'Refund processed successfully',
-      metadata: await this.refundService.processRefund({
-        refundLogIds: req.body.refundLogIds,
-        adminId: req.user.id,
-        refundMethod: req.body.refundMethod,
-        bankName: req.body.bankName,
-        accountNumber: req.body.accountNumber,
-        accountHolder: req.body.accountHolder,
-        transferImage: req.body.transferImage,
-        ipAddress,
       }),
     }).send(res);
   };
@@ -92,16 +60,6 @@ class RefundController {
     new ActionSuccess({
       message: 'Refund requests retrieved successfully',
       metadata: await this.refundService.getRefundRequestsForAdmin({
-        ...req.query,
-        orderId: req.query.orderId,
-      }),
-    }).send(res);
-  };
-
-  getManualRequiredRefunds = async (req, res, next) => {
-    new ActionSuccess({
-      message: 'Manual required refunds retrieved successfully',
-      metadata: await this.refundService.getManualRequiredRefunds({
         ...req.query,
         orderId: req.query.orderId,
       }),

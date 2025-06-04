@@ -1,7 +1,11 @@
 'use strict';
 
 const PaymentService = require('../services/payment.service');
-const { CreateSuccess, NoContentSuccess } = require('../utils/successResponse');
+const {
+  CreateSuccess,
+  NoContentSuccess,
+  ActionSuccess,
+} = require('../utils/successResponse');
 
 class PaymentController {
   constructor() {
@@ -95,14 +99,28 @@ class PaymentController {
       message: 'Manual refund processed successfully',
       metadata: await this.paymentService.processManualRefund({
         paymentTransactionId: req.params.paymentTransactionId,
-        refundIds: req.body.refundIds || [],
         adminId: req.user.id,
         bankName: req.body.bankName,
         accountNumber: req.body.accountNumber,
         accountHolder: req.body.accountHolder,
         transferImage: req.body.transferImage,
-        isCashRefund: req.body.isCashRefund || false,
       }),
+    }).send(res);
+  };
+
+  getTransactionDetail = async (req, res) => {
+    new ActionSuccess({
+      message: 'Transaction details retrieved successfully',
+      metadata: await this.paymentService.getTransactionDetails(
+        req.params.transactionId
+      ),
+    }).send(res);
+  };
+
+  getTransactionsByAdmin = async (req, res) => {
+    new ActionSuccess({
+      message: 'Transactions retrieved successfully',
+      metadata: await this.paymentService.getTransactionByAdmin(req.query),
     }).send(res);
   };
 }
