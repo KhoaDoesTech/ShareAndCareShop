@@ -72,6 +72,7 @@ class ProductRepository extends BaseRepository {
       discountEnd: product.prd_discount_end,
       quantity: product.prd_quantity,
       sold: product.prd_sold,
+      returned: product.prd_returned,
       category: product.prd_category,
       attributes: product.prd_attributes?.map((attr) => ({
         id: attr.id?._id,

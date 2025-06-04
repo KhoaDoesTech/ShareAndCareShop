@@ -36,7 +36,10 @@ class RefundLogRepository extends BaseRepository {
             email: doc.rfl_admin_id.usr_email,
           }
         : null,
+      manualRequired: doc.rfl_manual_required,
       requestedAt: doc.rfl_requested_at,
+      approvedAt: doc.rfl_approved_at,
+      rejectedAt: doc.rfl_rejected_at,
       completedAt: doc.rfl_completed_at,
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,

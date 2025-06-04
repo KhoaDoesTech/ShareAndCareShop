@@ -28,4 +28,17 @@ router.get(
   asyncHandler(PaymentController.handleMoMoCallback)
 );
 
+router.post(
+  '/payment/cod/:orderId/confirm',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_ORDER.PAYMENT.CONFIRM),
+  asyncHandler(PaymentController.confirmCODPayment)
+);
+router.post(
+  '/payment/manual-refund/:orderId',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_ORDER.PAYMENT.REFUND),
+  asyncHandler(PaymentController.processManualRefund)
+);
+
 module.exports = router;

@@ -31,7 +31,7 @@ const RefundLogSchema = new mongoose.Schema(
       enum: AvailableRefundStatus,
       default: RefundStatus.PENDING,
     },
-    rfl_reason: { type: String, enum: AvailableRefundReasons, required: true },
+    rfl_reason: { type: String, required: true },
     rfl_description: { type: String, trim: true },
     rfl_item: {
       prd_id: {
@@ -49,18 +49,36 @@ const RefundLogSchema = new mongoose.Schema(
         required: true,
         min: 1,
       },
+      prd_total: {
+        type: Number,
+        required: true,
+        min: 0,
+      },
     },
     rfl_admin_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      default: null,
+    },
+    rfl_manual_required: {
+      type: Boolean,
+      default: false,
     },
     rfl_requested_at: {
       type: Date,
       default: Date.now,
     },
+    rfl_approved_at: {
+      type: Date,
+      default: null,
+    },
+    rfl_rejected_at: {
+      type: Date,
+      default: null,
+    },
     rfl_completed_at: {
       type: Date,
+      default: null,
     },
   },
   {

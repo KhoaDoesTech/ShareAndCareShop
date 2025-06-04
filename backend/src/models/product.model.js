@@ -83,7 +83,7 @@ const productSchema = new Schema(
     // Stock & sales tracking
     prd_quantity: { type: Number, required: true, default: 0 },
     prd_sold: { type: Number, default: 0 },
-
+    prd_returned: { type: Number, default: 0 },
     // Return policy
     prd_return_days: { type: Number, default: 7 },
 
@@ -139,34 +139,24 @@ productSchema.index({
 productSchema.pre('save', async function (next) {
   if (!this.isModified('prd_name')) return next();
 
-  const session = await this.model(DOCUMENT_NAME).startSession();
-  try {
-    await session.withTransaction(async () => {
-      const baseSlug = slugify(this.prd_name, { lower: true, strict: true });
-      const slugRegex = new RegExp(`^${baseSlug}(-\\d+)?$`, 'i');
-      const existingSlugs = await this.model(DOCUMENT_NAME)
-        .find({ prd_slug: slugRegex })
-        .session(session)
-        .select('prd_slug')
-        .lean();
+  const baseSlug = slugify(this.prd_name, { lower: true, strict: true });
+  const slugRegex = new RegExp(`^${baseSlug}(-\\d+)?$`, 'i');
+  const existingSlugs = await this.model(DOCUMENT_NAME)
+    .find({ prd_slug: slugRegex })
+    .select('prd_slug')
+    .lean();
 
-      if (existingSlugs.length === 0) {
-        this.prd_slug = baseSlug;
-      } else {
-        const slugNumbers = existingSlugs.map((doc) => {
-          const match = doc.prd_slug.match(/-(\d+)$/);
-          return match ? parseInt(match[1], 10) : 0;
-        });
-        const maxNumber = Math.max(...slugNumbers);
-        this.prd_slug = `${baseSlug}-${maxNumber + 1}`;
-      }
+  if (existingSlugs.length === 0) {
+    this.prd_slug = baseSlug;
+  } else {
+    const slugNumbers = existingSlugs.map((doc) => {
+      const match = doc.prd_slug.match(/-(\d+)$/);
+      return match ? parseInt(match[1], 10) : 0;
     });
-    next();
-  } catch (error) {
-    next(error);
-  } finally {
-    session.endSession();
+    const maxNumber = Math.max(...slugNumbers);
+    this.prd_slug = `${baseSlug}-${maxNumber + 1}`;
   }
+  next();
 });
 
 //Export the model

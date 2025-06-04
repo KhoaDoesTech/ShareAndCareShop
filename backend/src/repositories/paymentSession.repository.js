@@ -9,19 +9,6 @@ class PaymentSessionRepository extends BaseRepository {
     this.model = PaymentSessionModel;
   }
 
-  async getByQuery({ filter = {}, fields = '', options = {} }) {
-    let documentQuery = this.model.findOne(filter, fields, options);
-    documentQuery = documentQuery.populate([
-      {
-        path: 'pms_order_id',
-        select: 'ord_total_price ord_payment_method ord_status',
-      },
-    ]);
-    const document = await documentQuery.lean();
-
-    return this.formatDocument(document);
-  }
-
   async updateByQuery(query, update) {
     const filter = query.filter || {};
     const options = query.options || { new: true };

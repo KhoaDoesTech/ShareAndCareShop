@@ -154,8 +154,17 @@ class ReviewService {
     if (rating) {
       filter.rvw_star = parseInt(rating);
     }
-    if (hasImage) {
-      filter.rvw_images = { $exists: true, $ne: [], $not: { $size: 0 } };
+
+    if (typeof hasImage !== 'undefined' && hasImage !== null) {
+      if (hasImage === true || hasImage === 'true') {
+        filter.rvw_images = { $exists: true, $ne: [], $not: { $size: 0 } };
+      } else if (hasImage === false || hasImage === 'false') {
+        filter.$or = [
+          { rvw_images: { $exists: false } },
+          { rvw_images: { $size: 0 } },
+          { rvw_images: [] },
+        ];
+      }
     }
 
     const mappedSort = sort
@@ -434,7 +443,7 @@ class ReviewService {
     if (order.status !== OrderStatus.DELIVERED) {
       throw new BadRequestError('Order must be delivered to write a review');
     }
-    console.log(order);
+
     return order;
   }
 

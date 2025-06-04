@@ -33,8 +33,12 @@ const PaymentTransactionSchema = new mongoose.Schema(
     pmt_account_number: { type: String, trim: true },
     pmt_account_holder: { type: String, trim: true },
     pmt_bank_transfer_image: { type: String, trim: true },
-    pmt_admin_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    pmt_completed_at: { type: Date },
+    pmt_admin_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    pmt_completed_at: { type: Date, default: null },
   },
   {
     timestamps: true,
@@ -44,7 +48,6 @@ const PaymentTransactionSchema = new mongoose.Schema(
 
 // Index ngoài schema để tối ưu truy vấn
 PaymentTransactionSchema.index({ pmt_order_id: 1 });
-PaymentTransactionSchema.index({ pmt_transaction_id: 1 });
 PaymentTransactionSchema.index({ pmt_status: 1 });
 
 module.exports = mongoose.model('PaymentTransaction', PaymentTransactionSchema);

@@ -19,6 +19,7 @@ const variantSchema = new Schema(
     var_price: { type: Number, required: true },
     var_quantity: { type: Number, required: true, default: 0 },
     var_sold: { type: Number, default: 0 },
+    var_returned: { type: Number, default: 0 },
     var_status: {
       type: String,
       enum: AvailableProductStatus,

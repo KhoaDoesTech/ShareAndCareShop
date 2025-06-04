@@ -211,6 +211,8 @@ class OrderService {
     await this._updateStock(itemsDetails);
 
     let paymentUrl = null;
+    let transaction = null;
+
     if (paymentMethod === PaymentMethod.VNPAY) {
       paymentUrl = await this.paymentService.createVNPayPaymentUrl({
         orderId: newOrder.id,
@@ -220,6 +222,11 @@ class OrderService {
       paymentUrl = await this.paymentService.createMoMoPaymentUrl({
         orderId: newOrder.id,
         ipAddress,
+      });
+    } else if (paymentMethod === PaymentMethod.COD) {
+      transaction = await this.paymentService.processCODPayment({
+        orderId: newOrder.id,
+        adminId: null, // System-initiated
       });
     }
 
@@ -242,10 +249,15 @@ class OrderService {
     }
 
     if (
-      order.status === OrderStatus.DELIVERED ||
-      order.status === OrderStatus.RETURNED
+      ![
+        OrderStatus.PENDING,
+        OrderStatus.AWAITING_PAYMENT,
+        OrderStatus.PROCESSING,
+      ].includes(order.status)
     ) {
-      throw new BadRequestError('Cannot cancel delivered or returned order');
+      throw new BadRequestError(
+        `Can only cancel orders in PENDING or AWAITING_PAYMENT status, current status: ${order.status}`
+      );
     }
 
     const updates = {
@@ -253,29 +265,51 @@ class OrderService {
       ord_payment_status: PaymentStatus.CANCELLED,
     };
 
+    let refundStatus = null;
+    let refundMessage = null;
+
     if (order.isPaid && order.paymentMethod !== PaymentMethod.COD) {
       if (!order.transactionId) {
         throw new BadRequestError('Missing transaction ID for refund');
       }
 
-      if (order.paymentMethod === PaymentMethod.MOMO) {
-        await this.paymentService.refundMoMoPayment({
-          orderId,
-          amount: order.totalPrice,
-          transId: order.transactionId,
-        });
-        updates.ord_status = OrderStatus.REFUNDED;
-        updates.ord_payment_status = PaymentStatus.REFUNDED;
-      } else if (order.paymentMethod === PaymentMethod.VNPAY) {
-        await this.paymentService.refundVNPayPayment({
-          orderId,
-          amount: order.totalPrice,
-          transId: order.transactionId,
-          ipAddress,
-        });
-        updates.ord_status = OrderStatus.PENDING_REFUND;
+      let refundResult;
+      try {
+        if (order.paymentMethod === PaymentMethod.MOMO) {
+          refundResult = await this.paymentService.refundMoMoPayment({
+            orderId,
+            totalRefundAmount: order.totalPrice,
+            refundLogIds: [],
+            adminId: null,
+          });
+        } else if (order.paymentMethod === PaymentMethod.VNPAY) {
+          refundResult = await this.paymentService.refundVNPayPayment({
+            orderId,
+            totalRefundAmount: order.totalPrice,
+            refundLogIds: [],
+            adminId: null,
+            ipAddress,
+          });
+        }
+
+        if (refundResult.status === 'MANUAL_REQUIRED') {
+          refundStatus = 'MANUAL_REQUIRED';
+          refundMessage =
+            refundResult.message ||
+            'Refund failed, please contact support for manual refund';
+          updates.ord_payment_status = PaymentStatus.PENDING_REFUND;
+        } else {
+          refundStatus = 'SUCCESS';
+          updates.ord_payment_status = PaymentStatus.REFUNDED;
+        }
+      } catch (error) {
+        refundStatus = 'FAILED';
+        refundMessage = 'Refund processing error, please contact support';
         updates.ord_payment_status = PaymentStatus.PENDING_REFUND;
       }
+    } else if (order.paymentMethod === PaymentMethod.COD) {
+      updates.ord_payment_status = PaymentStatus.PENDING;
+      refundStatus = 'NOT_REQUIRED';
     }
 
     await this.orderRepository.updateById(orderId, updates);
@@ -286,27 +320,41 @@ class OrderService {
 
     await this._reverseStock(order.items);
 
-    return { status: updates.ord_status };
+    return {
+      status: updates.ord_status,
+      refundStatus,
+      refundMessage,
+    };
   }
 
-  async updateOrderStatus({ orderId }) {
+  async updateOrderStatus({ orderId, shipperConfirmation = false }) {
     const order = await this.orderRepository.getById(orderId);
     if (!order) {
       throw new NotFoundError(`Order ${orderId} not found`);
     }
 
-    const nextStatus = this._getNextStatus(order.status);
-    if (!nextStatus) {
-      throw new BadRequestError(
-        `No valid next status for current status ${order.status}`
-      );
+    const validTransitions = {
+      [OrderStatus.PENDING]: [
+        OrderStatus.AWAITING_SHIPMENT,
+        OrderStatus.CANCELLED,
+      ],
+      [OrderStatus.AWAITING_PAYMENT]: [
+        OrderStatus.AWAITING_SHIPMENT,
+        OrderStatus.CANCELLED,
+      ],
+      [OrderStatus.AWAITING_SHIPMENT]: [OrderStatus.DELIVERED],
+      [OrderStatus.DELIVERED]: [],
+    };
+
+    const possibleNextStatuses = validTransitions[order.status] || [];
+    if (possibleNextStatuses.length === 0) {
+      throw new BadRequestError(`No valid next status for ${order.status}`);
     }
 
-    if (order.status === OrderStatus.DELIVERED) {
-      throw new BadRequestError(
-        'Cannot update status from DELIVERED to anything other than RETURN_REQUESTED'
-      );
-    }
+    // Prioritize non-CANCELLED status if multiple options exist
+    let nextStatus =
+      possibleNextStatuses.find((status) => status !== OrderStatus.CANCELLED) ||
+      possibleNextStatuses[0];
 
     if (
       order.paymentMethod !== PaymentMethod.COD &&
@@ -314,6 +362,12 @@ class OrderService {
       nextStatus !== OrderStatus.CANCELLED
     ) {
       throw new BadRequestError('Payment must be completed before proceeding');
+    }
+
+    if (nextStatus === OrderStatus.DELIVERED && !shipperConfirmation) {
+      throw new BadRequestError(
+        'Shipper confirmation required for DELIVERED status'
+      );
     }
 
     const updates = {
@@ -324,11 +378,6 @@ class OrderService {
     if (nextStatus === OrderStatus.DELIVERED) {
       updates.ord_is_delivered = true;
       updates.ord_delivered_at = new Date();
-      if (order.paymentMethod === PaymentMethod.COD) {
-        updates.ord_is_paid = true;
-        updates.ord_paid_at = new Date();
-        updates.ord_payment_status = PaymentStatus.COMPLETED;
-      }
     }
 
     const updatedOrder = await this.orderRepository.updateById(

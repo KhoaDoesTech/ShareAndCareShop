@@ -1,9 +1,10 @@
 'use strict';
 
+const { PaymentMethod } = require('../constants/status');
 const PaymentTransactionModel = require('../models/paymentTransaction.model');
 const BaseRepository = require('./base.repository');
 
-class RefundLogRepository extends BaseRepository {
+class PaymentTransactionRepository extends BaseRepository {
   constructor() {
     super(PaymentTransactionModel);
     this.model = PaymentTransactionModel;
@@ -21,7 +22,7 @@ class RefundLogRepository extends BaseRepository {
       amount: doc.pmt_amount,
       status: doc.pmt_status,
       bankDetails:
-        doc.pmt_method === 'MANUAL'
+        doc.pmt_method === PaymentMethod.MANUAL
           ? {
               bankName: doc.pmt_bank_name || '',
               accountNumber: doc.pmt_account_number || '',
@@ -43,4 +44,4 @@ class RefundLogRepository extends BaseRepository {
   }
 }
 
-module.exports = RefundLogRepository;
+module.exports = PaymentTransactionRepository;

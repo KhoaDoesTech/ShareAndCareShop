@@ -19,8 +19,8 @@ const paymentSessionSchema = new Schema(
       enum: AvailablePaymentGateway,
     },
     pms_payment_url: { type: String, required: true },
-    pms_request_id: { type: String }, // MoMo-specific
-    pms_transaction_id: { type: String }, // VNPay/MoMo transaction ID
+    pms_request_id: { type: String, default: null }, // MoMo-specific
+    pms_transaction_id: { type: String, default: null }, // VNPay/MoMo transaction ID
     pms_status: {
       type: String,
       enum: AvailablePaymentSessionStatus,

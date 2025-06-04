@@ -67,7 +67,6 @@ const OrderStatus = {
   DELIVERED: 'DELIVERED', // Đã giao
   CANCELLED: 'CANCELLED', // Đã hủy
   RETURN_REQUESTED: 'RETURN_REQUESTED', // Yêu cầu trả hàng
-  RETURN_APPROVED: 'RETURN_APPROVED',
   RETURNED: 'RETURNED', // Đã trả hàng
   PENDING_REFUND: 'PENDING_REFUND', // Chờ hoàn tiền
   REFUNDED: 'REFUNDED', // Đã hoàn tiền
@@ -108,6 +107,7 @@ const AvailablePaymentMethod = Object.values(PaymentMethod);
 
 const PaymentStatus = {
   PENDING: 'PENDING',
+  CANCELLED: 'CANCELLED',
   COMPLETED: 'COMPLETED',
   FAILED: 'FAILED',
   PENDING_REFUND: 'PENDING_REFUND',
@@ -132,6 +132,7 @@ const AvailablePaymentSessionStatus = Object.values(PaymentSessionStatus);
 const RefundStatus = {
   PENDING: 'PENDING',
   COMPLETED: 'COMPLETED',
+  APPROVED: 'APPROVED',
   FAILED: 'FAILED',
   REJECTED: 'REJECTED',
 };
