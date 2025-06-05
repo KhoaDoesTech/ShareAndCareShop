@@ -94,14 +94,16 @@ class VariantRepository extends BaseRepository {
       sold: variant.var_sold,
       returned: variant.var_returned,
       status: variant.var_status,
-      createdBy: variant.createdBy
+      createdBy: variant.createdBy,
+      createdDetail: variant.createdBy
         ? {
             id: variant.createdBy._id,
             name: variant.createdBy.usr_name,
             email: variant.createdBy.usr_email,
           }
         : null,
-      updatedBy: variant.updatedBy
+      updatedBy: variant.updatedBy,
+      updatedDetail: variant.updatedBy
         ? {
             id: variant.updatedBy._id,
             name: variant.updatedBy.usr_name,

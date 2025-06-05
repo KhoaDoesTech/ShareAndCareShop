@@ -734,8 +734,15 @@ class RefundService {
     if (!order || order.userId.toString() !== userId.toString()) {
       throw new BadRequestError('Order not found or does not belong to user');
     }
-    if (order.status !== OrderStatus.DELIVERED) {
-      throw new BadRequestError('Order must be delivered to refund');
+
+    if (
+      ![OrderStatus.DELIVERED, OrderStatus.RETURN_REQUESTED].includes(
+        order.ord_status
+      )
+    ) {
+      throw new BadRequestError(
+        'Order must be delivered or have an ongoing return request to refund'
+      );
     }
 
     return order;
