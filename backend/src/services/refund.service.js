@@ -115,7 +115,6 @@ class RefundService {
     // 8. Cập nhật trạng thái đơn hàng
     await this.orderRepository.updateById(orderId, {
       ord_status: OrderStatus.RETURN_REQUESTED,
-      ord_return_requested_at: new Date(),
     });
 
     // 9. Lọc trường an toàn
@@ -159,7 +158,6 @@ class RefundService {
       }
     );
 
-    // ĐIỂM KHÁC BIỆT: Cập nhật trạng thái đơn hàng
     const order = await this.orderRepository.getById(refundLog.orderId);
     await this.orderRepository.updateById(order.id, {
       ord_status: OrderStatus.RETURN_REQUESTED,
@@ -196,7 +194,7 @@ class RefundService {
         rfl_status: RefundStatus.REJECTED,
         rfl_admin_id: adminId,
         rfl_reject_reason: rejectReason.trim(),
-        rfl_updated_at: new Date(),
+        rfl_rejected_at: new Date(),
       }
     );
 
@@ -737,7 +735,7 @@ class RefundService {
 
     if (
       ![OrderStatus.DELIVERED, OrderStatus.RETURN_REQUESTED].includes(
-        order.ord_status
+        order.status
       )
     ) {
       throw new BadRequestError(

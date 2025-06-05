@@ -32,7 +32,8 @@ const RefundLogSchema = new mongoose.Schema(
       default: RefundStatus.PENDING,
     },
     rfl_reason: { type: String, required: true },
-    rfl_description: { type: String, trim: true },
+    rfl_reject_reason: { type: String, default: '' },
+    rfl_description: { type: String, trim: true, default: '' },
     rfl_item: {
       prd_id: {
         type: mongoose.Schema.Types.ObjectId,
@@ -44,11 +45,7 @@ const RefundLogSchema = new mongoose.Schema(
         ref: 'Variant',
         default: null,
       },
-      prd_quantity: {
-        type: Number,
-        required: true,
-        min: 1,
-      },
+      prd_quantity: { type: Number, required: true, min: 1 },
       prd_total: {
         type: Number,
         required: true,
@@ -60,26 +57,11 @@ const RefundLogSchema = new mongoose.Schema(
       ref: 'User',
       default: null,
     },
-    rfl_manual_required: {
-      type: Boolean,
-      default: false,
-    },
-    rfl_requested_at: {
-      type: Date,
-      default: Date.now,
-    },
-    rfl_approved_at: {
-      type: Date,
-      default: null,
-    },
-    rfl_rejected_at: {
-      type: Date,
-      default: null,
-    },
-    rfl_completed_at: {
-      type: Date,
-      default: null,
-    },
+    rfl_manual_required: { type: Boolean, default: false },
+    rfl_requested_at: { type: Date, default: Date.now },
+    rfl_approved_at: { type: Date, default: null },
+    rfl_rejected_at: { type: Date, default: null },
+    rfl_completed_at: { type: Date, default: null },
   },
   {
     timestamps: true,

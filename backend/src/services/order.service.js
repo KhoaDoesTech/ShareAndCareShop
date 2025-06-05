@@ -256,7 +256,7 @@ class OrderService {
       ].includes(order.status)
     ) {
       throw new BadRequestError(
-        `Can only cancel orders in PENDING or AWAITING_PAYMENT status, current status: ${order.status}`
+        `Can only cancel orders in PENDING or AWAITING_PAYMENT or PROCESSING status, current status: ${order.status}`
       );
     }
 
@@ -328,34 +328,12 @@ class OrderService {
       throw new NotFoundError(`Order ${orderId} not found`);
     }
 
-    const validTransitions = {
-      [OrderStatus.PENDING]: [
-        OrderStatus.AWAITING_SHIPMENT,
-        OrderStatus.CANCELLED,
-      ],
-      [OrderStatus.AWAITING_PAYMENT]: [
-        OrderStatus.AWAITING_SHIPMENT,
-        OrderStatus.CANCELLED,
-      ],
-      [OrderStatus.AWAITING_SHIPMENT]: [OrderStatus.DELIVERED],
-      [OrderStatus.DELIVERED]: [],
-    };
-
-    const possibleNextStatuses = validTransitions[order.status] || [];
-    if (possibleNextStatuses.length === 0) {
+    const nextStatus = this._getNextStatus(order.status);
+    if (!nextStatus) {
       throw new BadRequestError(`No valid next status for ${order.status}`);
     }
 
-    // Prioritize non-CANCELLED status if multiple options exist
-    let nextStatus =
-      possibleNextStatuses.find((status) => status !== OrderStatus.CANCELLED) ||
-      possibleNextStatuses[0];
-
-    if (
-      order.paymentMethod !== PaymentMethod.COD &&
-      !order.isPaid &&
-      nextStatus !== OrderStatus.CANCELLED
-    ) {
+    if (order.paymentMethod !== PaymentMethod.COD && !order.isPaid) {
       throw new BadRequestError('Payment must be completed before proceeding');
     }
 
@@ -842,12 +820,7 @@ class OrderService {
       [OrderStatus.PROCESSING]: OrderStatus.AWAITING_SHIPMENT,
       [OrderStatus.AWAITING_SHIPMENT]: OrderStatus.SHIPPED,
       [OrderStatus.SHIPPED]: OrderStatus.DELIVERED,
-      [OrderStatus.DELIVERED]: OrderStatus.RETURN_REQUESTED,
-      [OrderStatus.CANCELLED]: null,
-      [OrderStatus.PENDING_REFUND]: OrderStatus.REFUNDED,
-      [OrderStatus.REFUNDED]: null,
-      [OrderStatus.RETURN_REQUESTED]: OrderStatus.RETURNED,
-      [OrderStatus.RETURNED]: null,
+      [OrderStatus.DELIVERED]: null,
     };
     return NEXT_STATUS[orderStatus] || null;
   }

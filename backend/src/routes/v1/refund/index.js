@@ -18,9 +18,9 @@ router.post(
   asyncHandler(refundController.createRefundRequest)
 );
 router.get(
-  '/status/:refundLogId',
+  '/:refundLogId',
   authentication,
-  asyncHandler(refundController.getRefundStatus)
+  asyncHandler(refundController.getRefundDetails)
 );
 router.get(
   '/user',

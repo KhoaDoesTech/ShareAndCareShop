@@ -8,8 +8,18 @@ const {
   generateHmacSha256,
   generateHmacHash,
 } = require('../helpers/crypto.helper');
-const { BadRequestError, NotFoundError } = require('../utils/errorResponse');
-const { sortObject } = require('../utils/helpers');
+const {
+  BadRequestError,
+  NotFoundError,
+  InternalServerError,
+} = require('../utils/errorResponse');
+const {
+  sortObject,
+  listResponse,
+  pickFields,
+  omitFields,
+  convertToObjectIdMongodb,
+} = require('../utils/helpers');
 const {
   OrderStatus,
   PaymentStatus,
@@ -437,30 +447,30 @@ class PaymentService {
     transferImage,
   }) {
     const transaction = await this.paymentTransactionRepository.getById(
-      convertToObjectId(paymentTransactionId)
+      convertToObjectIdMongodb(paymentTransactionId)
     );
 
     console.log(transaction);
     if (!transaction) {
-      throw new NotFoundException('Payment transaction not found');
+      throw new NotFoundError('Payment transaction not found');
     }
 
-    if (transaction.status !== PaymentStatus.PENDING_REFUND) {
-      throw new BadRequestException(
-        `Transaction must be in ${PaymentStatus.PENDING_REFUND} refundStatus, current refundStatus: ${transaction.status}`
+    if (transaction.status !== PaymentStatus.PENDING) {
+      throw new BadRequestError(
+        `Transaction must be in ${PaymentStatus.PENDING} refundStatus, current refundStatus: ${transaction.status}`
       );
     }
 
-    const order = await this.orderRepository.findById(transaction.orderId);
+    const order = await this.orderRepository.getById(transaction.orderId);
     if (!order) {
-      throw new NotFoundException(`Order ${transaction.orderId} not found`);
+      throw new NotFoundError(`Order ${transaction.orderId} not found`);
     }
 
     // Update PaymentTransaction
     const updatedTransaction =
       await this.paymentTransactionRepository.updateById(paymentTransactionId, {
         pmt_status: PaymentStatus.COMPLETED,
-        pmt_admin_id: convertToObjectId(adminId),
+        pmt_admin_id: convertToObjectIdMongodb(adminId),
         pmt_bank_name: bankName,
         pmt_account_number: accountNumber,
         pmt_account_holder: accountHolder,
@@ -469,7 +479,7 @@ class PaymentService {
       });
 
     if (!updatedTransaction) {
-      throw new InternalServerException('Failed to update payment transaction');
+      throw new InternalServerError('Failed to update payment transaction');
     }
 
     const refundIds =
@@ -491,14 +501,13 @@ class PaymentService {
 
     // Update order payment refundStatus
     await this.orderRepository.updateById(order.id, {
-      payment_status: PaymentStatus.COMPLETED,
+      payment_status: PaymentStatus.REFUNDED,
     });
 
     return {
-      orderId: order.id,
+      paymentTransactionId: updatedTransaction.id,
       totalRefundAmount: transaction.amount,
       refundStatus: updatedTransaction.status,
-      paymentTransactionId: updatedTransaction.id,
     };
   }
 
@@ -531,7 +540,6 @@ class PaymentService {
       return {
         transactionId: transaction.id,
         orderId: transaction.orderId,
-        userId: transaction.orderId?.ord_user_id?._id || null,
         amount: transaction.amount,
         paymentMethod: transaction.method,
         status: transaction.status,
@@ -602,7 +610,12 @@ class PaymentService {
     );
 
     return listResponse({
-      items: transactions,
+      items: transactions.map((transaction) => ({
+        ...omitFields({
+          fields: ['bankDetails', 'createdAt', 'updatedAt', 'orderId'],
+          object: transaction,
+        }),
+      })),
       total,
       page,
       size,
@@ -1214,12 +1227,16 @@ class PaymentService {
         pmt_status: PaymentStatus.PENDING,
       });
 
+    console.log(existingTransaction);
+
     if (existingTransaction) {
       return existingTransaction;
     }
 
+    console.log(orderId);
+
     const refundTransactionId = `MANUAL_REFUND_${orderId}_${Date.now()}`;
-    return await this.paymentTransactionRepository.create({
+    const refund = await this.paymentTransactionRepository.create({
       pmt_order_id: convertToObjectIdMongodb(orderId),
       pmt_transaction_id: refundTransactionId,
       pmt_type: TransactionType.REFUND,
@@ -1228,6 +1245,8 @@ class PaymentService {
       pmt_status: PaymentStatus.PENDING,
       pmt_admin_id: convertToObjectIdMongodb(adminId) || null,
     });
+    console.log(refund);
+    return refund;
   }
 }
 

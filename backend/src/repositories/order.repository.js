@@ -144,7 +144,6 @@ class OrderRepository extends BaseRepository {
         ? {
             id: order.ord_delivery_method._id,
             name: order.ord_delivery_method.dlv_name || '',
-            price: order.ord_delivery_method.dlv_price || 0,
           }
         : null,
       itemsPrice: order.ord_items_price,
@@ -163,9 +162,6 @@ class OrderRepository extends BaseRepository {
       deliveredAt: order.ord_delivered_at,
       transactionId: order.ord_transaction_id,
       status: order.ord_status,
-      returnReason: order.ord_return_reason,
-      returnRequestedAt: order.ord_return_requested_at,
-      returnApprovedAt: order.ord_return_approved_at,
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
     };

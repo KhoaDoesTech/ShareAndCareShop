@@ -89,14 +89,6 @@ const orderSchema = new Schema(
       default: OrderStatus.PENDING,
       required: true,
     },
-    ord_return_reason: {
-      type: String,
-      enum: AvailableReturnReasons,
-      default: null,
-    },
-    ord_return_requested_at: { type: Date, default: null },
-    ord_return_approved_at: { type: Date, default: null },
-    ord_return_received_at: { type: Date, default: null },
   },
   {
     collection: COLLECTION_NAME,

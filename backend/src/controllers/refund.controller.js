@@ -47,10 +47,10 @@ class RefundController {
     }).send(res);
   };
 
-  getRefundStatus = async (req, res, next) => {
+  getRefundDetails = async (req, res, next) => {
     new ActionSuccess({
       message: 'Refund status retrieved successfully',
-      metadata: await this.refundService.getRefundStatus(
+      metadata: await this.refundService.getRefundDetails(
         req.params.refundLogId
       ),
     }).send(res);
