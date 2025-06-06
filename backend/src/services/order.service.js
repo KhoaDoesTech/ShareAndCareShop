@@ -342,7 +342,7 @@ class OrderService {
       !order.isPaid &&
       order.paymentMethod === PaymentMethod.COD
     ) {
-      this.paymentService.confirmCODPayment({ orderId, adminId });
+      await this.paymentService.confirmCODPayment({ orderId, adminId });
     }
 
     if (nextStatus === OrderStatus.DELIVERED) {
