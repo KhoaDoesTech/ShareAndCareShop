@@ -395,7 +395,10 @@ class OrderService {
         }));
     }
 
-    const reviewedProductIds = await this._getReviewedProductIds(userId);
+    const reviewedProductIds = await this._getReviewedProductKeys(
+      userId,
+      order.id
+    );
 
     // Lấy refund logs cho tất cả items trong orders
     const refundLogs = await this.refundLogRepository.getAll({
@@ -457,7 +460,7 @@ class OrderService {
           );
           const canReview = !!(
             order.deliveredAt &&
-            !reviewedProductIds.has(item.productId.toString())
+            !reviewedProductIds.has(`${item.productId}_${order.id}`)
           );
 
           return {
@@ -589,10 +592,13 @@ class OrderService {
     });
 
     const total = await this.orderRepository.countDocuments(filter);
-    const reviewedProductIds = await this._getReviewedProductIds(userId);
 
-    // Lấy refund logs cho tất cả items trong orders
     const orderIds = orders.map((order) => order.id);
+    const reviewedProductIds = await this._getReviewedProductKeys(
+      userId,
+      orderIds
+    );
+
     const refundLogs = await this.refundLogRepository.getAll({
       filter: {
         rfl_order_id: { $in: orderIds },
@@ -601,12 +607,10 @@ class OrderService {
 
     // Tạo map để tra cứu refund log theo productId và variantId
     const refundLogMap = new Map();
-    console.log(refundLogs);
     refundLogs.forEach((log) => {
       const key = `${log.orderId}_${log.item.productId}_${
         log.item.variantId || 'no-variant'
       }`;
-      console.log(key);
       refundLogMap.set(key, log);
     });
 
@@ -626,7 +630,6 @@ class OrderService {
           }`;
           const hasActiveRefund = refundLogMap.has(refundKey);
           const refundLog = refundLogMap.get(refundKey);
-          console.log(refundLog);
           const canReturn = !!(
             this._isItemReturnable(order.deliveredAt, item.returnDays) &&
             !hasActiveRefund &&
@@ -634,7 +637,7 @@ class OrderService {
           );
           const canReview = !!(
             order.deliveredAt &&
-            !reviewedProductIds.has(item.productId.toString())
+            !reviewedProductIds.has(`${item.productId}_${order.id}`)
           );
           return {
             productId: item.productId,
@@ -935,11 +938,18 @@ class OrderService {
     return (now - deliveredDate) / (1000 * 60 * 60 * 24) <= returnDays;
   }
 
-  async _getReviewedProductIds(userId) {
+  async _getReviewedProductKeys(userId, orderIds) {
     const reviews = await this.reviewRepository.getAll({
-      filter: { rvw_user_id: userId, rvw_is_hidden: false },
+      filter: {
+        rvw_user_id: userId,
+        rvw_is_hidden: false,
+        rvw_order_id: { $in: Array.isArray(orderIds) ? orderIds : [orderIds] },
+      },
     });
-    return new Set(reviews.map((review) => review.productId.toString()));
+
+    return new Set(
+      reviews.map((review) => `${review.productId}_${review.orderId}`)
+    );
   }
 
   _isOrderCancelable(status) {

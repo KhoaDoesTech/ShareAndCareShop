@@ -1,5 +1,6 @@
 const AuthService = require('../services/auth.service');
 const TokenService = require('../services/token.service');
+const { pickFields } = require('../utils/helpers');
 const {
   ActionSuccess,
   CreateSuccess,
@@ -76,6 +77,10 @@ class AuthController {
   panelLogin = async (req, res, next) => {
     new ActionSuccess({
       message: 'Access to admin panel granted',
+      metadata: pickFields({
+        fields: ['id', 'avatar', 'name', 'email', 'phone'],
+        object: req.user,
+      }),
     }).send(res);
   };
 
