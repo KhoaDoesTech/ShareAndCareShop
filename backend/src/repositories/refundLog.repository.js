@@ -23,6 +23,12 @@ class RefundLogRepository extends BaseRepository {
     return {
       id: doc._id,
       orderId: doc.rfl_order_id?._id || doc.rfl_order_id,
+      order: doc.rfl_order_id
+        ? {
+            id: doc.rfl_order_id._id,
+            status: doc.rfl_order_id.ord_status,
+          }
+        : null,
       paymentTransactionId:
         doc.rfl_payment_transaction_id?._id || doc.rfl_payment_transaction_id,
       amount: doc.rfl_amount,
@@ -34,12 +40,17 @@ class RefundLogRepository extends BaseRepository {
         productId: doc.rfl_item.prd_id?._id || doc.rfl_item.prd_id,
         productName: doc.rfl_item.prd_id?.prd_name || '',
         variantId: doc.rfl_item.var_id?._id || doc.rfl_item.var_id,
-        variantName: doc.rfl_item.var_id?.var_name || '',
+        variantName: doc.rfl_item.var_id?.var_slug || '',
+        image:
+          doc.rfl_item.var_id?.var_image ||
+          doc.rfl_item.prd_id?.prd_main_image ||
+          '',
         quantity: doc.rfl_item.prd_quantity,
       },
       adminId: doc.rfl_admin_id?._id || doc.rfl_admin_id,
       admin: doc.rfl_admin_id
         ? {
+            id: doc.rfl_admin_id._id,
             name: doc.rfl_admin_id.usr_name,
             email: doc.rfl_admin_id.usr_email,
           }

@@ -36,6 +36,13 @@ router.post(
 );
 
 router.post(
+  '/cod/:orderId/manual',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_ORDER.PAYMENT.CONFIRM),
+  asyncHandler(PaymentController.processManualPayment)
+);
+
+router.post(
   '/manual/:paymentTransactionId/refund',
   authentication,
   verifyPermission(CONFIG_PERMISSIONS.MANAGE_ORDER.PAYMENT.REFUND),

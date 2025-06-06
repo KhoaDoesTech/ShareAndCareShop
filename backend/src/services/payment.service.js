@@ -450,7 +450,6 @@ class PaymentService {
       convertToObjectIdMongodb(paymentTransactionId)
     );
 
-    console.log(transaction);
     if (!transaction) {
       throw new NotFoundError('Payment transaction not found');
     }
@@ -490,8 +489,7 @@ class PaymentService {
     // Update RefundLogs for product returns (if provided)
     if (refundIds && refundIds.length > 0) {
       for (const refundId of refundIds) {
-        console.log(refundId);
-        await this.refundLogRepository.updateById(refundId, {
+        await this.refundLogRepository.updateById(refundId.id, {
           rfl_status: RefundStatus.COMPLETED,
           rfl_manual_required: false,
           rfl_completed_at: new Date(),
@@ -501,7 +499,7 @@ class PaymentService {
 
     // Update order payment refundStatus
     await this.orderRepository.updateById(order.id, {
-      payment_status: PaymentStatus.REFUNDED,
+      ord_payment_status: PaymentStatus.REFUNDED,
     });
 
     return {
@@ -537,6 +535,8 @@ class PaymentService {
         ],
       });
 
+      console.log(refundLogs);
+
       return {
         transactionId: transaction.id,
         orderId: transaction.orderId,
@@ -547,8 +547,6 @@ class PaymentService {
         bankDetails: transaction.bankDetails,
         admin: transaction.admin,
         completedAt: transaction.completedAt,
-        createdAt: transaction.createdAt,
-        updatedAt: transaction.updatedAt,
         refundLogs: refundLogs.map((log) => ({
           id: log.id,
           status: log.status,
@@ -556,11 +554,12 @@ class PaymentService {
           description: log.description,
           amount: log.amount,
           item: {
-            productId: log.item.prd_id,
-            productName: log.item.prd_id?.prd_name || '',
-            variantId: log.item.var_id,
-            variantName: log.item.var_id?.var_name || '',
-            quantity: log.item.prd_quantity,
+            productId: log.item.productId,
+            productName: log.item.productName,
+            variantId: log.item.variantId,
+            variantName: log.item.variantName,
+            image: log.item.image,
+            quantity: log.item.quantity,
           },
         })),
       };
@@ -745,7 +744,7 @@ class PaymentService {
     return transaction;
   }
 
-  async confirmCODPayment({ orderId, adminId, cashReceived = false }) {
+  async confirmCODPayment({ orderId, adminId }) {
     const order = await this.orderRepository.getById(orderId);
     if (!order) {
       throw new NotFoundError(`Order ${orderId} not found`);
@@ -753,13 +752,10 @@ class PaymentService {
     if (order.paymentMethod !== PaymentMethod.COD) {
       throw new BadRequestError('Order is not a COD order');
     }
-    if (order.status !== OrderStatus.DELIVERED) {
+    if (order.status !== OrderStatus.SHIPPED) {
       throw new BadRequestError(
         'Order must be delivered to confirm COD payment'
       );
-    }
-    if (!cashReceived) {
-      throw new BadRequestError('Shipper must confirm cash received');
     }
 
     const transaction = await this.paymentTransactionRepository.getByQuery({
@@ -775,15 +771,16 @@ class PaymentService {
       );
     }
 
-    await this.orderRepository.updateById(orderId, {
-      ord_payment_status: PaymentStatus.COMPLETED,
-      ord_is_paid: true,
-    });
-
     await this.paymentTransactionRepository.updateById(transaction.id, {
       pmt_status: PaymentStatus.COMPLETED,
       pmt_completed_at: new Date(),
       pmt_admin_id: adminId,
+    });
+
+    await this.orderRepository.updateById(orderId, {
+      ord_payment_status: PaymentStatus.COMPLETED,
+      ord_is_paid: true,
+      ord_paid_at: new Date(),
     });
 
     return transaction;
@@ -797,25 +794,35 @@ class PaymentService {
     accountHolder,
     transferImage,
   }) {
-    const order = await this._validateOrder(orderId, PaymentMethod.MANUAL);
-    const transactionId = `MANUAL_${orderId}_${Date.now()}`;
-
-    const transaction = await this.paymentTransactionRepository.create({
+    await this._validateOrder(orderId, PaymentMethod.COD);
+    const transaction = await this.paymentTransactionRepository.getByQuery({
       pmt_order_id: orderId,
-      pmt_transaction_id: transactionId,
       pmt_type: TransactionType.PAYMENT,
-      pmt_method: PaymentMethod.MANUAL,
-      pmt_amount: order.totalPrice,
+      pmt_method: PaymentMethod.COD,
+      pmt_status: PaymentStatus.PENDING,
+    });
+
+    if (!transaction) {
+      throw new NotFoundError(
+        `No pending COD transaction found for order ${orderId}`
+      );
+    }
+
+    await this.paymentTransactionRepository.updateById(transaction.id, {
       pmt_status: PaymentStatus.COMPLETED,
       pmt_admin_id: adminId,
       pmt_completed_at: new Date(),
-      pmt_bank_name: bankName || '',
-      pmt_account_number: accountNumber || '',
-      pmt_account_holder: accountHolder || '',
-      pmt_bank_transfer_image: transferImage || '',
+      pmt_bank_name: bankName,
+      pmt_account_number: accountNumber,
+      pmt_account_holder: accountHolder,
+      pmt_bank_transfer_image: transferImage,
     });
 
-    await this._markOrderAsPaid(orderId, transactionId);
+    await this.orderRepository.updateById(orderId, {
+      ord_is_paid: true,
+      ord_paid_at: new Date(),
+      ord_payment_status: PaymentStatus.COMPLETED,
+    });
 
     return transaction;
   }
@@ -915,20 +922,6 @@ class PaymentService {
     }
     if (!order.isPaid) {
       throw new BadRequestError('Order not paid');
-    }
-    return order;
-  }
-
-  async _validateRefundOrder(orderId) {
-    const order = await this.orderRepository.getById(orderId);
-    if (!order) {
-      throw new NotFoundError(`Không tìm thấy đơn hàng ${orderId}`);
-    }
-    if (!order.isPaid) {
-      throw new BadRequestError('Đơn hàng chưa được thanh toán');
-    }
-    if (order.status !== OrderStatus.RETURNED) {
-      throw new BadRequestError('Đơn hàng chưa được trả hàng');
     }
     return order;
   }

@@ -40,7 +40,7 @@ class OrderController {
       message: 'Order updated successfully',
       metadata: await this.orderService.updateOrderStatus({
         orderId: req.params.orderId,
-        shipperConfirmation: req.query.shipperConfirmation,
+        adminId: req.user.id,
       }),
     }).send(res);
   };

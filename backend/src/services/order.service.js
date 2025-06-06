@@ -7,6 +7,7 @@ const {
   ProductStatus,
   SortFieldOrder,
   PaymentSessionStatus,
+  RefundStatus,
 } = require('../constants/status');
 const {
   BadRequestError,
@@ -211,7 +212,6 @@ class OrderService {
     await this._updateStock(itemsDetails);
 
     let paymentUrl = null;
-    let transaction = null;
 
     if (paymentMethod === PaymentMethod.VNPAY) {
       paymentUrl = await this.paymentService.createVNPayPaymentUrl({
@@ -224,9 +224,9 @@ class OrderService {
         ipAddress,
       });
     } else if (paymentMethod === PaymentMethod.COD) {
-      transaction = await this.paymentService.processCODPayment({
+      await this.paymentService.processCODPayment({
         orderId: newOrder.id,
-        adminId: null, // System-initiated
+        adminId: null,
       });
     }
 
@@ -322,7 +322,7 @@ class OrderService {
     };
   }
 
-  async updateOrderStatus({ orderId, shipperConfirmation = false }) {
+  async updateOrderStatus({ orderId, adminId }) {
     const order = await this.orderRepository.getById(orderId);
     if (!order) {
       throw new NotFoundError(`Order ${orderId} not found`);
@@ -333,19 +333,17 @@ class OrderService {
       throw new BadRequestError(`No valid next status for ${order.status}`);
     }
 
-    if (order.paymentMethod !== PaymentMethod.COD && !order.isPaid) {
-      throw new BadRequestError('Payment must be completed before proceeding');
-    }
-
-    if (nextStatus === OrderStatus.DELIVERED && !shipperConfirmation) {
-      throw new BadRequestError(
-        'Shipper confirmation required for DELIVERED status'
-      );
-    }
-
     const updates = {
       ord_status: nextStatus,
     };
+
+    if (
+      nextStatus === OrderStatus.DELIVERED &&
+      !order.isPaid &&
+      order.paymentMethod === PaymentMethod.COD
+    ) {
+      this.paymentService.confirmCODPayment({ orderId, adminId });
+    }
 
     if (nextStatus === OrderStatus.DELIVERED) {
       updates.ord_is_delivered = true;
@@ -399,10 +397,29 @@ class OrderService {
 
     const reviewedProductIds = await this._getReviewedProductIds(userId);
 
+    // Lấy refund logs cho tất cả items trong orders
+    const refundLogs = await this.refundLogRepository.getAll({
+      filter: {
+        rfl_order_id: { $in: order.id },
+      },
+    });
+
+    // Tạo map để tra cứu refund log theo productId và variantId
+    const refundLogMap = new Map();
+
+    refundLogs.forEach((log) => {
+      const key = `${log.orderId}_${log.item.productId}_${
+        log.item.variantId || 'no-variant'
+      }`;
+
+      refundLogMap.set(key, log);
+    });
+
     return {
       order: {
         id: order.id,
         status: order.status,
+        paymentStatus: order.paymentStatus,
         paymentMethod: order.paymentMethod,
         canCancel: this._isOrderCancelable(order.status),
         pricing: {
@@ -427,31 +444,59 @@ class OrderService {
           object: order.shippingAddress,
           fields: ['fullname', 'phone', 'city', 'district', 'ward', 'street'],
         }),
-        items: order.items.map((item) => ({
-          ...pickFields({
-            object: item,
-            fields: [
-              'productId',
-              'variantId',
-              'productName',
-              'variantSlug',
-              'image',
-              'price',
-              'quantity',
-              'productDiscount',
-              'couponDiscount',
-              'returnDays',
-              'isReviewed',
-              'total',
-            ],
-          }),
-          canReturn:
-            order.status === OrderStatus.DELIVERED &&
-            this._isItemReturnable(order.deliveredAt, item.returnDays),
-          canReview:
-            order.status === OrderStatus.DELIVERED &&
-            !reviewedProductIds.has(item.productId.toString()),
-        })),
+        items: order.items.map((item) => {
+          const refundKey = `${order.id}_${item.productId}_${
+            item.variantId || 'no-variant'
+          }`;
+          const hasActiveRefund = refundLogMap.has(refundKey);
+          const refundLog = refundLogMap.get(refundKey);
+          const canReturn = !!(
+            this._isItemReturnable(order.deliveredAt, item.returnDays) &&
+            !hasActiveRefund &&
+            order.deliveredAt
+          );
+          const canReview = !!(
+            order.deliveredAt &&
+            !reviewedProductIds.has(item.productId.toString())
+          );
+
+          return {
+            ...pickFields({
+              object: item,
+              fields: [
+                'productId',
+                'variantId',
+                'productName',
+                'variantSlug',
+                'image',
+                'price',
+                'quantity',
+                'productDiscount',
+                'couponDiscount',
+                'returnDays',
+                'isReviewed',
+                'total',
+              ],
+            }),
+            canReturn,
+            canReview,
+            returnStatus: refundLog
+              ? omitFields({
+                  fields: [
+                    'orderId',
+                    'order',
+                    'paymentMethod',
+                    'item',
+                    'adminId',
+                    'admin',
+                    'createdAt',
+                    'updatedAt',
+                  ],
+                  object: refundLog,
+                })
+              : null,
+          };
+        }),
       },
       paymentUrl,
     };
@@ -546,6 +591,25 @@ class OrderService {
     const total = await this.orderRepository.countDocuments(filter);
     const reviewedProductIds = await this._getReviewedProductIds(userId);
 
+    // Lấy refund logs cho tất cả items trong orders
+    const orderIds = orders.map((order) => order.id);
+    const refundLogs = await this.refundLogRepository.getAll({
+      filter: {
+        rfl_order_id: { $in: orderIds },
+      },
+    });
+
+    // Tạo map để tra cứu refund log theo productId và variantId
+    const refundLogMap = new Map();
+    console.log(refundLogs);
+    refundLogs.forEach((log) => {
+      const key = `${log.orderId}_${log.item.productId}_${
+        log.item.variantId || 'no-variant'
+      }`;
+      console.log(key);
+      refundLogMap.set(key, log);
+    });
+
     return listResponse({
       items: orders.map((order) => ({
         id: order.id,
@@ -556,22 +620,51 @@ class OrderService {
         deliveredAt: order.deliveredAt,
         returnAt: order.returnApprovedAt,
         createAt: order.createdAt,
-        items: order.items.map((item) => ({
-          productId: item.productId,
-          variantId: item.variantId,
-          productName: item.productName,
-          variantSlug: item.variantSlug,
-          image: item.image,
-          price: item.price,
-          quantity: item.quantity,
-          isReviewed: item.isReviewed,
-          canReturn:
-            order.status === OrderStatus.DELIVERED &&
-            this._isItemReturnable(order.deliveredAt, item.returnDays),
-          canReview:
-            order.status === OrderStatus.DELIVERED &&
-            !reviewedProductIds.has(item.productId.toString()),
-        })),
+        items: order.items.map((item) => {
+          const refundKey = `${order.id}_${item.productId}_${
+            item.variantId || 'no-variant'
+          }`;
+          const hasActiveRefund = refundLogMap.has(refundKey);
+          const refundLog = refundLogMap.get(refundKey);
+          console.log(refundLog);
+          const canReturn = !!(
+            this._isItemReturnable(order.deliveredAt, item.returnDays) &&
+            !hasActiveRefund &&
+            order.deliveredAt
+          );
+          const canReview = !!(
+            order.deliveredAt &&
+            !reviewedProductIds.has(item.productId.toString())
+          );
+          return {
+            productId: item.productId,
+            variantId: item.variantId,
+            productName: item.productName,
+            variantSlug: item.variantSlug,
+            image: item.image,
+            price: item.price,
+            quantity: item.quantity,
+            isReviewed: item.isReviewed,
+            canReturn,
+            canReview,
+            returnStatus: refundLog
+              ? omitFields({
+                  fields: [
+                    'orderId',
+                    'order',
+                    // 'amount',
+                    'paymentMethod',
+                    'item',
+                    'adminId',
+                    'admin',
+                    'createdAt',
+                    'updatedAt',
+                  ],
+                  object: refundLog,
+                })
+              : null,
+          };
+        }),
       })),
       total,
       page,

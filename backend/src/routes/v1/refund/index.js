@@ -35,23 +35,17 @@ router.get(
   verifyPermission(CONFIG_PERMISSIONS.MANAGE_ORDER.REFUND.VIEW),
   asyncHandler(refundController.getRefundRequestsForAdmin)
 );
-router.get(
-  '/manual-required',
+router.patch(
+  '/confirm',
   authentication,
-  verifyPermission(CONFIG_PERMISSIONS.MANAGE_ORDER.REFUND.VIEW),
-  asyncHandler(refundController.getManualRequiredRefunds)
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_ORDER.REFUND.APPROVE),
+  asyncHandler(refundController.confirmReturnReceived)
 );
 router.patch(
   '/:refundLogId/approve',
   authentication,
   verifyPermission(CONFIG_PERMISSIONS.MANAGE_ORDER.REFUND.APPROVE),
   asyncHandler(refundController.approveRefundRequest)
-);
-router.patch(
-  '/:refundLogId/confirm',
-  authentication,
-  verifyPermission(CONFIG_PERMISSIONS.MANAGE_ORDER.REFUND.APPROVE),
-  asyncHandler(refundController.confirmReturnReceived)
 );
 router.patch(
   '/:refundLogId/reject',

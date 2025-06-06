@@ -67,8 +67,7 @@ const OrderStatus = {
   DELIVERED: 'DELIVERED', // Đã giao
   CANCELLED: 'CANCELLED', // Đã hủy
   NOT_DELIVERED: 'NOT_DELIVERED', // Không giao được
-  RETURN_REQUESTED: 'RETURN_REQUESTED', // Yêu cầu trả hàng
-  RETURNED: 'RETURNED', // Đã trả hàng
+  RETURN: 'RETURN', // Bao gồm mọi bước liên quan return
 };
 const AvailableOrderStatus = Object.values(OrderStatus);
 

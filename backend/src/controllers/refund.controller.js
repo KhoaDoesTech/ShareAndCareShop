@@ -47,6 +47,19 @@ class RefundController {
     }).send(res);
   };
 
+  confirmReturnReceived = async (req, res, next) => {
+    const ipAddress =
+      req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    new ActionSuccess({
+      message: 'Refund confirmed successfully',
+      metadata: await this.refundService.confirmReturnReceived({
+        adminId: req.user.id,
+        ipAddress,
+        ...req.body,
+      }),
+    }).send(res);
+  };
+
   getRefundDetails = async (req, res, next) => {
     new ActionSuccess({
       message: 'Refund status retrieved successfully',
@@ -61,7 +74,6 @@ class RefundController {
       message: 'Refund requests retrieved successfully',
       metadata: await this.refundService.getRefundRequestsForAdmin({
         ...req.query,
-        orderId: req.query.orderId,
       }),
     }).send(res);
   };

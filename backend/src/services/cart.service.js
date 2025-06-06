@@ -13,27 +13,26 @@ class CartService {
 
     if (!foundCart) throw new BadRequestError('Cart not found');
 
-    const relatedItems = foundCart.items.filter(
-      (item) => item.productId?.toString() === productId?.toString()
-    );
+    const itemIndex = foundCart.items.findIndex((item) => {
+      const isSameProduct =
+        item.productId?.toString() === productId?.toString();
+      const isSameVariant =
+        (!item.variantId && !variantId) ||
+        item.variantId?.toString() === variantId?.toString();
 
-    const newVariantIndex = relatedItems.findIndex(
-      (item) => item.variantId?.toString() === variantId?.toString()
-    );
+      return isSameProduct && isSameVariant;
+    });
 
     if (quantity === 0) {
-      if (newVariantIndex > -1) {
-        const itemIndex = foundCart.items.indexOf(
-          relatedItems[newVariantIndex]
-        );
-        if (itemIndex > -1) foundCart.items.splice(itemIndex, 1);
+      if (itemIndex > -1) {
+        foundCart.items.splice(itemIndex, 1);
       }
-    } else if (newVariantIndex > -1) {
-      foundCart.items[newVariantIndex].quantity = quantity;
+    } else if (itemIndex > -1) {
+      foundCart.items[itemIndex].quantity = quantity;
     } else {
       foundCart.items.push({
         productId,
-        variantId,
+        variantId: variantId || null,
         quantity,
       });
     }
