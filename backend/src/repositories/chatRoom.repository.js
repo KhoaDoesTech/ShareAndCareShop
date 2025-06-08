@@ -13,10 +13,10 @@ class ChatRoomRepository extends BaseRepository {
     if (!room) return null;
     return {
       id: room._id,
-      deviceToken: room.room_device_token,
-      userId: room.room_user_id,
-      createdAt: room.created_at,
-      updatedAt: room.updated_at,
+      room_device_token: room.room_device_token,
+      room_user_id: room.room_user_id,
+      created_at: room.created_at,
+      updated_at: room.updated_at,
     };
   }
 }

@@ -326,7 +326,7 @@ class RefundService {
   }) {
     // Process refund
     let refundResult;
-    if (paymentMethod === PaymentMethod.COD) {
+    if (isCashRefund || paymentMethod === PaymentMethod.COD) {
       refundResult = await this.paymentService.processCODRefund({
         orderId,
         totalRefundAmount,
@@ -363,7 +363,7 @@ class RefundService {
       }
     } else if (refundResult.status === 'COMPLETED') {
       for (const refundLogId of refundLogIds) {
-        await this.refundLogRepository.updateById(
+        const updatedRefund = await this.refundLogRepository.updateById(
           convertToObjectIdMongodb(refundLogId),
           {
             rfl_status: RefundStatus.COMPLETED,
@@ -371,13 +371,12 @@ class RefundService {
             rfl_completed_at: new Date(),
           }
         );
-      }
-      // Update product and variant stats
-      for (const refundLog of refundLogIds) {
+
+        // Update product and variant stats
         await this._updateProductAndVariantOnRefund({
-          productId: refundLog.item.productId,
-          variantId: refundLog.item.variantId,
-          quantity: refundLog.item.quantity,
+          productId: updatedRefund.item.productId,
+          variantId: updatedRefund.item.variantId,
+          quantity: updatedRefund.item.quantity,
         });
       }
     } else {

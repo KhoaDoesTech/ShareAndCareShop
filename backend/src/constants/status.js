@@ -62,11 +62,11 @@ const OrderStatus = {
   PENDING: 'PENDING', // Đơn hàng mới tạo (COD hoặc chưa thanh toán)
   AWAITING_PAYMENT: 'AWAITING_PAYMENT', // Chờ thanh toán (VNPay/MoMo)
   PROCESSING: 'PROCESSING', // Đang xử lý
-  AWAITING_SHIPMENT: 'AWAITING_SHIPMENT', // Chờ vận chuyển
-  SHIPPED: 'SHIPPED', // Đã vận chuyển
+  READY_TO_SHIP: 'READY_TO_SHIP', // Đơn sẵn sàng giao
+  IN_TRANSIT: 'IN_TRANSIT', // Đơn đang trên đường giao hàng
   DELIVERED: 'DELIVERED', // Đã giao
   CANCELLED: 'CANCELLED', // Đã hủy
-  NOT_DELIVERED: 'NOT_DELIVERED', // Không giao được
+  DELIVERY_FAILED: 'DELIVERY_FAILED', // Không giao được
   RETURN: 'RETURN', // Bao gồm mọi bước liên quan return
 };
 const AvailableOrderStatus = Object.values(OrderStatus);

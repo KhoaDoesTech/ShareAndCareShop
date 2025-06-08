@@ -26,14 +26,21 @@ const { Server } = require('socket.io');
 const rateLimit = require('express-rate-limit');
 const compressionOptions = require('./configs/compression.config');
 const helmetOptions = require('./configs/helmet.config');
+const ChatSocketHandler = require('./sockets/chatSocket');
+const ChatService = require('./services/chat.service');
+const WHITELIST_DOMAINS = require('./constants/whiteList');
+
 class App {
   constructor() {
     this.app = express();
     this.httpServer = createServer(this.app);
     this.port = process.env.PORT || 3000;
+    this.io = null;
+    this.chatService = new ChatService();
+    this.chatSocketHandler = null;
 
-    this.initSocket();
     this.initConfig();
+    this.initSocket();
     this.initMiddlewares();
     this.initRoutes();
     this.initErrorHandling();
@@ -43,6 +50,39 @@ class App {
   initConfig() {
     const database = new Database();
     database.connect();
+  }
+
+  initSocket() {
+    this.io = new Server(this.httpServer, {
+      pingTimeout: 60000,
+      pingInterval: 25000,
+      cors: {
+        origin: WHITELIST_DOMAINS,
+        methods: ['GET', 'POST'],
+        credentials: true,
+      },
+      connectionStateRecovery: {
+        maxDisconnectionDuration: 2 * 60 * 1000, // 2 minutes
+        skipMiddlewares: true,
+      },
+    });
+
+    this.chatSocketHandler = new ChatSocketHandler(this.io, this.chatService);
+    this.chatSocketHandler.initialize();
+
+    this.app.set('io', this.io);
+    this.app.set('chatSocketHandler', this.chatSocketHandler);
+
+    this.io.use((socket, next) => {
+      logger.info(`Socket attempting to connect: ${socket.id}`);
+      next();
+    });
+
+    this.io.engine.on('connection_error', (err) => {
+      logger.error('Socket connection error:', err);
+    });
+
+    logger.info('Socket.IO chat system initialized'.green.bold);
   }
 
   initMiddlewares() {
@@ -65,7 +105,7 @@ class App {
         store: MongoStore.create({
           mongoUrl: process.env.DB_URL,
           collectionName: 'sessions',
-          ttl: 14 * 24 * 60 * 60, // session sống 14 ngày
+          ttl: 14 * 24 * 60 * 60, // 14 days
         }),
       })
     );
@@ -74,6 +114,7 @@ class App {
   }
 
   initRoutes() {
+    this.app.use('/chat', express.static('public/chat'));
     this.app.use('/', require('./routes/v1'));
 
     this.app.all(
@@ -82,15 +123,6 @@ class App {
         throw new NotFoundError('The requested resource was not found');
       })
     );
-  }
-
-  initSocket() {
-    const io = new Server(this.httpServer, {
-      pingTimeout: 60000,
-      cors: corsOptions,
-    });
-
-    this.app.set('io', io);
   }
 
   initErrorHandling() {
@@ -102,7 +134,6 @@ class App {
       JobManager.addJob(cleanTemporaryImages);
       logger.info('cleanTemporaryImages job added');
     }
-
     JobManager.startAll();
   }
 
@@ -113,14 +144,37 @@ class App {
   startServer() {
     const server = this.httpServer.listen(this.port, () => {
       logger.info(`⚙️  Server is running on port: ${this.port}`.yellow.bold);
+      logger.info(
+        `💬 Chat system available at: http://localhost:${this.port}/chat`.cyan
+          .bold
+      );
+      logger.info(
+        `📊 Chat status API: http://localhost:${this.port}/api/v1/chats/status`
+          .cyan.bold
+      );
     });
 
     process.on('SIGINT', () => {
+      logger.info('Shutting down gracefully...'.yellow);
       this.stopCronJobs();
       server.close(() => {
         logger.info('Process terminated'.red.bold);
+        process.exit(0);
       });
     });
+
+    process.on('SIGTERM', () => {
+      logger.info('SIGTERM received, shutting down gracefully...'.yellow);
+      this.stopCronJobs();
+      server.close(() => {
+        logger.info('Process terminated'.red.bold);
+        process.exit(0);
+      });
+    });
+  }
+
+  getChatHandler() {
+    return this.chatSocketHandler;
   }
 }
 

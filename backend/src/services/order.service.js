@@ -913,9 +913,9 @@ class OrderService {
     const NEXT_STATUS = {
       [OrderStatus.AWAITING_PAYMENT]: OrderStatus.PROCESSING,
       [OrderStatus.PENDING]: OrderStatus.PROCESSING,
-      [OrderStatus.PROCESSING]: OrderStatus.AWAITING_SHIPMENT,
-      [OrderStatus.AWAITING_SHIPMENT]: OrderStatus.SHIPPED,
-      [OrderStatus.SHIPPED]: OrderStatus.DELIVERED,
+      [OrderStatus.PROCESSING]: OrderStatus.READY_TO_SHIP,
+      [OrderStatus.READY_TO_SHIP]: OrderStatus.IN_TRANSIT,
+      [OrderStatus.IN_TRANSIT]: OrderStatus.DELIVERED,
       [OrderStatus.DELIVERED]: null,
     };
     return NEXT_STATUS[orderStatus] || null;

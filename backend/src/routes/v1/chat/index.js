@@ -1,22 +1,51 @@
-// src/routes/v1/chat.routes.js
-'use strict';
-
 const express = require('express');
 const router = express.Router();
-const asyncHandler = require('../../../middlewares/async.middleware');
-const { authentication } = require('../../../middlewares/auth.middleware');
-const ChatController = require('../../../controllers/chat.controller');
-const upload = require('../../../middlewares/multer.middleware');
+const chatController = require('../../../controllers/chat.controller');
 
-// Gửi message, có thể kèm useAI=true để gọi ChatGPT
-router.post('/message', asyncHandler(ChatController.postMessage));
+router.post('/message', chatController.postMessage.bind(chatController));
 
-// Lấy toàn bộ conversation
 router.get(
   '/conversation/:conversationId',
-  asyncHandler(ChatController.getConversation)
+  chatController.getConversation.bind(chatController)
 );
 
-router.get('/me', asyncHandler(ChatController.getConversationBySender));
+router.get(
+  '/conversations',
+  chatController.getConversationsBySender.bind(chatController)
+);
+
+router.post('/merge', chatController.mergeAnonymousChat.bind(chatController));
+
+router.post(
+  '/link-device',
+  chatController.linkDeviceToUser.bind(chatController)
+);
+
+router.post(
+  '/mark-seen',
+  chatController.markMessagesAsSeen.bind(chatController)
+);
+
+router.delete(
+  '/conversation/:conversationId',
+  chatController.deleteConversation.bind(chatController)
+);
+
+router.get(
+  '/unseen-count',
+  chatController.getUnseenMessageCount.bind(chatController)
+);
+
+router.post(
+  '/take-over',
+  chatController.takeOverConversation.bind(chatController)
+);
+
+router.post(
+  '/release',
+  chatController.releaseConversation.bind(chatController)
+);
+
+router.get('/status', chatController.getStatus.bind(chatController));
 
 module.exports = router;

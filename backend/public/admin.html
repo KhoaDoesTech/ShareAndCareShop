@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ShareAndCare Admin Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
+    <style>
+      .chat-container {
+        height: 60vh;
+        overflow-y: auto;
+        scroll-behavior: smooth;
+      }
+      .message-bubble {
+        max-width: 75%;
+        word-wrap: break-word;
+      }
+      .user-message {
+        background-color: #3b82f6;
+        color: white;
+      }
+      .ai-message {
+        background-color: #e5e7eb;
+        color: black;
+      }
+      .admin-message {
+        background-color: #10b981;
+        color: white;
+      }
+      .system-message {
+        background-color: #f3f4f6;
+        color: #6b7280;
+        font-style: italic;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+    <div class="w-full max-w-3xl bg-white rounded-lg shadow-lg p-6">
+      <header class="text-center mb-6">
+        <h1 class="text-2xl font-bold text-gray-800">
+          ShareAndCare Admin Dashboard
+        </h1>
+        <p id="adminStatus" class="text-sm text-gray-600 mt-2">
+          Admin: Not logged in
+        </p>
+      </header>
+
+      <section class="mb-6">
+        <div class="text-lg font-semibold mb-2">Pending Requests</div>
+        <div id="requestList" class="bg-gray-50 p-4 rounded-lg">
+          <p class="text-gray-500">No pending requests</p>
+        </div>
+      </section>
+
+      <section class="chat-container" id="chatContainer" hidden>
+        <div class="p-8 text-center text-gray-500">
+          Select a conversation to start chatting
+        </div>
+      </section>
+
+      <section id="messageSection" class="mt-4 hidden">
+        <div class="flex gap-4">
+          <input
+            type="text"
+            id="messageInput"
+            class="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Type your message..."
+          />
+          <button
+            id="sendBtn"
+            class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition"
+          >
+            Send
+          </button>
+        </div>
+      </section>
+
+      <section class="mt-4">
+        <button
+          id="releaseBtn"
+          class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition hidden"
+        >
+          Release Chat to AI
+        </button>
+      </section>
+
+      <footer class="mt-6 text-sm text-gray-600">
+        <span id="connectionStatus">Connected</span>
+      </footer>
+    </div>
+
+    <script>
+      const socket = io('http://localhost:3000', {
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1000,
+      });
+
+      const chatContainer = document.getElementById('chatContainer');
+      const messageInput = document.getElementById('messageInput');
+      const sendBtn = document.getElementById('sendBtn');
+      const releaseBtn = document.getElementById('releaseBtn');
+      const requestList = document.getElementById('requestList');
+      const adminStatus = document.getElementById('adminStatus');
+      const messageSection = document.getElementById('messageSection');
+      const connectionStatus = document.getElementById('connectionStatus');
+
+      let adminId =
+        localStorage.getItem('adminId') ||
+        prompt('Enter admin ID (for demo, any string works):');
+      if (adminId) {
+        localStorage.setItem('adminId', adminId);
+        adminStatus.textContent = `Admin: ${adminId}`;
+      }
+      let currentRoomId = null;
+
+      function scrollToBottom() {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+      }
+
+      function renderMessage(message, type) {
+        const div = document.createElement('div');
+        div.className = `message p-3 rounded-lg mb-2 message-bubble ${
+          type === 'user'
+            ? 'user-message ml-auto'
+            : type === 'ai'
+            ? 'ai-message'
+            : type === 'admin'
+            ? 'admin-message'
+            : 'system-message'
+        }`;
+        const content =
+          message.msg_content || (message.msg_image ? '' : 'No content');
+        div.innerHTML = `
+        <p class="font-bold">${
+          message.msg_sender || (type === 'ai' ? 'Assistant' : 'System')
+        }</p>
+        <p>${content}</p>
+        ${
+          message.msg_image
+            ? `<img src="${message.msg_image}" class="mt-2 max-w-full h-auto rounded" />`
+            : ''
+        }
+      `;
+        chatContainer.appendChild(div);
+        scrollToBottom();
+      }
+
+      function renderRequest(request) {
+        const div = document.createElement('div');
+        div.className = 'p-2 flex justify-between items-center';
+        div.innerHTML = `
+        <span>User: ${request.userId || 'Anonymous'} (Room: ${
+          request.roomId
+        })</span>
+        <button data-room-id="${
+          request.roomId
+        }" class="takeover-btn bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600">
+          Take Over
+        </button>
+      `;
+        requestList.appendChild(div);
+
+        div
+          .querySelector('.takeover-btn')
+          .addEventListener('click', async () => {
+            try {
+              const response = await fetch(
+                'http://localhost:3000/api/v1/chats/take-over',
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  credentials: 'include',
+                  body: JSON.stringify({
+                    conversationId: request.roomId,
+                    adminId,
+                  }),
+                }
+              );
+
+              const data = await response.json();
+              if (response.ok) {
+                currentRoomId = request.roomId; // Cập nhật currentRoomId
+                chatContainer.innerHTML = '';
+                data.messages?.forEach((msg) =>
+                  renderMessage(
+                    msg,
+                    msg.msg_sender_type?.toLowerCase() || 'unknown'
+                  )
+                );
+                messageSection.classList.remove('hidden');
+                releaseBtn.classList.remove('hidden');
+                requestList.innerHTML =
+                  '<p class="text-gray-500">No pending requests</p>';
+                chatContainer.classList.remove('hidden');
+
+                // Gửi join_admin với roomId
+                socket.emit('join_admin', { adminId, roomId: currentRoomId });
+              } else {
+                throw new Error(
+                  data.message || `HTTP ${response.status}: Failed to take over`
+                );
+              }
+            } catch (error) {
+              console.error('Takeover error:', error);
+              alert(
+                `Error: ${
+                  error.message ||
+                  'Failed to take over conversation. Please try again.'
+                }`
+              );
+            }
+          });
+      }
+
+      socket.on('connect', () => {
+        connectionStatus.textContent = 'Connected';
+        socket.emit('join_admin', { adminId }); // Kết nối ban đầu không cần roomId
+      });
+
+      socket.on('disconnect', () => {
+        connectionStatus.textContent = 'Disconnected';
+      });
+
+      socket.on('admin_alert', (data) => {
+        requestList.innerHTML = '';
+        renderRequest(data);
+      });
+
+      socket.on('joined', (data) => {
+        if (data.conversation) {
+          chatContainer.innerHTML = '';
+          data.conversation.forEach((msg) => {
+            renderMessage(msg, msg.msg_sender_type?.toLowerCase() || 'unknown');
+          });
+        }
+        chatContainer.classList.remove('hidden');
+      });
+
+      socket.on('new_message', (data) => {
+        if (data.messages) {
+          data.messages.forEach((msg) => renderMessage(msg, data.type));
+        } else {
+          renderMessage(data.message, data.type);
+        }
+      });
+
+      socket.on('error', (data) => {
+        alert(`Error: ${data.message}`);
+      });
+
+      sendBtn.addEventListener('click', () => {
+        const content = messageInput.value.trim();
+        if (!content || !currentRoomId) {
+          alert('Please select a conversation and enter a message.');
+          return;
+        }
+        socket.emit('send_message', {
+          content,
+          roomId: currentRoomId,
+          adminId,
+          senderType: 'admin',
+        });
+        messageInput.value = '';
+      });
+
+      messageInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendBtn.click();
+      });
+
+      releaseBtn.addEventListener('click', async () => {
+        try {
+          const response = await fetch(
+            'http://localhost:3000/api/v1/chats/release',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              credentials: 'include',
+              body: JSON.stringify({ conversationId: currentRoomId, adminId }),
+            }
+          );
+          const data = await response.json();
+          if (response.ok) {
+            chatContainer.innerHTML =
+              '<div class="p-8 text-center text-gray-500">Select a conversation to start chatting</div>';
+            messageSection.classList.add('hidden');
+            releaseBtn.classList.add('hidden');
+            currentRoomId = null;
+            chatContainer.classList.add('hidden');
+            alert('Chat released to AI');
+          } else {
+            throw new Error(
+              data.message || `HTTP ${response.status}: Failed to release`
+            );
+          }
+        } catch (error) {
+          console.error('Release error:', error);
+          alert(
+            `Error: ${
+              error.message ||
+              'Failed to release conversation. Please try again.'
+            }`
+          );
+        }
+      });
+
+      scrollToBottom();
+    </script>
+  </body>
+</html>

@@ -393,7 +393,6 @@ class PaymentService {
       await this.paymentTransactionRepository.getByQuery({
         pmt_order_id: convertToObjectIdMongodb(orderId),
         pmt_type: TransactionType.PAYMENT,
-        pmt_method: PaymentMethod.COD,
         pmt_status: PaymentStatus.COMPLETED,
       });
 
@@ -752,7 +751,7 @@ class PaymentService {
     if (order.paymentMethod !== PaymentMethod.COD) {
       throw new BadRequestError('Order is not a COD order');
     }
-    if (order.status !== OrderStatus.SHIPPED) {
+    if (order.status !== OrderStatus.IN_TRANSIT) {
       throw new BadRequestError(
         'Order must be delivered to confirm COD payment'
       );

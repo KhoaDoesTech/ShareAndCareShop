@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ShareAndCare Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
+    <style>
+      .chat-container {
+        height: 70vh;
+        overflow-y: auto;
+        scroll-behavior: smooth;
+      }
+      .message-bubble {
+        max-width: 75%;
+        word-wrap: break-word;
+      }
+      .user-message {
+        background-color: #3b82f6;
+        color: white;
+      }
+      .ai-message {
+        background-color: #e5e7eb;
+        color: black;
+      }
+      .admin-message {
+        background-color: #10b981;
+        color: white;
+      }
+      .system-message {
+        background-color: #f3f4f6;
+        color: #6b7280;
+        font-style: italic;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+    <div class="w-full max-w-2xl bg-white rounded-lg shadow-lg p-6">
+      <header class="text-center mb-6">
+        <h1 class="text-2xl font-bold text-gray-800">ShareAndCare Assistant</h1>
+        <p id="userStatus" class="text-sm text-gray-500 mt-2">Anonymous</p>
+        <p id="chatStatus" class="text-sm text-gray-500 mt-1">
+          Chatting with AI
+        </p>
+      </header>
+
+      <section class="mb-6">
+        <div class="flex justify-center gap-4">
+          <button
+            id="loginBtn"
+            class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition"
+          >
+            Login
+          </button>
+          <button
+            id="requestAdminBtn"
+            class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition"
+          >
+            Chat với Admin
+          </button>
+        </div>
+        <p class="text-sm text-gray-600 text-center mt-2">
+          Login to sync your chat history across devices
+        </p>
+      </section>
+
+      <section class="chat-container" id="chatContainer">
+        <!-- Tin nhắn sẽ được render động -->
+      </section>
+
+      <section class="mb-4">
+        <div class="flex items-center text-sm text-gray-500">
+          <span id="typingIndicator" class="hidden"></span>
+          <div id="typingDots" class="flex space-x-2 ml-2 hidden">
+            <div
+              class="w-2 h-2 bg-gray-500 rounded-full animate-bounce"
+              style="animation-delay: 0s"
+            ></div>
+            <div
+              class="w-2 h-2 bg-gray-500 rounded-full animate-bounce"
+              style="animation-delay: 0.2s"
+            ></div>
+            <div
+              class="w-2 h-2 bg-gray-500 rounded-full animate-bounce"
+              style="animation-delay: 0.4s"
+            ></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="flex gap-4">
+        <input
+          type="text"
+          id="messageInput"
+          class="flex-1 p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Type your message..."
+        />
+        <button
+          id="sendBtn"
+          class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition"
+        >
+          Gửi
+        </button>
+      </section>
+
+      <section class="mt-4">
+        <button
+          id="aiSimulationBtn"
+          class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600 transition"
+        >
+          🤖 AI Simulation
+        </button>
+      </section>
+
+      <footer class="mt-6 text-sm text-gray-500 flex justify-between">
+        <div>
+          <span id="connectionStatus">Connected</span>
+        </div>
+        <div>
+          <span id="unseenCount">No new messages</span>
+        </div>
+      </footer>
+    </div>
+
+    <script>
+      const socket = io('http://localhost:3000', {
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+      });
+
+      const chatContainer = document.getElementById('chatContainer');
+      const messageInput = document.getElementById('messageInput');
+      const sendBtn = document.getElementById('sendBtn');
+      const loginBtn = document.getElementById('loginBtn');
+      const aiSimulationBtn = document.getElementById('aiSimulationBtn');
+      const requestAdminBtn = document.getElementById('requestAdminBtn');
+      const userStatus = document.getElementById('userStatus');
+      const chatStatus = document.getElementById('chatStatus');
+      const typingIndicator = document.getElementById('typingIndicator');
+      const typingDots = document.getElementById('typingDots');
+      const connectionStatus = document.getElementById('connectionStatus');
+      const unseenCount = document.getElementById('unseenCount');
+
+      let deviceToken =
+        localStorage.getItem('deviceToken') ||
+        'demo_' + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('deviceToken', deviceToken);
+      let userId = null;
+      let roomId = null;
+      let isAdminMode = false;
+
+      function scrollToBottom() {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+      }
+
+      function renderMessage(message, type) {
+        const div = document.createElement('div');
+        div.className = `message p-3 rounded-lg mb-2 message-bubble ${
+          type === 'user'
+            ? 'user-message ml-auto'
+            : type === 'ai'
+            ? 'ai-message'
+            : type === 'admin'
+            ? 'admin-message'
+            : 'system-message'
+        }`;
+        const content =
+          message.msg_content || (message.msg_image ? '' : 'No content');
+        div.innerHTML = `
+        <p class="font-bold">${
+          message.msg_sender ||
+          (type === 'ai' ? 'ShareAndCare Assistant' : 'System')
+        }</p>
+        <p>${content}</p>
+        ${
+          message.msg_image
+            ? `<img src="${message.msg_image}" class="mt-2 max-w-full h-auto rounded" />`
+            : ''
+        }
+      `;
+        chatContainer.appendChild(div);
+        scrollToBottom();
+      }
+
+      socket.on('connect', () => {
+        connectionStatus.textContent = 'Connected';
+        socket.emit('join', { deviceToken, userId });
+      });
+
+      socket.on('disconnect', () => {
+        connectionStatus.textContent = 'Disconnected';
+      });
+
+      socket.on('joined', (data) => {
+        userStatus.textContent =
+          data.userType === 'authenticated' ? `User: ${userId}` : 'Anonymous';
+        roomId = data.roomId;
+        chatContainer.innerHTML = '';
+        if (data.conversation.length === 0) {
+          // Hiển thị placeholder nếu không có tin nhắn
+          const placeholder = document.createElement('div');
+          placeholder.className = 'p-8 text-center text-gray-500';
+          placeholder.textContent =
+            'Bắt đầu trò chuyện với ShareAndCare Assistant!';
+          chatContainer.appendChild(placeholder);
+        } else {
+          data.conversation.forEach((msg) => {
+            renderMessage(msg, msg.msg_sender_type?.toLowerCase() || 'user');
+          });
+        }
+      });
+
+      socket.on('new_message', (data) => {
+        // Xóa placeholder nếu có
+        const placeholder = chatContainer.querySelector('.p-8');
+        if (placeholder) placeholder.remove();
+
+        if (data.messages) {
+          data.messages.forEach((msg) => renderMessage(msg, data.type));
+        } else {
+          renderMessage(data.message, data.type);
+        }
+      });
+
+      socket.on('messages_marked_seen', (data) => {
+        console.log('Messages marked as seen:', data);
+      });
+
+      socket.on('unseen_count', (data) => {
+        unseenCount.textContent =
+          data.unseenCount > 0
+            ? `${data.unseenCount} new messages`
+            : 'No new messages';
+      });
+
+      socket.on('user_typing', (data) => {
+        typingIndicator.classList.toggle('hidden', !data.isTyping);
+        typingDots.classList.toggle('hidden', !data.isTyping);
+        typingIndicator.textContent = data.isTyping
+          ? data.userId.startsWith('admin_')
+            ? 'Admin đang trả lời'
+            : 'AI đang trả lời'
+          : '';
+      });
+
+      socket.on('login_success', (data) => {
+        userStatus.textContent = `User: ${userId}`;
+        chatContainer.innerHTML = '';
+        data.conversations.forEach((conv) => {
+          conv.messages.forEach((msg) =>
+            renderMessage(msg, msg.msg_sender_type?.toLowerCase() || 'user')
+          );
+        });
+      });
+
+      socket.on('admin_request_response', (data) => {
+        renderMessage(
+          { msg_sender: 'System', msg_content: data.message },
+          'system'
+        );
+        requestAdminBtn.disabled = data.success;
+        requestAdminBtn.textContent = data.success
+          ? 'Đang chờ Admin...'
+          : 'Chat với Admin';
+        chatStatus.textContent = data.success
+          ? 'Waiting for Admin'
+          : 'Chatting with AI';
+        isAdminMode = data.success;
+      });
+
+      socket.on('error', (data) => {
+        renderMessage(
+          { msg_sender: 'System', msg_content: data.message },
+          'system'
+        );
+      });
+
+      socket.on('ai_simulation_started', (data) => {
+        aiSimulationBtn.disabled = true;
+        aiSimulationBtn.textContent = 'AI Simulation Running...';
+      });
+
+      socket.on('ai_simulation_completed', () => {
+        aiSimulationBtn.disabled = false;
+        aiSimulationBtn.textContent = '🤖 AI Simulation';
+      });
+
+      sendBtn.addEventListener('click', () => {
+        const content = messageInput.value.trim();
+        if (!content) return;
+        socket.emit('send_message', { content, useAI: !isAdminMode });
+        messageInput.value = '';
+      });
+
+      messageInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendBtn.click();
+      });
+
+      messageInput.addEventListener('input', () => {
+        socket.emit('typing_start', { roomId });
+        clearTimeout(window.typingTimeout);
+        window.typingTimeout = setTimeout(
+          () => socket.emit('typing_stop', { roomId }),
+          1000
+        );
+      });
+
+      loginBtn.addEventListener('click', () => {
+        userId = prompt('Enter your user ID (for demo, any string works):');
+        if (userId) {
+          socket.emit('user_login', { userId, deviceToken });
+        }
+      });
+
+      requestAdminBtn.addEventListener('click', () => {
+        if (!roomId) {
+          alert('Please join a chat room first!');
+          return;
+        }
+        socket.emit('request_admin', { roomId, deviceToken, userId });
+      });
+
+      aiSimulationBtn.addEventListener('click', () => {
+        socket.emit('start_ai_simulation', {
+          prompt: 'Start a product discussion',
+          turns: 3,
+        });
+      });
+
+      scrollToBottom();
+    </script>
+  </body>
+</html>

@@ -14,7 +14,7 @@ const chatMessageSchema = new Schema(
       required: true,
     },
     msg_sender: { type: String },
-    msg_role: { type: String, enum: AvailableChatRoles, required: true },
+    msg_role: { type: String, required: true },
     msg_content: { type: String },
     msg_image: { type: String },
     msg_seen: { type: Boolean, default: false },
