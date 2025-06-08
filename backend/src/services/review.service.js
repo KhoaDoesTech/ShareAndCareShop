@@ -155,16 +155,16 @@ class ReviewService {
       filter.rvw_star = parseInt(rating);
     }
 
-    if (typeof hasImage !== 'undefined' && hasImage !== null) {
-      if (hasImage === true || hasImage === 'true') {
-        filter.rvw_images = { $exists: true, $ne: [], $not: { $size: 0 } };
-      } else if (hasImage === false || hasImage === 'false') {
-        filter.$or = [
-          { rvw_images: { $exists: false } },
-          { rvw_images: { $size: 0 } },
-          { rvw_images: [] },
-        ];
-      }
+    const hasImageBool = hasImage === true || hasImage === 'true';
+    const hasImageFalse = hasImage === false || hasImage === 'false';
+
+    if (hasImageBool) {
+      filter.rvw_images = { $exists: true, $ne: [], $not: { $size: 0 } };
+    } else if (hasImageFalse) {
+      filter.$or = [
+        { rvw_images: { $exists: false } },
+        { rvw_images: { $size: 0 } },
+      ];
     }
 
     const mappedSort = sort

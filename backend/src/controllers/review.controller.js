@@ -50,7 +50,7 @@ class ReviewController {
         page,
         size,
         rating: rating ? parseInt(rating) : undefined,
-        hasImage: hasImage === 'true',
+        hasImage,
       }),
     }).send(res);
   };
