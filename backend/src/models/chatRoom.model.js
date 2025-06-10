@@ -9,6 +9,8 @@ const chatRoomSchema = new Schema(
   {
     room_device_token: { type: String },
     room_user_id: { type: Schema.Types.ObjectId, ref: 'User' },
+    room_supporters: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    room_admin_support_requested: { type: Boolean, default: false },
   },
   {
     timestamps: true,

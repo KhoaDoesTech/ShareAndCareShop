@@ -1,170 +1,81 @@
+'use strict';
+
 const ChatService = require('../services/chat.service');
-const logger = require('../helpers/logger.helper');
+const { ActionSuccess, CreateSuccess } = require('../utils/successResponse');
 
 class ChatController {
   constructor() {
     this.chatService = new ChatService();
   }
 
-  async postMessage(req, res, next) {
-    try {
-      const { deviceToken, userId, adminId, role, content, imageUrls, useAI } =
-        req.body;
-      const result = await this.chatService.postMessage({
-        deviceToken,
-        userId,
-        adminId,
-        role,
-        content,
-        imageUrls,
-        useAI,
-        senderType: adminId ? 'admin' : 'user',
-      });
-      res.json(result);
-    } catch (error) {
-      logger.error('Post message error:', error);
-      next(error);
-    }
-  }
+  postMessageByUser = async (req, res, next) => {
+    new CreateSuccess({
+      message: 'Message posted successfully',
+      metadata: await this.chatService.postMessageByUser({
+        ...req.body,
+        user: req.user,
+        conversationId: req.params.conversationId,
+      }),
+    }).send(res);
+  };
 
-  async getConversation(req, res, next) {
-    try {
-      const { conversationId } = req.params;
-      const result = await this.chatService.getConversation(conversationId);
-      res.json(result);
-    } catch (error) {
-      logger.error('Get conversation error:', error);
-      next(error);
-    }
-  }
+  postMessageByAnonymous = async (req, res, next) => {
+    new CreateSuccess({
+      message: 'Message posted successfully',
+      metadata: await this.chatService.postMessageByAnonymous(req.body),
+    }).send(res);
+  };
 
-  async getConversationsBySender(req, res, next) {
-    try {
-      const { deviceToken, userId } = req.query;
-      const result = await this.chatService.getConversationBySender({
-        deviceToken,
-        userId,
-      });
-      res.json(result);
-    } catch (error) {
-      logger.error('Get conversations by sender error:', error);
-      next(error);
-    }
-  }
+  getAllConversationsByUser = async (req, res, next) => {
+    new ActionSuccess({
+      message: 'Conversation retrieved successfully',
+      metadata: await this.chatService.getAllConversationsByUser({
+        userId: req.user.id,
+        ...req.query,
+      }),
+    }).send(res);
+  };
 
-  async mergeAnonymousChat(req, res, next) {
-    try {
-      const { deviceToken, userId } = req.body;
-      const result = await this.chatService.mergeAnonymousChatToUser({
-        deviceToken,
-        userId,
-      });
-      res.json(result);
-    } catch (error) {
-      logger.error('Merge anonymous chat error:', error);
-      next(error);
-    }
-  }
+  getAllConversationsByAdmin = async (req, res, next) => {
+    new ActionSuccess({
+      message: 'Conversation retrieved successfully',
+      metadata: await this.chatService.getAllConversationsByAdmin({
+        userId: req.user.id,
+        ...req.query,
+      }),
+    }).send(res);
+  };
 
-  async linkDeviceToUser(req, res, next) {
-    try {
-      const { deviceToken, userId } = req.body;
-      const result = await this.chatService.mergeAnonymousChatToUser({
-        deviceToken,
-        userId,
-      });
-      res.json(result);
-    } catch (error) {
-      logger.error('Link device to user error:', error);
-      next(error);
-    }
-  }
+  getMessageByConversationId = async (req, res, next) => {
+    new ActionSuccess({
+      message: 'Messages retrieved successfully',
+      metadata: await this.chatService.getMessageByConversationId({
+        conversationId: req.params.conversationId,
+        userId: req.user.id,
+        ...req.query,
+      }),
+    }).send(res);
+  };
 
-  async markMessagesAsSeen(req, res, next) {
-    try {
-      const { conversationId, userId, deviceToken } = req.body;
-      const result = await this.chatService.markMessagesAsSeen({
-        conversationId,
-        userId,
-        deviceToken,
-      });
-      res.json(result);
-    } catch (error) {
-      logger.error('Mark messages as seen error:', error);
-      next(error);
-    }
-  }
+  mergeAnonymousChatToUser = async (req, res, next) => {
+    new ActionSuccess({
+      message: 'Anonymous chat merged successfully',
+      metadata: await this.chatService.mergeAnonymousChatToUser({
+        user: req.user,
+        deviceToken: req.body.deviceToken,
+      }),
+    }).send(res);
+  };
 
-  async deleteConversation(req, res, next) {
-    try {
-      const { conversationId } = req.params;
-      const { userId, deviceToken } = req.body;
-      const result = await this.chatService.deleteConversation({
-        conversationId,
-        userId,
-        deviceToken,
-      });
-      res.json(result);
-    } catch (error) {
-      logger.error('Delete conversation error:', error);
-      next(error);
-    }
-  }
-
-  async getUnseenMessageCount(req, res, next) {
-    try {
-      const { userId, deviceToken } = req.query;
-      const result = await this.chatService.getUnseenMessageCount({
-        userId,
-        deviceToken,
-      });
-      res.json(result);
-    } catch (error) {
-      logger.error('Get unseen message count error:', error);
-      next(error);
-    }
-  }
-
-  async takeOverConversation(req, res, next) {
-    try {
-      const { conversationId, adminId } = req.body;
-      const result = await this.chatService.takeOverConversation({
-        conversationId,
-        adminId,
-      });
-      res.json(result);
-    } catch (error) {
-      logger.error('Take over conversation error:', error);
-      next(error);
-    }
-  }
-
-  async releaseConversation(req, res, next) {
-    try {
-      const { conversationId, adminId } = req.body;
-      const result = await this.chatService.releaseConversation({
-        conversationId,
-        adminId,
-      });
-      res.json(result);
-    } catch (error) {
-      logger.error('Release conversation error:', error);
-      next(error);
-    }
-  }
-
-  async getStatus(req, res) {
-    const chatSocketHandler = req.app.get('chatSocketHandler');
-    const stats = chatSocketHandler
-      ? chatSocketHandler.getConnectedUsersCount()
-      : { authenticated: 0, anonymous: 0, admins: 0, total: 0 };
-
-    res.json({
-      status: 'online',
-      connectedUsers: stats,
-      timestamp: new Date(),
-    });
-  }
+  markMessageAsSeen = async (req, res, next) => {
+    new ActionSuccess({
+      message: 'Messages seen status updated successfully',
+      metadata: await this.chatService.markMessageAsSeen({
+        conversationId: req.params.conversationId,
+        userId: req.user.id,
+      }),
+    }).send(res);
+  };
 }
 
 module.exports = new ChatController();

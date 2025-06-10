@@ -8,6 +8,10 @@ const corsOptions = {
       return callback(null, true);
     }
 
+    if (SERVER_CONFIG.env === 'development') {
+      return callback(null, true);
+    }
+
     if (!origin) {
       return callback(null, true);
     }

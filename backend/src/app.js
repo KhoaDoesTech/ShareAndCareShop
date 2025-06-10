@@ -57,7 +57,7 @@ class App {
       pingTimeout: 60000,
       pingInterval: 25000,
       cors: {
-        origin: WHITELIST_DOMAINS,
+        origin: '*',
         methods: ['GET', 'POST'],
         credentials: true,
       },

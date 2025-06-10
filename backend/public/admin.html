@@ -5,311 +5,260 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ShareAndCare Admin Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
-    <style>
-      .chat-container {
-        height: 60vh;
-        overflow-y: auto;
-        scroll-behavior: smooth;
-      }
-      .message-bubble {
-        max-width: 75%;
-        word-wrap: break-word;
-      }
-      .user-message {
-        background-color: #3b82f6;
-        color: white;
-      }
-      .ai-message {
-        background-color: #e5e7eb;
-        color: black;
-      }
-      .admin-message {
-        background-color: #10b981;
-        color: white;
-      }
-      .system-message {
-        background-color: #f3f4f6;
-        color: #6b7280;
-        font-style: italic;
-      }
-    </style>
+    <script src="/socket.io/socket.io.js"></script>
   </head>
-  <body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
-    <div class="w-full max-w-3xl bg-white rounded-lg shadow-lg p-6">
-      <header class="text-center mb-6">
-        <h1 class="text-2xl font-bold text-gray-800">
-          ShareAndCare Admin Dashboard
-        </h1>
-        <p id="adminStatus" class="text-sm text-gray-600 mt-2">
-          Admin: Not logged in
-        </p>
-      </header>
+  <body class="bg-gray-100 h-screen flex flex-col">
+    <div class="bg-blue-600 text-white p-4">
+      <h1 class="text-2xl font-bold">ShareAndCare Admin Dashboard</h1>
+      <div class="mt-2">
+        <span id="adminStatus">Admin: Not logged in</span>
+      </div>
+    </div>
 
-      <section class="mb-6">
-        <div class="text-lg font-semibold mb-2">Pending Requests</div>
-        <div id="requestList" class="bg-gray-50 p-4 rounded-lg">
-          <p class="text-gray-500">No pending requests</p>
+    <div class="flex-1 overflow-auto p-4">
+      <div class="max-w-2xl mx-auto">
+        <div id="conversationList" class="bg-white rounded-lg shadow p-4 mb-4">
+          <p class="text-gray-500">No active conversations</p>
         </div>
-      </section>
 
-      <section class="chat-container" id="chatContainer" hidden>
-        <div class="p-8 text-center text-gray-500">
-          Select a conversation to start chatting
+        <div
+          id="chatHistory"
+          class="bg-white rounded-lg shadow p-4 mb-4 hidden"
+        >
+          <p class="text-gray-500">No chat history available</p>
         </div>
-      </section>
 
-      <section id="messageSection" class="mt-4 hidden">
-        <div class="flex gap-4">
+        <div class="flex space-x-2">
           <input
-            type="text"
             id="messageInput"
-            class="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Type your message..."
+            type="text"
+            class="flex-1 border rounded px-3 py-2 hidden"
+            placeholder="Type a message..."
           />
           <button
             id="sendBtn"
-            class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition"
+            class="bg-blue-500 text-white px-4 py-2 rounded hidden"
           >
             Send
           </button>
+          <button
+            id="releaseBtn"
+            class="bg-red-500 text-white px-4 py-2 rounded hidden"
+          >
+            Release Chat to AI
+          </button>
+          <button
+            id="transferBtn"
+            class="bg-yellow-500 text-white px-4 py-2 rounded hidden"
+          >
+            Transfer Conversation
+          </button>
         </div>
-      </section>
+      </div>
+    </div>
 
-      <section class="mt-4">
-        <button
-          id="releaseBtn"
-          class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition hidden"
-        >
-          Release Chat to AI
-        </button>
-      </section>
-
-      <footer class="mt-6 text-sm text-gray-600">
-        <span id="connectionStatus">Connected</span>
-      </footer>
+    <div class="text-center p-2 text-gray-500">
+      <span id="connectionStatus">Connecting...</span>
+      <span id="newMessageStatus" class="ml-2">No new messages</span>
     </div>
 
     <script>
+      // Initialize Socket.IO with explicit backend URL and reconnection options
       const socket = io('http://localhost:3000', {
         reconnection: true,
         reconnectionAttempts: 10,
         reconnectionDelay: 1000,
       });
 
-      const chatContainer = document.getElementById('chatContainer');
-      const messageInput = document.getElementById('messageInput');
-      const sendBtn = document.getElementById('sendBtn');
-      const releaseBtn = document.getElementById('releaseBtn');
-      const requestList = document.getElementById('requestList');
-      const adminStatus = document.getElementById('adminStatus');
-      const messageSection = document.getElementById('messageSection');
-      const connectionStatus = document.getElementById('connectionStatus');
+      let adminId = null;
+      let currentConversationId = null;
 
-      let adminId =
-        localStorage.getItem('adminId') ||
-        prompt('Enter admin ID (for demo, any string works):');
-      if (adminId) {
-        localStorage.setItem('adminId', adminId);
-        adminStatus.textContent = `Admin: ${adminId}`;
-      }
-      let currentRoomId = null;
-
-      function scrollToBottom() {
-        chatContainer.scrollTop = chatContainer.scrollHeight;
-      }
-
-      function renderMessage(message, type) {
-        const div = document.createElement('div');
-        div.className = `message p-3 rounded-lg mb-2 message-bubble ${
-          type === 'user'
-            ? 'user-message ml-auto'
-            : type === 'ai'
-            ? 'ai-message'
-            : type === 'admin'
-            ? 'admin-message'
-            : 'system-message'
-        }`;
-        const content =
-          message.msg_content || (message.msg_image ? '' : 'No content');
-        div.innerHTML = `
-        <p class="font-bold">${
-          message.msg_sender || (type === 'ai' ? 'Assistant' : 'System')
-        }</p>
-        <p>${content}</p>
-        ${
-          message.msg_image
-            ? `<img src="${message.msg_image}" class="mt-2 max-w-full h-auto rounded" />`
-            : ''
-        }
-      `;
-        chatContainer.appendChild(div);
-        scrollToBottom();
-      }
-
-      function renderRequest(request) {
-        const div = document.createElement('div');
-        div.className = 'p-2 flex justify-between items-center';
-        div.innerHTML = `
-        <span>User: ${request.userId || 'Anonymous'} (Room: ${
-          request.roomId
-        })</span>
-        <button data-room-id="${
-          request.roomId
-        }" class="takeover-btn bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600">
-          Take Over
-        </button>
-      `;
-        requestList.appendChild(div);
-
-        div
-          .querySelector('.takeover-btn')
-          .addEventListener('click', async () => {
-            try {
-              const response = await fetch(
-                'http://localhost:3000/api/v1/chats/take-over',
-                {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  credentials: 'include',
-                  body: JSON.stringify({
-                    conversationId: request.roomId,
-                    adminId,
-                  }),
-                }
-              );
-
-              const data = await response.json();
-              if (response.ok) {
-                currentRoomId = request.roomId; // Cập nhật currentRoomId
-                chatContainer.innerHTML = '';
-                data.messages?.forEach((msg) =>
-                  renderMessage(
-                    msg,
-                    msg.msg_sender_type?.toLowerCase() || 'unknown'
-                  )
-                );
-                messageSection.classList.remove('hidden');
-                releaseBtn.classList.remove('hidden');
-                requestList.innerHTML =
-                  '<p class="text-gray-500">No pending requests</p>';
-                chatContainer.classList.remove('hidden');
-
-                // Gửi join_admin với roomId
-                socket.emit('join_admin', { adminId, roomId: currentRoomId });
-              } else {
-                throw new Error(
-                  data.message || `HTTP ${response.status}: Failed to take over`
-                );
-              }
-            } catch (error) {
-              console.error('Takeover error:', error);
-              alert(
-                `Error: ${
-                  error.message ||
-                  'Failed to take over conversation. Please try again.'
-                }`
-              );
-            }
-          });
-      }
-
+      // Handle successful connection
       socket.on('connect', () => {
-        connectionStatus.textContent = 'Connected';
-        socket.emit('join_admin', { adminId }); // Kết nối ban đầu không cần roomId
-      });
-
-      socket.on('disconnect', () => {
-        connectionStatus.textContent = 'Disconnected';
-      });
-
-      socket.on('admin_alert', (data) => {
-        requestList.innerHTML = '';
-        renderRequest(data);
-      });
-
-      socket.on('joined', (data) => {
-        if (data.conversation) {
-          chatContainer.innerHTML = '';
-          data.conversation.forEach((msg) => {
-            renderMessage(msg, msg.msg_sender_type?.toLowerCase() || 'unknown');
-          });
-        }
-        chatContainer.classList.remove('hidden');
-      });
-
-      socket.on('new_message', (data) => {
-        if (data.messages) {
-          data.messages.forEach((msg) => renderMessage(msg, data.type));
-        } else {
-          renderMessage(data.message, data.type);
+        document.getElementById('connectionStatus').textContent = 'Connected';
+        adminId = prompt('Enter admin ID:');
+        if (adminId) {
+          socket.emit('join_admin', { adminId });
+          document.getElementById(
+            'adminStatus'
+          ).textContent = `Admin: ${adminId}`;
         }
       });
 
+      // Handle connection errors
+      socket.on('connect_error', (error) => {
+        document.getElementById(
+          'connectionStatus'
+        ).textContent = `Connection failed: ${error.message}`;
+      });
+
+      // Handle reconnection
+      socket.on('reconnect', (attempt) => {
+        document.getElementById(
+          'connectionStatus'
+        ).textContent = `Reconnected after ${attempt} attempts`;
+        if (adminId) {
+          socket.emit('join_admin', { adminId });
+        }
+      });
+
+      // Handle reconnection failure
+      socket.on('reconnect_failed', () => {
+        document.getElementById('connectionStatus').textContent =
+          'Failed to reconnect. Please refresh the page.';
+      });
+
+      // Handle server errors
       socket.on('error', (data) => {
         alert(`Error: ${data.message}`);
       });
 
-      sendBtn.addEventListener('click', () => {
+      socket.on('admin_dashboard', (data) => {
+        updateConversationList(data.assignedConversations);
+      });
+
+      socket.on('new_message', (data) => {
+        if (data.roomId === currentConversationId) {
+          updateChatHistory(data.messages || [data.message]);
+        }
+        document.getElementById('newMessageStatus').textContent =
+          'New message received';
+        socket.emit('get_conversation', { conversationId: data.roomId });
+      });
+
+      socket.on('conversation_data', (data) => {
+        if (data.conversationId === currentConversationId) {
+          updateChatHistory(data.messages);
+          socket.emit('mark_seen', { conversationId: currentConversationId });
+        }
+      });
+
+      socket.on('mode_changed', (data) => {
+        if (data.roomId === currentConversationId) {
+          updateChatMode(data.mode);
+        }
+      });
+
+      document.getElementById('sendBtn').addEventListener('click', () => {
+        const messageInput = document.getElementById('messageInput');
         const content = messageInput.value.trim();
-        if (!content || !currentRoomId) {
-          alert('Please select a conversation and enter a message.');
-          return;
-        }
-        socket.emit('send_message', {
-          content,
-          roomId: currentRoomId,
-          adminId,
-          senderType: 'admin',
-        });
-        messageInput.value = '';
-      });
-
-      messageInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') sendBtn.click();
-      });
-
-      releaseBtn.addEventListener('click', async () => {
-        try {
-          const response = await fetch(
-            'http://localhost:3000/api/v1/chats/release',
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              credentials: 'include',
-              body: JSON.stringify({ conversationId: currentRoomId, adminId }),
-            }
-          );
-          const data = await response.json();
-          if (response.ok) {
-            chatContainer.innerHTML =
-              '<div class="p-8 text-center text-gray-500">Select a conversation to start chatting</div>';
-            messageSection.classList.add('hidden');
-            releaseBtn.classList.add('hidden');
-            currentRoomId = null;
-            chatContainer.classList.add('hidden');
-            alert('Chat released to AI');
-          } else {
-            throw new Error(
-              data.message || `HTTP ${response.status}: Failed to release`
-            );
-          }
-        } catch (error) {
-          console.error('Release error:', error);
-          alert(
-            `Error: ${
-              error.message ||
-              'Failed to release conversation. Please try again.'
-            }`
-          );
+        if (content && currentConversationId) {
+          socket.emit('send_message', {
+            content,
+            roomId: currentConversationId,
+            senderType: 'admin',
+            adminId,
+          });
+          messageInput.value = '';
         }
       });
 
-      scrollToBottom();
+      document.getElementById('messageInput').addEventListener('input', () => {
+        if (currentConversationId) {
+          socket.emit('typing_start', { roomId: currentConversationId });
+          clearTimeout(window.typingTimeout);
+          window.typingTimeout = setTimeout(() => {
+            socket.emit('typing_stop', { roomId: currentConversationId });
+          }, 1000);
+        }
+      });
+
+      document.getElementById('releaseBtn').addEventListener('click', () => {
+        if (currentConversationId) {
+          socket.emit('toggle_admin_mode', {
+            roomId: currentConversationId,
+            mode: 'AI',
+          });
+        }
+      });
+
+      document.getElementById('transferBtn').addEventListener('click', () => {
+        const toAdminId = prompt('Enter target admin ID:');
+        if (toAdminId && currentConversationId) {
+          socket.emit('transfer_conversation', {
+            conversationId: currentConversationId,
+            fromAdminId: adminId,
+            toAdminId,
+          });
+        }
+      });
+
+      /**
+       * Updates the conversation list UI
+       * @param {Array} conversations - Array of conversation objects
+       */
+      function updateConversationList(conversations) {
+        const conversationList = document.getElementById('conversationList');
+        conversationList.innerHTML = conversations.length
+          ? conversations
+              .map(
+                (conv) => `
+            <div class="p-2 cursor-pointer hover:bg-gray-100" onclick="selectConversation('${conv.conversationId}')">
+              Conversation ${conv.conversationId} (${conv.unreadCount} unread)
+            </div>
+          `
+              )
+              .join('')
+          : '<p class="text-gray-500">No active conversations</p>';
+      }
+
+      /**
+       * Selects a conversation and loads its history
+       * @param {string} conversationId - The conversation ID
+       */
+      function selectConversation(conversationId) {
+        currentConversationId = conversationId;
+        socket.emit('get_conversation', { conversationId });
+        document.getElementById('chatHistory').classList.remove('hidden');
+        document.getElementById('messageInput').classList.remove('hidden');
+        document.getElementById('sendBtn').classList.remove('hidden');
+        document.getElementById('releaseBtn').classList.remove('hidden');
+        document.getElementById('transferBtn').classList.remove('hidden');
+      }
+
+      /**
+       * Updates the chat history UI
+       * @param {Array} messages - Array of message objects
+       */
+      function updateChatHistory(messages) {
+        const chatHistory = document.getElementById('chatHistory');
+        chatHistory.innerHTML = messages.length
+          ? messages
+              .map(
+                (msg) => `
+            <div class="p-2 ${
+              msg.msg_sender_type === 'user' ? 'text-right' : 'text-left'
+            }">
+              <span class="inline-block bg-${
+                msg.msg_sender_type === 'user'
+                  ? 'blue'
+                  : msg.msg_sender_type === 'AI'
+                  ? 'gray'
+                  : 'green'
+              }-100 rounded px-3 py-1">
+                ${
+                  msg.msg_content ||
+                  (msg.msg_image
+                    ? `<img src="${msg.msg_image}" class="max-w-xs">`
+                    : '')
+                }
+              </span>
+            </div>
+          `
+              )
+              .join('')
+          : '<p class="text-gray-500">No chat history available</p>';
+      }
+
+      /**
+       * Updates the chat mode UI
+       * @param {string} mode - 'AI' or 'ADMIN'
+       */
+      function updateChatMode(mode) {
+        document.getElementById(
+          'newMessageStatus'
+        ).textContent = `Chatting in ${mode} mode`;
+      }
     </script>
   </body>
 </html>

@@ -1,51 +1,51 @@
+'use strict';
+
+const {
+  authentication,
+  verifyPermission,
+} = require('../../../middlewares/auth.middleware');
+const CONFIG_PERMISSIONS = require('../../../constants/permissions');
+const ChatController = require('../../../controllers/chat.controller');
 const express = require('express');
+const asyncHandler = require('../../../middlewares/async.middleware');
+
+// Initialize the router
 const router = express.Router();
-const chatController = require('../../../controllers/chat.controller');
 
-router.post('/message', chatController.postMessage.bind(chatController));
+// Public (anonymous user)
+router.post('/', asyncHandler(ChatController.postMessageByAnonymous));
 
+// Authenticated user
+router.use(authentication);
+
+// Messages within a conversation
+router.post(
+  '/conversations/:conversationId',
+  asyncHandler(ChatController.postMessageByUser)
+);
+router.put(
+  '/conversations/:conversationId/seen',
+  asyncHandler(ChatController.markMessageAsSeen)
+);
 router.get(
-  '/conversation/:conversationId',
-  chatController.getConversation.bind(chatController)
+  '/conversations/:conversationId',
+  asyncHandler(ChatController.getMessageByConversationId)
 );
 
+// Merge anonymous chat (user claiming old anonymous chat)
+router.post('/merge', asyncHandler(ChatController.mergeAnonymousChatToUser));
+
+// User-specific conversations
+router.get(
+  '/conversations/me',
+  asyncHandler(ChatController.getAllConversationsByUser)
+);
+
+// Admin: get all conversations (requires permission)
 router.get(
   '/conversations',
-  chatController.getConversationsBySender.bind(chatController)
+  verifyPermission(CONFIG_PERMISSIONS.PAGE.PANEL),
+  asyncHandler(ChatController.getAllConversationsByAdmin)
 );
-
-router.post('/merge', chatController.mergeAnonymousChat.bind(chatController));
-
-router.post(
-  '/link-device',
-  chatController.linkDeviceToUser.bind(chatController)
-);
-
-router.post(
-  '/mark-seen',
-  chatController.markMessagesAsSeen.bind(chatController)
-);
-
-router.delete(
-  '/conversation/:conversationId',
-  chatController.deleteConversation.bind(chatController)
-);
-
-router.get(
-  '/unseen-count',
-  chatController.getUnseenMessageCount.bind(chatController)
-);
-
-router.post(
-  '/take-over',
-  chatController.takeOverConversation.bind(chatController)
-);
-
-router.post(
-  '/release',
-  chatController.releaseConversation.bind(chatController)
-);
-
-router.get('/status', chatController.getStatus.bind(chatController));
 
 module.exports = router;
