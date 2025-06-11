@@ -27,8 +27,6 @@ const rateLimit = require('express-rate-limit');
 const compressionOptions = require('./configs/compression.config');
 const helmetOptions = require('./configs/helmet.config');
 const ChatSocketHandler = require('./sockets/chatSocket');
-const ChatService = require('./services/chat.service');
-const WHITELIST_DOMAINS = require('./constants/whiteList');
 
 class App {
   constructor() {
@@ -36,7 +34,6 @@ class App {
     this.httpServer = createServer(this.app);
     this.port = process.env.PORT || 3000;
     this.io = null;
-    this.chatService = new ChatService();
     this.chatSocketHandler = null;
 
     this.initConfig();
@@ -67,12 +64,6 @@ class App {
       },
     });
 
-    this.chatSocketHandler = new ChatSocketHandler(this.io, this.chatService);
-    this.chatSocketHandler.initialize();
-
-    this.app.set('io', this.io);
-    this.app.set('chatSocketHandler', this.chatSocketHandler);
-
     this.io.use((socket, next) => {
       logger.info(`Socket attempting to connect: ${socket.id}`);
       next();
@@ -81,6 +72,9 @@ class App {
     this.io.engine.on('connection_error', (err) => {
       logger.error('Socket connection error:', err);
     });
+
+    this.chatSocketHandler = new ChatSocketHandler(this.io);
+    this.chatSocketHandler.initializeSocketIO();
 
     logger.info('Socket.IO chat system initialized'.green.bold);
   }

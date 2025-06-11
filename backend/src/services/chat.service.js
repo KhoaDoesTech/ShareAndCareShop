@@ -10,7 +10,7 @@ const { BadRequestError } = require('../utils/errorResponse');
 const ProductRepository = require('../repositories/product.repository');
 const { ProductStatus } = require('../constants/status');
 
-class EnhancedChatService {
+class ChatService {
   constructor() {
     this.roomRepository = new ChatRoomRepository();
     this.messageRepository = new ChatMessageRepository();
@@ -18,6 +18,17 @@ class EnhancedChatService {
     this.productRepository = new ProductRepository();
     this.openai = new OpenAI({ apiKey: config.openAi.API_KEY });
     this.io = null;
+  }
+
+  setSocketIO(io) {
+    this.io = io;
+  }
+
+  getSocketIO() {
+    if (!this.io) {
+      throw new Error('Socket.IO instance is not initialized');
+    }
+    return this.io;
   }
 
   async postMessageByAnonymous({
@@ -489,4 +500,4 @@ class EnhancedChatService {
   }
 }
 
-module.exports = EnhancedChatService;
+module.exports = ChatService;
