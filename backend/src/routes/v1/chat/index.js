@@ -25,10 +25,7 @@ router.get(
 );
 
 // Messages within a conversation
-router.post(
-  '/conversations/:conversationId',
-  asyncHandler(ChatController.postMessageByUser)
-);
+router.post('/conversations', asyncHandler(ChatController.postMessageByUser));
 router.put(
   '/conversations/:conversationId/seen',
   asyncHandler(ChatController.markMessageAsSeen)
