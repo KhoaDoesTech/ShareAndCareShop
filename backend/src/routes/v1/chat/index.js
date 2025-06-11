@@ -18,6 +18,12 @@ router.post('/', asyncHandler(ChatController.postMessageByAnonymous));
 // Authenticated user
 router.use(authentication);
 
+// User-specific conversations
+router.get(
+  '/conversations/me',
+  asyncHandler(ChatController.getAllConversationsByUser)
+);
+
 // Messages within a conversation
 router.post(
   '/conversations/:conversationId',
@@ -34,12 +40,6 @@ router.get(
 
 // Merge anonymous chat (user claiming old anonymous chat)
 router.post('/merge', asyncHandler(ChatController.mergeAnonymousChatToUser));
-
-// User-specific conversations
-router.get(
-  '/conversations/me',
-  asyncHandler(ChatController.getAllConversationsByUser)
-);
 
 // Admin: get all conversations (requires permission)
 router.get(
