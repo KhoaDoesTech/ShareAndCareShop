@@ -9,6 +9,7 @@ const { omitFields, listResponse } = require('../utils/helpers');
 const { BadRequestError } = require('../utils/errorResponse');
 const ProductRepository = require('../repositories/product.repository');
 const { ProductStatus } = require('../constants/status');
+const { ChatEventEnum } = require('../constants/chatEvent');
 
 class ChatService {
   constructor() {
@@ -53,8 +54,6 @@ class ChatService {
       isAdminSupport: !useAI,
     });
 
-    console.log(!useAI);
-
     const userMessage = await this._saveMessages({
       chatRoomId: chatRoom.id,
       sender: deviceToken || 'user_' + userId,
@@ -68,16 +67,34 @@ class ChatService {
       aiResponse = await this._generateEnhancedAIResponse(chatRoom.id);
     }
 
+    if (this.io) {
+      this.io.to(chatRoom.id.toString()).emit(ChatEventEnum.NEW_MESSAGE, {
+        conversationId: chatRoom.id,
+        userMessages: userMessage.map((msg) =>
+          omitFields({
+            fields: ['updatedAt', 'conversationId'],
+            object: msg,
+          })
+        ),
+        aiResponse: aiResponse
+          ? omitFields({
+              fields: ['updatedAt', 'conversationId'],
+              object: aiResponse,
+            })
+          : null,
+      });
+    }
+
     return {
       conversationId: chatRoom.id,
       userMessages: userMessage.map((msg) =>
         omitFields({
-          fields: ['createdAt', 'updatedAt', 'conversationId'],
+          fields: ['updatedAt', 'conversationId'],
           object: msg,
         })
       ),
       aiResponse: omitFields({
-        fields: ['createdAt', 'updatedAt', 'conversationId'],
+        fields: ['updatedAt', 'conversationId'],
         object: aiResponse,
       }),
     };
@@ -129,16 +146,34 @@ class ChatService {
       aiResponse = await this._generateEnhancedAIResponse(chatRoom.id);
     }
 
+    if (this.io) {
+      this.io.to(chatRoom.id.toString()).emit(ChatEventEnum.NEW_MESSAGE, {
+        conversationId: chatRoom.id,
+        userMessages: userMessage.map((msg) =>
+          omitFields({
+            fields: ['updatedAt', 'conversationId'],
+            object: msg,
+          })
+        ),
+        aiResponse: aiResponse
+          ? omitFields({
+              fields: ['updatedAt', 'conversationId'],
+              object: aiResponse,
+            })
+          : null,
+      });
+    }
+
     return {
       conversationId: chatRoom.id,
       userMessages: userMessage.map((msg) =>
         omitFields({
-          fields: ['createdAt', 'updatedAt', 'conversationId'],
+          fields: ['updatedAt', 'conversationId'],
           object: msg,
         })
       ),
       aiResponse: omitFields({
-        fields: ['createdAt', 'updatedAt', 'conversationId'],
+        fields: ['updatedAt', 'conversationId'],
         object: aiResponse,
       }),
     };
@@ -171,7 +206,7 @@ class ChatService {
         return {
           id: room.id,
           latestMessage: omitFields({
-            fields: ['createdAt', 'updatedAt', 'conversationId', 'senderType'],
+            fields: ['updatedAt', 'conversationId', 'senderType'],
             object: latestMessage,
           }),
         };
@@ -230,7 +265,7 @@ class ChatService {
         return {
           id: room.id,
           latestMessage: omitFields({
-            fields: ['createdAt', 'updatedAt', 'conversationId', 'senderType'],
+            fields: ['updatedAt', 'conversationId', 'senderType'],
             object: latestMessage,
           }),
         };
@@ -283,7 +318,7 @@ class ChatService {
     return listResponse({
       items: formattedMessages.map((msg) =>
         omitFields({
-          fields: ['createdAt', 'updatedAt', 'conversationId'],
+          fields: ['updatedAt', 'conversationId'],
           object: msg,
         })
       ),
@@ -334,6 +369,13 @@ class ChatService {
       { $set: { msg_seen: true } }
     );
 
+    if (this.io) {
+      this.io.to(conversationId.toString()).emit(ChatEventEnum.MESSAGE_SEEN, {
+        conversationId,
+        updatedMessages,
+      });
+    }
+
     return updatedMessages;
   }
 
@@ -352,7 +394,7 @@ class ChatService {
       });
     }
 
-    if (isAdminSupport && !chatRoom.room_admin_support_requested) {
+    if (isAdminSupport && !chatRoom.adminSupportRequested) {
       chatRoom = await this.roomRepository.updateById(chatRoom.id, {
         room_admin_support_requested: true,
       });
