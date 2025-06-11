@@ -41,11 +41,6 @@ class ChatSocketHandler {
           }`
         );
 
-        // Mount events
-        this.mountJoinChatEvent(socket);
-        this.mountParticipantTypingEvent(socket);
-        this.mountParticipantStoppedTypingEvent(socket);
-
         socket.on(ChatEventEnum.DISCONNECT_EVENT, () => {
           console.log(`User disconnected: ${socket.user?.id}`);
           socket.leave(socket.user.id);
