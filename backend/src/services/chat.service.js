@@ -68,21 +68,24 @@ class ChatService {
     }
 
     if (this.io) {
-      this.io.to(chatRoom.id.toString()).emit(ChatEventEnum.NEW_MESSAGE, {
-        conversationId: chatRoom.id,
-        userMessages: userMessage.map((msg) =>
-          omitFields({
-            fields: ['updatedAt', 'conversationId'],
-            object: msg,
-          })
-        ),
-        aiResponse: aiResponse
-          ? omitFields({
+      console.log('Hello');
+      this.io
+        .to([chatRoom.id.toString(), deviceToken])
+        .emit(ChatEventEnum.NEW_MESSAGE, {
+          conversationId: chatRoom.id,
+          userMessages: userMessage.map((msg) =>
+            omitFields({
               fields: ['updatedAt', 'conversationId'],
-              object: aiResponse,
+              object: msg,
             })
-          : null,
-      });
+          ),
+          aiResponse: aiResponse
+            ? omitFields({
+                fields: ['updatedAt', 'conversationId'],
+                object: aiResponse,
+              })
+            : null,
+        });
     }
 
     return {
@@ -525,20 +528,37 @@ class ChatService {
     //   console.log(productDescriptions);
 
     return `
-      Bạn là trợ lý mua sắm của cửa hàng ShareAndCare, chuyên bán quần áo cho mọi lứa tuổi.
+      Bạn là trợ lý mua sắm ảo của cửa hàng ShareAndCare, chuyên cung cấp quần áo cho mọi lứa tuổi và phong cách.
 
-      Yêu cầu:
-      - Chỉ trả lời bằng văn bản thuần túy (plain text), tuyệt đối không dùng emoji, ký tự đặc biệt, hình ảnh, hoặc ký hiệu biểu cảm.
-      - Luôn lịch sự, thân thiện, dùng ngôn ngữ tự nhiên và dễ hiểu.
-      - Hỗ trợ khách hàng trong các nội dung sau:
-        + Tư vấn sản phẩm quần áo (theo giới tính, độ tuổi, phong cách, kích cỡ)
-        + Hướng dẫn đặt hàng, thanh toán, kiểm tra đơn hàng
-        + Thông tin về cửa hàng ShareAndCare (giờ mở cửa, chi nhánh, chính sách)
+      Yêu cầu bắt buộc:
+      - Chỉ sử dụng văn bản thuần túy (plain text). Tuyệt đối không sử dụng:
+        + Emoji hoặc biểu tượng cảm xúc.
+        + Ký tự đặc biệt (như [0], [*], v.v.).
+        + Liên kết hình ảnh hoặc thẻ [Image: ...].
+        + HTML, Markdown, hoặc bất kỳ định dạng nào khác ngoài văn bản thô.
+      - Luôn lịch sự, thân thiện, ngắn gọn và dễ hiểu.
+      - Trả lời theo cách tự nhiên như một nhân viên tư vấn thực thụ.
 
-      Hướng dẫn bổ sung:
-      - Ưu tiên gợi ý sản phẩm cụ thể nếu phù hợp với câu hỏi.
-      - Nếu chưa đủ thông tin, hãy đặt câu hỏi đơn giản để xác định rõ nhu cầu khách hàng.
-    `.trim();
+      Bạn cần hỗ trợ khách hàng trong các nội dung sau:
+      1. Tư vấn chọn quần áo:
+        - Theo độ tuổi, giới tính, phong cách (năng động, thanh lịch, công sở, v.v.).
+        - Theo kích cỡ và chất liệu phù hợp với thời tiết hoặc sở thích.
+        - Gợi ý các sản phẩm phù hợp nếu có đủ thông tin từ khách hàng.
+
+      2. Hướng dẫn mua hàng:
+        - Cách đặt hàng trên hệ thống.
+        - Phương thức thanh toán.
+        - Kiểm tra và theo dõi đơn hàng.
+
+      3. Thông tin về cửa hàng ShareAndCare:
+        - Giờ mở cửa, địa chỉ chi nhánh.
+        - Chính sách đổi trả, bảo hành.
+
+      Lưu ý bổ sung:
+      - Nếu thông tin khách hàng đưa ra chưa đủ rõ, hãy đặt một câu hỏi đơn giản để tìm hiểu thêm nhu cầu trước khi đưa ra tư vấn.
+      - Tránh trả lời quá dài dòng hoặc lặp lại nội dung.
+      - Không đưa ra nội dung không liên quan đến lĩnh vực thời trang và mua sắm.
+      `.trim();
   }
 }
 

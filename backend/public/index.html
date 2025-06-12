@@ -1,245 +1,722 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ShareAndCare Assistant</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="/socket.io/socket.io.js"></script>
+    <title>ShareAndCare - Chat Support</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: 'Arial', sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .chat-container {
+        width: 400px;
+        height: 600px;
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .chat-header {
+        background: linear-gradient(45deg, #667eea, #764ba2);
+        color: white;
+        padding: 20px;
+        text-align: center;
+        position: relative;
+      }
+
+      .chat-header h2 {
+        font-size: 1.2em;
+        margin-bottom: 5px;
+      }
+
+      .chat-header .status {
+        font-size: 0.9em;
+        opacity: 0.9;
+      }
+
+      .mode-toggle {
+        position: absolute;
+        right: 15px;
+        top: 15px;
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        color: white;
+        padding: 8px 12px;
+        border-radius: 15px;
+        cursor: pointer;
+        font-size: 0.8em;
+        transition: background 0.3s;
+      }
+
+      .mode-toggle:hover {
+        background: rgba(255, 255, 255, 0.3);
+      }
+
+      .chat-messages {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+        background: #f8f9fa;
+      }
+
+      .message {
+        margin-bottom: 15px;
+        display: flex;
+        align-items: flex-start;
+      }
+
+      .message.user {
+        justify-content: flex-end;
+      }
+
+      .message-content {
+        max-width: 80%;
+        padding: 12px 16px;
+        border-radius: 18px;
+        word-wrap: break-word;
+        position: relative;
+      }
+
+      .message.user .message-content {
+        background: linear-gradient(45deg, #667eea, #764ba2);
+        color: white;
+        border-bottom-right-radius: 5px;
+      }
+
+      .message.assistant .message-content {
+        background: white;
+        color: #333;
+        border: 1px solid #e1e5e9;
+        border-bottom-left-radius: 5px;
+      }
+
+      .message.admin .message-content {
+        background: #28a745;
+        color: white;
+        border-bottom-left-radius: 5px;
+      }
+
+      .message-sender {
+        font-size: 0.7em;
+        margin-bottom: 5px;
+        opacity: 0.7;
+      }
+
+      .message-time {
+        font-size: 0.7em;
+        opacity: 0.6;
+        margin-top: 5px;
+      }
+
+      .message-image {
+        max-width: 200px;
+        border-radius: 10px;
+        margin-top: 5px;
+      }
+
+      .chat-input {
+        padding: 20px;
+        background: white;
+        border-top: 1px solid #e1e5e9;
+      }
+
+      .input-container {
+        display: flex;
+        gap: 10px;
+        align-items: flex-end;
+      }
+
+      .message-input {
+        flex: 1;
+        border: 1px solid #ddd;
+        border-radius: 20px;
+        padding: 12px 16px;
+        resize: none;
+        font-family: inherit;
+        max-height: 100px;
+        min-height: 44px;
+      }
+
+      .message-input:focus {
+        outline: none;
+        border-color: #667eea;
+      }
+
+      .send-btn {
+        background: linear-gradient(45deg, #667eea, #764ba2);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 44px;
+        height: 44px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.2s;
+      }
+
+      .send-btn:hover {
+        transform: scale(1.05);
+      }
+
+      .send-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .file-input-label {
+        background: #f8f9fa;
+        border: 1px solid #ddd;
+        border-radius: 50%;
+        width: 44px;
+        height: 44px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s;
+      }
+
+      .file-input-label:hover {
+        background: #e9ecef;
+      }
+
+      .file-input {
+        display: none;
+      }
+
+      .typing-indicator {
+        display: none;
+        padding: 10px;
+        font-style: italic;
+        color: #666;
+        font-size: 0.9em;
+      }
+
+      .connection-status {
+        padding: 10px;
+        text-align: center;
+        font-size: 0.9em;
+        background: #d4edda;
+        color: #155724;
+        border-bottom: 1px solid #c3e6cb;
+      }
+
+      .connection-status.disconnected {
+        background: #f8d7da;
+        color: #721c24;
+        border-bottom-color: #f1aeb5;
+      }
+
+      .conversations-toggle {
+        position: absolute;
+        left: 15px;
+        top: 15px;
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        color: white;
+        padding: 8px 12px;
+        border-radius: 15px;
+        cursor: pointer;
+        font-size: 0.8em;
+        transition: background 0.3s;
+      }
+
+      .conversations-toggle:hover {
+        background: rgba(255, 255, 255, 0.3);
+      }
+
+      .conversations-panel {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background: white;
+        z-index: 1000;
+        display: none;
+        flex-direction: column;
+      }
+
+      .conversations-header {
+        background: linear-gradient(45deg, #667eea, #764ba2);
+        color: white;
+        padding: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .conversations-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 10px;
+      }
+
+      .conversation-item {
+        padding: 15px;
+        border-bottom: 1px solid #eee;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+
+      .conversation-item:hover {
+        background: #f8f9fa;
+      }
+
+      .conversation-item.active {
+        background: #e3f2fd;
+      }
+
+      .conversation-preview {
+        font-size: 0.9em;
+        color: #666;
+        margin-top: 5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .message {
+        animation: fadeIn 0.3s ease-out;
+      }
+
+      .loading {
+        text-align: center;
+        padding: 20px;
+        color: #666;
+      }
+    </style>
   </head>
-  <body class="bg-gray-100 h-screen flex flex-col">
-    <div class="bg-blue-600 text-white p-4">
-      <h1 class="text-2xl font-bold">ShareAndCare Assistant</h1>
-      <div class="mt-2">
-        <span id="userStatus">Anonymous</span>
-        <span id="chatMode" class="ml-4">Chatting with AI</span>
-      </div>
-    </div>
+  <body>
+    <div class="chat-container">
+      <div class="connection-status" id="connectionStatus">Đang kết nối...</div>
 
-    <div class="flex-1 overflow-auto p-4">
-      <div class="max-w-2xl mx-auto">
-        <div id="chatHistory" class="bg-white rounded-lg shadow p-4 mb-4">
-          <p class="text-gray-500">No chat history available</p>
+      <div class="chat-header">
+        <button class="conversations-toggle" onclick="toggleConversations()">
+          📋
+        </button>
+        <div>
+          <h2>ShareAndCare Support</h2>
+          <div class="status" id="chatMode">Đang chat với AI</div>
         </div>
-
-        <div class="flex space-x-2">
-          <button
-            id="loginBtn"
-            class="bg-blue-500 text-white px-4 py-2 rounded"
-          >
-            Login
-          </button>
-          <button
-            id="toggleModeBtn"
-            class="bg-green-500 text-white px-4 py-2 rounded"
-          >
-            Chat với Admin
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <div class="bg-white p-4 border-t">
-      <div class="max-w-2xl mx-auto flex space-x-2">
-        <input
-          id="messageInput"
-          type="text"
-          class="flex-1 border rounded px-3 py-2"
-          placeholder="Bắt đầu trò chuyện với ShareAndCare Assistant!"
-        />
-        <button id="sendBtn" class="bg-blue-500 text-white px-4 py-2 rounded">
-          Gửi
+        <button class="mode-toggle" id="modeToggle" onclick="toggleChatMode()">
+          Chuyển sang Admin
         </button>
       </div>
-    </div>
 
-    <div class="text-center p-2 text-gray-500">
-      <span id="connectionStatus">Connecting...</span>
-      <span id="newMessageStatus" class="ml-2">No new messages</span>
+      <div class="chat-messages" id="chatMessages">
+        <div class="message assistant">
+          <div class="message-content">
+            <div class="message-sender">AI Assistant</div>
+            Xin chào! Tôi là trợ lý của ShareAndCare. Tôi có thể giúp bạn tư vấn
+            sản phẩm quần áo và hỗ trợ mua sắm. Bạn cần hỗ trợ gì hôm nay?
+            <div class="message-time">Vừa xong</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="typing-indicator" id="typingIndicator">
+        AI đang trả lời...
+      </div>
+
+      <div class="chat-input">
+        <div class="input-container">
+          <label for="fileInput" class="file-input-label">📎</label>
+          <input
+            type="file"
+            id="fileInput"
+            class="file-input"
+            accept="image/*"
+            multiple
+          />
+          <textarea
+            id="messageInput"
+            class="message-input"
+            placeholder="Nhập tin nhắn của bạn..."
+            rows="1"
+          ></textarea>
+          <button id="sendBtn" class="send-btn">▶️</button>
+        </div>
+      </div>
+
+      <!-- Conversations Panel -->
+      <div class="conversations-panel" id="conversationsPanel">
+        <div class="conversations-header">
+          <h3>Lịch sử chat</h3>
+          <button
+            onclick="toggleConversations()"
+            style="
+              background: none;
+              border: none;
+              color: white;
+              font-size: 1.2em;
+              cursor: pointer;
+            "
+          >
+            ✕
+          </button>
+        </div>
+        <div class="conversations-list" id="conversationsList">
+          <div class="loading">Đang tải...</div>
+        </div>
+      </div>
     </div>
 
     <script>
-      // Initialize Socket.IO with explicit backend URL and reconnection options
-      const socket = io('http://localhost:3000', {
-        reconnection: true,
-        reconnectionAttempts: 10,
-        reconnectionDelay: 1000,
-      });
+      class ChatClient {
+        constructor() {
+          this.socket = null;
+          this.currentConversationId = null;
+          this.useAI = true;
+          this.isConnected = false;
+          this.deviceToken = this.generateDeviceToken();
+          this.conversations = [];
 
-      let deviceToken =
-        localStorage.getItem('deviceToken') || generateDeviceToken();
-      localStorage.setItem('deviceToken', deviceToken);
-      let userId = null;
-      let roomId = null;
-      let currentMode = 'AI';
-
-      /**
-       * Generates a unique device token
-       * @returns {string} UUID-like device token
-       */
-      function generateDeviceToken() {
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-          const r = (Math.random() * 16) | 0;
-          return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
-        });
-      }
-
-      // Handle successful connection
-      socket.on('connect', () => {
-        document.getElementById('connectionStatus').textContent = 'Connected';
-        socket.emit('join', { deviceToken, userId });
-      });
-
-      // Handle connection errors
-      socket.on('connect_error', (error) => {
-        document.getElementById(
-          'connectionStatus'
-        ).textContent = `Connection failed: ${error.message}`;
-      });
-
-      // Handle reconnection
-      socket.on('reconnect', (attempt) => {
-        document.getElementById(
-          'connectionStatus'
-        ).textContent = `Reconnected after ${attempt} attempts`;
-        socket.emit('join', { deviceToken, userId });
-      });
-
-      // Handle reconnection failure
-      socket.on('reconnect_failed', () => {
-        document.getElementById('connectionStatus').textContent =
-          'Failed to reconnect. Please refresh the page.';
-      });
-
-      // Handle server errors
-      socket.on('error', (data) => {
-        alert(`Error: ${data.message}`);
-      });
-
-      socket.on('joined', (data) => {
-        roomId = data.roomId;
-        updateChatHistory(data.conversation);
-        updateUserStatus(data.userType);
-        updateChatMode(data.metadata.mode);
-        socket.emit('mark_seen', { conversationId: roomId });
-      });
-
-      socket.on('new_message', (data) => {
-        document.getElementById('newMessageStatus').textContent =
-          'New message received';
-        updateChatHistory(data.messages || [data.message]);
-        socket.emit('mark_seen', { conversationId: roomId });
-      });
-
-      socket.on('mode_changed', (data) => {
-        updateChatMode(data.mode);
-      });
-
-      socket.on('mode_toggled', (data) => {
-        updateChatMode(data.mode);
-      });
-
-      socket.on('unseen_count', (data) => {
-        document.getElementById(
-          'newMessageStatus'
-        ).textContent = `${data.unseenCount} unseen messages`;
-      });
-
-      socket.on('user_typing', (data) => {
-        document.getElementById('newMessageStatus').textContent = data.isTyping
-          ? 'Typing...'
-          : 'No new messages';
-      });
-
-      document.getElementById('sendBtn').addEventListener('click', () => {
-        const messageInput = document.getElementById('messageInput');
-        const content = messageInput.value.trim();
-        if (content && roomId) {
-          socket.emit('send_message', {
-            content,
-            roomId,
-            useAI: currentMode === 'AI',
-            senderType: userId ? 'user' : 'anonymous',
-          });
-          messageInput.value = '';
+          this.initElements();
+          this.initSocket();
+          this.bindEvents();
         }
-      });
 
-      document.getElementById('messageInput').addEventListener('input', () => {
-        if (roomId) {
-          socket.emit('typing_start', { roomId });
-          clearTimeout(window.typingTimeout);
-          window.typingTimeout = setTimeout(() => {
-            socket.emit('typing_stop', { roomId });
+        generateDeviceToken() {
+          return (
+            localStorage.getItem('deviceToken') ||
+            (() => {
+              const token =
+                'device_' +
+                Date.now() +
+                '_' +
+                Math.random().toString(36).substr(2, 9);
+              localStorage.setItem('deviceToken', token);
+              return token;
+            })()
+          );
+        }
+
+        initElements() {
+          this.elements = {
+            connectionStatus: document.getElementById('connectionStatus'),
+            chatMessages: document.getElementById('chatMessages'),
+            messageInput: document.getElementById('messageInput'),
+            sendBtn: document.getElementById('sendBtn'),
+            fileInput: document.getElementById('fileInput'),
+            modeToggle: document.getElementById('modeToggle'),
+            chatMode: document.getElementById('chatMode'),
+            typingIndicator: document.getElementById('typingIndicator'),
+            conversationsPanel: document.getElementById('conversationsPanel'),
+            conversationsList: document.getElementById('conversationsList'),
+          };
+        }
+
+        initSocket() {
+          this.socket = io('http://localhost:3000', {
+            auth: {
+              deviceToken: this.deviceToken,
+              role: 'user',
+            },
+          });
+
+          this.socket.on('connected', (data) => {
+            console.log('Connected:', data);
+            this.isConnected = true;
+            this.updateConnectionStatus('Đã kết nối', true);
+            this.loadConversations();
+          });
+
+          this.socket.on('new_message', (data) => {
+            console.log('New message:', data);
+            this.hideTypingIndicator();
+
+            if (data.userMessages) {
+              data.userMessages.forEach((msg) => this.displayMessage(msg));
+            }
+
+            if (data.aiResponse) {
+              this.displayMessage(data.aiResponse);
+            }
+
+            this.currentConversationId = data.conversationId;
+            this.loadConversations();
+          });
+
+          this.socket.on('refresh_conversations', (data) => {
+            console.log('Refresh conversations:', data);
+            this.loadConversations();
+          });
+
+          this.socket.on('message_seen', (data) => {
+            console.log('Message seen:', data);
+          });
+
+          this.socket.on('socket_error', (error) => {
+            console.error('Socket error:', error);
+            this.hideTypingIndicator();
+            this.displayMessage({
+              senderType: 'system',
+              content: 'Có lỗi xảy ra: ' + error.message,
+              createdAt: new Date().toISOString(),
+            });
+          });
+
+          this.socket.on('disconnect', () => {
+            console.log('Disconnected');
+            this.isConnected = false;
+            this.updateConnectionStatus('Mất kết nối', false);
+          });
+        }
+
+        bindEvents() {
+          this.elements.sendBtn.addEventListener('click', () =>
+            this.sendMessage()
+          );
+
+          this.elements.messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              this.sendMessage();
+            }
+          });
+
+          this.elements.messageInput.addEventListener('input', () => {
+            this.autoResize();
+          });
+
+          this.elements.fileInput.addEventListener('change', (e) => {
+            this.handleFileSelect(e);
+          });
+        }
+
+        autoResize() {
+          const textarea = this.elements.messageInput;
+          textarea.style.height = 'auto';
+          textarea.style.height = Math.min(textarea.scrollHeight, 100) + 'px';
+        }
+
+        async handleFileSelect(event) {
+          const files = Array.from(event.target.files);
+          if (files.length === 0) return;
+
+          // In a real implementation, you would upload these files to your server
+          // For now, we'll just show them as attachments
+          const imageUrls = [];
+
+          for (const file of files) {
+            if (file.type.startsWith('image/')) {
+              const dataUrl = await this.fileToDataUrl(file);
+              imageUrls.push(dataUrl);
+            }
+          }
+
+          if (imageUrls.length > 0) {
+            this.sendMessage('', imageUrls);
+          }
+
+          event.target.value = '';
+        }
+
+        fileToDataUrl(file) {
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.readAsDataURL(file);
+          });
+        }
+
+        sendMessage(content = null, imageUrls = []) {
+          const messageText =
+            content || this.elements.messageInput.value.trim();
+
+          if (!messageText && imageUrls.length === 0) return;
+          if (!this.isConnected) {
+            alert('Chưa kết nối đến server');
+            return;
+          }
+
+          const messageData = {
+            conversationId: this.currentConversationId,
+            content: messageText,
+            imageUrls: imageUrls,
+            useAI: this.useAI,
+          };
+
+          console.log('Sending message:', messageData);
+          this.socket.emit('send_message', messageData);
+
+          if (messageText) {
+            this.elements.messageInput.value = '';
+            this.autoResize();
+          }
+
+          if (this.useAI) {
+            this.showTypingIndicator();
+          }
+
+          this.elements.sendBtn.disabled = true;
+          setTimeout(() => {
+            this.elements.sendBtn.disabled = false;
           }, 1000);
         }
-      });
 
-      document.getElementById('toggleModeBtn').addEventListener('click', () => {
-        const newMode = currentMode === 'AI' ? 'ADMIN' : 'AI';
-        socket.emit('toggle_admin_mode', { roomId, mode: newMode });
-      });
+        displayMessage(message) {
+          const messageDiv = document.createElement('div');
+          messageDiv.className = `message ${message.senderType || 'user'}`;
 
-      document.getElementById('loginBtn').addEventListener('click', () => {
-        userId = prompt('Enter user ID:');
-        if (userId) {
-          socket.emit('user_login', { userId, deviceToken });
+          const senderName = this.getSenderName(message);
+          const time = this.formatTime(message.createdAt);
+
+          let content = '';
+          if (message.content) {
+            content += `<div>${this.escapeHtml(message.content)}</div>`;
+          }
+
+          if (message.image) {
+            content += `<img src="${message.image}" alt="Image" class="message-image">`;
+          }
+
+          messageDiv.innerHTML = `
+                    <div class="message-content">
+                        <div class="message-sender">${senderName}</div>
+                        ${content}
+                        <div class="message-time">${time}</div>
+                    </div>
+                `;
+
+          this.elements.chatMessages.appendChild(messageDiv);
+          this.scrollToBottom();
         }
+
+        getSenderName(message) {
+          switch (message.senderType) {
+            case 'assistant':
+              return 'AI Assistant';
+            case 'admin':
+              return 'Admin Support';
+            case 'user':
+              return 'Bạn';
+            default:
+              return message.sender || 'Unknown';
+          }
+        }
+
+        formatTime(dateString) {
+          const date = new Date(dateString);
+          const now = new Date();
+          const diff = now - date;
+
+          if (diff < 60000) return 'Vừa xong';
+          if (diff < 3600000) return Math.floor(diff / 60000) + ' phút trước';
+          if (diff < 86400000) return Math.floor(diff / 3600000) + ' giờ trước';
+
+          return date.toLocaleDateString('vi-VN');
+        }
+
+        escapeHtml(text) {
+          const div = document.createElement('div');
+          div.textContent = text;
+          return div.innerHTML;
+        }
+
+        showTypingIndicator() {
+          this.elements.typingIndicator.style.display = 'block';
+          this.scrollToBottom();
+        }
+
+        hideTypingIndicator() {
+          this.elements.typingIndicator.style.display = 'none';
+        }
+
+        scrollToBottom() {
+          setTimeout(() => {
+            this.elements.chatMessages.scrollTop =
+              this.elements.chatMessages.scrollHeight;
+          }, 100);
+        }
+
+        updateConnectionStatus(message, connected) {
+          this.elements.connectionStatus.textContent = message;
+          this.elements.connectionStatus.className = connected
+            ? 'connection-status'
+            : 'connection-status disconnected';
+
+          if (connected) {
+            setTimeout(() => {
+              this.elements.connectionStatus.style.display = 'none';
+            }, 2000);
+          } else {
+            this.elements.connectionStatus.style.display = 'block';
+          }
+        }
+
+        async loadConversations() {
+          // In a real implementation, you would fetch conversations from API
+          // For now, we'll show a placeholder
+          this.elements.conversationsList.innerHTML = `
+                    <div class="conversation-item active">
+                        <div><strong>Cuộc trò chuyện hiện tại</strong></div>
+                        <div class="conversation-preview">Đang chat với ${
+                          this.useAI ? 'AI' : 'Admin'
+                        }</div>
+                    </div>
+                `;
+        }
+      }
+
+      // Global functions
+      function toggleChatMode() {
+        const chatClient = window.chatClient;
+        chatClient.useAI = !chatClient.useAI;
+
+        const modeToggle = document.getElementById('modeToggle');
+        const chatMode = document.getElementById('chatMode');
+
+        if (chatClient.useAI) {
+          modeToggle.textContent = 'Chuyển sang Admin';
+          chatMode.textContent = 'Đang chat với AI';
+        } else {
+          modeToggle.textContent = 'Chuyển sang AI';
+          chatMode.textContent = 'Đang chat với Admin';
+        }
+      }
+
+      function toggleConversations() {
+        const panel = document.getElementById('conversationsPanel');
+        panel.style.display = panel.style.display === 'flex' ? 'none' : 'flex';
+      }
+
+      // Initialize chat when page loads
+      document.addEventListener('DOMContentLoaded', () => {
+        window.chatClient = new ChatClient();
       });
-
-      /**
-       * Updates the chat history UI
-       * @param {Array} messages - Array of message objects
-       */
-      function updateChatHistory(messages) {
-        const chatHistory = document.getElementById('chatHistory');
-        chatHistory.innerHTML = messages
-          .map(
-            (msg) => `
-        <div class="p-2 ${
-          msg.msg_sender_type === 'user' ? 'text-right' : 'text-left'
-        }">
-          <span class="inline-block bg-${
-            msg.msg_sender_type === 'user'
-              ? 'blue'
-              : msg.msg_sender_type === 'AI'
-              ? 'gray'
-              : 'green'
-          }-100 rounded px-3 py-1">
-            ${
-              msg.msg_content ||
-              (msg.msg_image
-                ? `<img src="${msg.msg_image}" class="max-w-xs">`
-                : '')
-            }
-          </span>
-        </div>
-      `
-          )
-          .join('');
-      }
-
-      /**
-       * Updates the user status UI
-       * @param {string} userType - 'authenticated' or 'anonymous'
-       */
-      function updateUserStatus(userType) {
-        document.getElementById('userStatus').textContent =
-          userType === 'authenticated' ? `User: ${userId}` : 'Anonymous';
-      }
-
-      /**
-       * Updates the chat mode UI
-       * @param {string} mode - 'AI' or 'ADMIN'
-       */
-      function updateChatMode(mode) {
-        currentMode = mode;
-        document.getElementById(
-          'chatMode'
-        ).textContent = `Chatting with ${mode}`;
-        document.getElementById('toggleModeBtn').textContent =
-          mode === 'AI' ? 'Chat với Admin' : 'Chat với AI';
-      }
     </script>
   </body>
 </html>

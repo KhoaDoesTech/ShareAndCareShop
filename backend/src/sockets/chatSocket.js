@@ -38,10 +38,12 @@ class ChatSocketHandler {
 
         socket.user = user;
         socket.role = role;
-        socket.join(user.id.toString());
 
         if (!isAnonymous) {
+          socket.join(user.id.toString());
           await this.joinChatRooms(socket, user, role);
+        } else {
+          socket.join(deviceToken.toString());
         }
 
         socket.emit(ChatEventEnum.CONNECTED_EVENT, {
@@ -172,21 +174,12 @@ class ChatSocketHandler {
         });
       }
 
-      if (!isAnonymous && conversationId) {
-        socket.join(conversationId.toString());
-        logger.info(
-          `User ${socket.user.id} (${socket.role}) joined room ${conversationId}`
-        );
-      }
+      socket.join(response.conversationId.toString());
+      logger.info(
+        `User ${socket.user.id} (${socket.role}) joined room ${response.conversationId}`
+      );
 
-      this.io
-        .to(socket.user.id.toString())
-        .emit(ChatEventEnum.REFRESH_CONVERSATIONS, {
-          conversationId: response.conversationId,
-          message: 'New message in your conversation',
-        });
-
-      // Nếu user yêu cầu hỗ trợ admin (useAI=false), thông báo cho admin
+      // If user requests admin support (useAI=false), notify admin room
       if (!useAI && socket.role === 'user') {
         this.io.to('admin_room').emit(ChatEventEnum.REFRESH_CONVERSATIONS, {
           conversationId: response.conversationId,
