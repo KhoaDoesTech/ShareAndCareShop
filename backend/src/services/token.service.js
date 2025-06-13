@@ -82,7 +82,13 @@ class TokenService {
 
     await this.tokenRespository.createTokens({ filter, update });
 
-    return { tokens };
+    return {
+      user: pickFields({
+        fields: ['id', 'avatar', 'email', 'name', 'phone'],
+        object: user,
+      }),
+      tokens,
+    };
   }
 
   async updateDeviceName({ user, deviceToken, deviceName }) {
