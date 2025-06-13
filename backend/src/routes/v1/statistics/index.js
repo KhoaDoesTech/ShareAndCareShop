@@ -18,4 +18,11 @@ router.get(
   asyncHandler(StatisticsController.getReportCountRecords)
 );
 
+router.get(
+  '/reviews',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.PAGE.DASHBOARD),
+  asyncHandler(StatisticsController.getReviewStats)
+);
+
 module.exports = router;
