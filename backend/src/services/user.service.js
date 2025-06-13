@@ -6,7 +6,7 @@ const {
 const RoleRepository = require('../repositories/role.repository');
 const UserRepository = require('../repositories/user.repository');
 const { BadRequestError } = require('../utils/errorResponse');
-const { pickFields } = require('../utils/helpers');
+const { pickFields, listResponse } = require('../utils/helpers');
 
 class UserService {
   constructor() {
@@ -14,7 +14,7 @@ class UserService {
     this.roleRepository = new RoleRepository();
   }
 
-  async getAllUsers({ search, status, roleId, sort, page, size }) {
+  async getAllUsers({ search, status, roleId, sort, page = 1, size = 10 }) {
     let userFilter = {};
     if (search) {
       userFilter = {
@@ -57,14 +57,19 @@ class UserService {
       populateOptions,
     });
 
-    return {
-      users: users.map((user) =>
+    const totalUsers = await this.userRepository.countDocuments(userFilter);
+
+    return listResponse({
+      items: users.map((user) =>
         pickFields({
           fields: ['id', 'name', 'email', 'status', 'role.name', 'role.id'],
           object: user,
         })
       ),
-    };
+      total: totalUsers,
+      page: page,
+      size: size,
+    });
   }
 
   async assignRoleToUser({ userId, roleId }) {
