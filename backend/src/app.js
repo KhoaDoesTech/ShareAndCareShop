@@ -27,6 +27,7 @@ const rateLimit = require('express-rate-limit');
 const compressionOptions = require('./configs/compression.config');
 const helmetOptions = require('./configs/helmet.config');
 const ChatSocketHandler = require('./sockets/chatSocket');
+const WHITELIST_DOMAINS = require('./constants/whiteList');
 
 class App {
   constructor() {
@@ -54,7 +55,7 @@ class App {
       pingTimeout: 60000,
       pingInterval: 25000,
       cors: {
-        origin: '*',
+        origin: WHITELIST_DOMAINS,
         methods: ['GET', 'POST'],
         credentials: true,
       },
