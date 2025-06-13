@@ -45,6 +45,7 @@ class AddressService {
     return response.data.predictions.map((prediction) => ({
       placeId: prediction.place_id,
       description: prediction.description,
+      street: prediction.structured_formatting.main_text,
       compound: {
         ward: prediction.compound.commune,
         district: prediction.compound.district,
@@ -202,7 +203,7 @@ class AddressService {
     });
 
     return omitFields({
-      fields: ['userId','createdAt', 'updatedAt'],
+      fields: ['userId', 'createdAt', 'updatedAt'],
       object: newAddress,
     });
   }
