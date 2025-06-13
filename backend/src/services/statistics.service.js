@@ -28,7 +28,7 @@ class StatisticsService {
   }
 
   async getReviewStats({ startDate, endDate } = {}) {
-    _validateDateRange(startDate, endDate);
+    this._validateDateRange(startDate, endDate);
 
     const reviewStats = await this.reviewRepository.getReviewStats({
       startDate,
