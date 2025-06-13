@@ -1,264 +1,912 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ShareAndCare Admin Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="/socket.io/socket.io.js"></script>
+    <title>ShareAndCare - Admin Chat</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: 'Arial', sans-serif;
+        background: #f5f7fa;
+        height: 100vh;
+        display: flex;
+      }
+
+      .sidebar {
+        width: 350px;
+        background: white;
+        border-right: 1px solid #e1e5e9;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .sidebar-header {
+        background: linear-gradient(45deg, #dc3545, #c82333);
+        color: white;
+        padding: 20px;
+        text-align: center;
+      }
+
+      .sidebar-header h2 {
+        font-size: 1.3em;
+        margin-bottom: 5px;
+      }
+
+      .tab-buttons {
+        display: flex;
+        background: #f8f9fa;
+        border-bottom: 1px solid #e1e5e9;
+      }
+
+      .tab-btn {
+        flex: 1;
+        padding: 15px;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        font-weight: 500;
+        transition: all 0.3s;
+      }
+
+      .tab-btn.active {
+        background: white;
+        color: #dc3545;
+        border-bottom: 2px solid #dc3545;
+      }
+
+      .conversations-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 10px;
+      }
+
+      .conversation-item {
+        padding: 15px;
+        border-bottom: 1px solid #eee;
+        cursor: pointer;
+        transition: background 0.2s;
+        border-radius: 8px;
+        margin-bottom: 5px;
+      }
+
+      .conversation-item:hover {
+        background: #f8f9fa;
+      }
+
+      .conversation-item.active {
+        background: #e3f2fd;
+        border-left: 4px solid #dc3545;
+      }
+
+      .conversation-item.unread {
+        background: #fff3cd;
+        border-left: 4px solid #ffc107;
+      }
+
+      .conversation-preview {
+        font-size: 0.9em;
+        color: #666;
+        margin-top: 5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .conversation-time {
+        font-size: 0.8em;
+        color: #999;
+        float: right;
+      }
+
+      .main-chat {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: white;
+      }
+
+      .chat-header {
+        background: linear-gradient(45deg, #dc3545, #c82333);
+        color: white;
+        padding: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #e1e5e9;
+      }
+
+      .chat-info h3 {
+        margin-bottom: 5px;
+      }
+
+      .chat-info .status {
+        font-size: 0.9em;
+        opacity: 0.9;
+      }
+
+      .chat-actions {
+        display: flex;
+        gap: 10px;
+      }
+
+      .action-btn {
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        color: white;
+        padding: 8px 15px;
+        border-radius: 20px;
+        cursor: pointer;
+        font-size: 0.9em;
+        transition: background 0.3s;
+      }
+
+      .action-btn:hover {
+        background: rgba(255, 255, 255, 0.3);
+      }
+
+      .chat-messages {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+        background: #f8f9fa;
+      }
+
+      .message {
+        margin-bottom: 15px;
+        display: flex;
+        align-items: flex-start;
+        animation: fadeIn 0.3s ease-out;
+      }
+
+      .message.user {
+        justify-content: flex-end;
+      }
+
+      .message.admin {
+        justify-content: flex-start;
+      }
+
+      .message-content {
+        max-width: 70%;
+        padding: 12px 16px;
+        border-radius: 18px;
+        word-wrap: break-word;
+        position: relative;
+      }
+
+      .message.user .message-content {
+        background: #007bff;
+        color: white;
+        border-bottom-right-radius: 5px;
+      }
+
+      .message.admin .message-content {
+        background: #dc3545;
+        color: white;
+        border-bottom-left-radius: 5px;
+      }
+
+      .message.assistant .message-content {
+        background: white;
+        color: #333;
+        border: 1px solid #e1e5e9;
+        border-bottom-left-radius: 5px;
+      }
+
+      .message-sender {
+        font-size: 0.8em;
+        margin-bottom: 5px;
+        opacity: 0.8;
+      }
+
+      .message-time {
+        font-size: 0.7em;
+        opacity: 0.6;
+        margin-top: 5px;
+      }
+
+      .message-image {
+        max-width: 200px;
+        border-radius: 10px;
+        margin-top: 5px;
+      }
+
+      .chat-input {
+        padding: 20px;
+        background: white;
+        border-top: 1px solid #e1e5e9;
+      }
+
+      .input-container {
+        display: flex;
+        gap: 10px;
+        align-items: flex-end;
+      }
+
+      .message-input {
+        flex: 1;
+        border: 1px solid #ddd;
+        border-radius: 20px;
+        padding: 12px 16px;
+        resize: none;
+        font-family: inherit;
+        max-height: 100px;
+        min-height: 44px;
+      }
+
+      .message-input:focus {
+        outline: none;
+        border-color: #dc3545;
+      }
+
+      .send-btn {
+        background: linear-gradient(45deg, #dc3545, #c82333);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 44px;
+        height: 44px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.2s;
+      }
+
+      .send-btn:hover {
+        transform: scale(1.05);
+      }
+
+      .send-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 50px 20px;
+        color: #666;
+      }
+
+      .empty-state h3 {
+        margin-bottom: 10px;
+        color: #333;
+      }
+
+      .connection-status {
+        padding: 10px;
+        text-align: center;
+        font-size: 0.9em;
+        background: #d4edda;
+        color: #155724;
+        border-bottom: 1px solid #c3e6cb;
+      }
+
+      .connection-status.disconnected {
+        background: #f8d7da;
+        color: #721c24;
+        border-bottom-color: #f1aeb5;
+      }
+
+      .loading {
+        text-align: center;
+        padding: 20px;
+        color: #666;
+      }
+
+      .badge {
+        background: #dc3545;
+        color: white;
+        font-size: 0.7em;
+        padding: 2px 6px;
+        border-radius: 10px;
+        margin-left: 5px;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @media (max-width: 768px) {
+        body {
+          flex-direction: column;
+        }
+
+        .sidebar {
+          width: 100%;
+          height: 50vh;
+        }
+      }
+    </style>
   </head>
-  <body class="bg-gray-100 h-screen flex flex-col">
-    <div class="bg-blue-600 text-white p-4">
-      <h1 class="text-2xl font-bold">ShareAndCare Admin Dashboard</h1>
-      <div class="mt-2">
-        <span id="adminStatus">Admin: Not logged in</span>
+  <body>
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <h2>Admin Chat Panel</h2>
+        <div class="status" id="adminStatus">ShareAndCare Support</div>
       </div>
-    </div>
 
-    <div class="flex-1 overflow-auto p-4">
-      <div class="max-w-2xl mx-auto">
-        <div id="conversationList" class="bg-white rounded-lg shadow p-4 mb-4">
-          <p class="text-gray-500">No active conversations</p>
-        </div>
-
-        <div
-          id="chatHistory"
-          class="bg-white rounded-lg shadow p-4 mb-4 hidden"
+      <div class="tab-buttons">
+        <button
+          class="tab-btn active"
+          id="pendingTab"
+          onclick="switchTab('pending')"
         >
-          <p class="text-gray-500">No chat history available</p>
-        </div>
+          Chờ hỗ trợ <span class="badge" id="pendingBadge">0</span>
+        </button>
+        <button
+          class="tab-btn"
+          id="mySupportTab"
+          onclick="switchTab('mySupport')"
+        >
+          Của tôi <span class="badge" id="mySupportBadge">0</span>
+        </button>
+      </div>
 
-        <div class="flex space-x-2">
-          <input
-            id="messageInput"
-            type="text"
-            class="flex-1 border rounded px-3 py-2 hidden"
-            placeholder="Type a message..."
-          />
-          <button
-            id="sendBtn"
-            class="bg-blue-500 text-white px-4 py-2 rounded hidden"
-          >
-            Send
-          </button>
-          <button
-            id="releaseBtn"
-            class="bg-red-500 text-white px-4 py-2 rounded hidden"
-          >
-            Release Chat to AI
-          </button>
-          <button
-            id="transferBtn"
-            class="bg-yellow-500 text-white px-4 py-2 rounded hidden"
-          >
-            Transfer Conversation
-          </button>
-        </div>
+      <div class="conversations-list" id="conversationsList">
+        <div class="loading">Đang tải cuộc hội thoại...</div>
       </div>
     </div>
 
-    <div class="text-center p-2 text-gray-500">
-      <span id="connectionStatus">Connecting...</span>
-      <span id="newMessageStatus" class="ml-2">No new messages</span>
+    <div class="main-chat">
+      <div class="connection-status" id="connectionStatus">Đang kết nối...</div>
+
+      <div class="chat-header" id="chatHeader" style="display: none">
+        <div class="chat-info">
+          <h3 id="chatTitle">Chọn cuộc hội thoại</h3>
+          <div class="status" id="chatSubtitle">
+            Chọn một cuộc hội thoại để bắt đầu
+          </div>
+        </div>
+        <div class="chat-actions">
+          <button
+            class="action-btn"
+            id="refreshBtn"
+            onclick="refreshConversations()"
+          >
+            🔄 Làm mới
+          </button>
+          <button
+            class="action-btn"
+            id="takeOverBtn"
+            onclick="takeOverConversation()"
+            style="display: none"
+          >
+            📞 Tiếp quản
+          </button>
+        </div>
+      </div>
+
+      <div class="chat-messages" id="chatMessages">
+        <div class="empty-state">
+          <h3>Chào mừng Admin!</h3>
+          <p>
+            Chọn một cuộc hội thoại từ danh sách bên trái để bắt đầu hỗ trợ
+            khách hàng.
+          </p>
+        </div>
+      </div>
+
+      <div class="chat-input" id="chatInput" style="display: none">
+        <div class="input-container">
+          <textarea
+            id="messageInput"
+            class="message-input"
+            placeholder="Nhập tin nhắn hỗ trợ..."
+            rows="1"
+          ></textarea>
+          <button id="sendBtn" class="send-btn">▶️</button>
+        </div>
+      </div>
     </div>
 
     <script>
-      // Initialize Socket.IO with explicit backend URL and reconnection options
-      const socket = io('http://localhost:3000', {
-        reconnection: true,
-        reconnectionAttempts: 10,
-        reconnectionDelay: 1000,
-      });
+      class AdminChatClient {
+        constructor() {
+          this.socket = null;
+          this.currentConversationId = null;
+          this.currentTab = 'pending';
+          this.isConnected = false;
+          this.conversations = {
+            pending: [],
+            mySupport: [],
+          };
+          this.currentUser = null;
 
-      let adminId = null;
-      let currentConversationId = null;
-
-      // Handle successful connection
-      socket.on('connect', () => {
-        document.getElementById('connectionStatus').textContent = 'Connected';
-        adminId = prompt('Enter admin ID:');
-        if (adminId) {
-          socket.emit('join_admin', { adminId });
-          document.getElementById(
-            'adminStatus'
-          ).textContent = `Admin: ${adminId}`;
+          this.initElements();
+          this.initSocket();
+          this.bindEvents();
         }
-      });
 
-      // Handle connection errors
-      socket.on('connect_error', (error) => {
-        document.getElementById(
-          'connectionStatus'
-        ).textContent = `Connection failed: ${error.message}`;
-      });
-
-      // Handle reconnection
-      socket.on('reconnect', (attempt) => {
-        document.getElementById(
-          'connectionStatus'
-        ).textContent = `Reconnected after ${attempt} attempts`;
-        if (adminId) {
-          socket.emit('join_admin', { adminId });
+        initElements() {
+          this.elements = {
+            connectionStatus: document.getElementById('connectionStatus'),
+            chatMessages: document.getElementById('chatMessages'),
+            messageInput: document.getElementById('messageInput'),
+            sendBtn: document.getElementById('sendBtn'),
+            conversationsList: document.getElementById('conversationsList'),
+            chatHeader: document.getElementById('chatHeader'),
+            chatInput: document.getElementById('chatInput'),
+            chatTitle: document.getElementById('chatTitle'),
+            chatSubtitle: document.getElementById('chatSubtitle'),
+            pendingTab: document.getElementById('pendingTab'),
+            mySupportTab: document.getElementById('mySupportTab'),
+            pendingBadge: document.getElementById('pendingBadge'),
+            mySupportBadge: document.getElementById('mySupportBadge'),
+            takeOverBtn: document.getElementById('takeOverBtn'),
+          };
         }
-      });
 
-      // Handle reconnection failure
-      socket.on('reconnect_failed', () => {
-        document.getElementById('connectionStatus').textContent =
-          'Failed to reconnect. Please refresh the page.';
-      });
+        initSocket() {
+          // Simulate admin authentication - in real app, get from login
+          const adminToken = this.getAdminToken();
+          const deviceToken = this.getDeviceToken();
 
-      // Handle server errors
-      socket.on('error', (data) => {
-        alert(`Error: ${data.message}`);
-      });
-
-      socket.on('admin_dashboard', (data) => {
-        updateConversationList(data.assignedConversations);
-      });
-
-      socket.on('new_message', (data) => {
-        if (data.roomId === currentConversationId) {
-          updateChatHistory(data.messages || [data.message]);
-        }
-        document.getElementById('newMessageStatus').textContent =
-          'New message received';
-        socket.emit('get_conversation', { conversationId: data.roomId });
-      });
-
-      socket.on('conversation_data', (data) => {
-        if (data.conversationId === currentConversationId) {
-          updateChatHistory(data.messages);
-          socket.emit('mark_seen', { conversationId: currentConversationId });
-        }
-      });
-
-      socket.on('mode_changed', (data) => {
-        if (data.roomId === currentConversationId) {
-          updateChatMode(data.mode);
-        }
-      });
-
-      document.getElementById('sendBtn').addEventListener('click', () => {
-        const messageInput = document.getElementById('messageInput');
-        const content = messageInput.value.trim();
-        if (content && currentConversationId) {
-          socket.emit('send_message', {
-            content,
-            roomId: currentConversationId,
-            senderType: 'admin',
-            adminId,
+          this.socket = io('http://localhost:3000', {
+            auth: {
+              token: adminToken,
+              deviceToken: deviceToken,
+              role: 'admin',
+            },
           });
-          messageInput.value = '';
-        }
-      });
 
-      document.getElementById('messageInput').addEventListener('input', () => {
-        if (currentConversationId) {
-          socket.emit('typing_start', { roomId: currentConversationId });
-          clearTimeout(window.typingTimeout);
-          window.typingTimeout = setTimeout(() => {
-            socket.emit('typing_stop', { roomId: currentConversationId });
+          this.socket.on('connected', (data) => {
+            console.log('Admin connected:', data);
+            this.isConnected = true;
+            this.currentUser = data.user;
+            this.updateConnectionStatus('Đã kết nối', true);
+            this.loadConversations();
+          });
+
+          this.socket.on('new_message', (data) => {
+            console.log('New message received:', data);
+
+            if (data.conversationId === this.currentConversationId) {
+              if (data.userMessages) {
+                data.userMessages.forEach((msg) => this.displayMessage(msg));
+              }
+              if (data.aiResponse) {
+                this.displayMessage(data.aiResponse);
+              }
+            }
+
+            this.loadConversations();
+          });
+
+          this.socket.on('refresh_conversations', (data) => {
+            console.log('Refresh conversations:', data);
+            this.loadConversations();
+          });
+
+          this.socket.on('message_seen', (data) => {
+            console.log('Messages marked as seen:', data);
+          });
+
+          this.socket.on('socket_error', (error) => {
+            console.error('Socket error:', error);
+            this.displaySystemMessage(
+              'Có lỗi xảy ra: ' + (error.message || error)
+            );
+          });
+
+          this.socket.on('disconnect', () => {
+            console.log('Admin disconnected');
+            this.isConnected = false;
+            this.updateConnectionStatus('Mất kết nối', false);
+          });
+        }
+
+        getAdminToken() {
+          let token = localStorage.getItem('adminToken');
+          if (!token) {
+            token = prompt('Vui lòng nhập adminToken để đăng nhập Admin Chat:');
+            if (token) {
+              localStorage.setItem('adminToken', token);
+            }
+          }
+          return token || 'admin_demo_token';
+        }
+
+        getDeviceToken() {
+          let deviceToken = localStorage.getItem('adminDeviceToken');
+          if (!deviceToken) {
+            deviceToken = prompt(
+              'Vui lòng nhập deviceToken để đăng nhập Admin Chat:'
+            );
+            if (deviceToken) {
+              localStorage.setItem('adminDeviceToken', deviceToken);
+            }
+          }
+          return deviceToken;
+        }
+
+        bindEvents() {
+          this.elements.sendBtn.addEventListener('click', () =>
+            this.sendMessage()
+          );
+
+          this.elements.messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              this.sendMessage();
+            }
+          });
+
+          this.elements.messageInput.addEventListener('input', () => {
+            this.autoResize();
+          });
+        }
+
+        autoResize() {
+          const textarea = this.elements.messageInput;
+          textarea.style.height = 'auto';
+          textarea.style.height = Math.min(textarea.scrollHeight, 100) + 'px';
+        }
+
+        async loadConversations() {
+          try {
+            // Simulate API calls - in real app, these would be actual API endpoints
+            const pendingResponse = await this.fetchConversations('pending');
+            const mySupportResponse = await this.fetchConversations(
+              'mySupport'
+            );
+
+            this.conversations.pending = pendingResponse.items || [];
+            this.conversations.mySupport = mySupportResponse.items || [];
+
+            this.updateBadges();
+            this.renderConversations();
+          } catch (error) {
+            console.error('Error loading conversations:', error);
+            this.elements.conversationsList.innerHTML =
+              '<div class="loading">Lỗi tải dữ liệu</div>';
+          }
+        }
+
+        async fetchConversations(type) {
+          // Mock API response - in real app, call actual endpoints
+          return new Promise((resolve) => {
+            setTimeout(() => {
+              const mockData = {
+                pending: {
+                  items: [
+                    {
+                      id: 'conv_1',
+                      latestMessage: {
+                        content: 'Tôi cần hỗ trợ về sản phẩm',
+                        createdAt: new Date().toISOString(),
+                        senderType: 'user',
+                      },
+                    },
+                    {
+                      id: 'conv_2',
+                      latestMessage: {
+                        content: 'Khi nào shop có hàng mới?',
+                        createdAt: new Date(Date.now() - 300000).toISOString(),
+                        senderType: 'user',
+                      },
+                    },
+                  ],
+                },
+                mySupport: {
+                  items: [
+                    {
+                      id: 'conv_3',
+                      latestMessage: {
+                        content: 'Cảm ơn admin đã hỗ trợ',
+                        createdAt: new Date(Date.now() - 600000).toISOString(),
+                        senderType: 'user',
+                      },
+                    },
+                  ],
+                },
+              };
+              resolve(mockData[type] || { items: [] });
+            }, 500);
+          });
+        }
+
+        updateBadges() {
+          this.elements.pendingBadge.textContent =
+            this.conversations.pending.length;
+          this.elements.mySupportBadge.textContent =
+            this.conversations.mySupport.length;
+        }
+
+        renderConversations() {
+          const conversations = this.conversations[this.currentTab];
+
+          if (conversations.length === 0) {
+            this.elements.conversationsList.innerHTML =
+              '<div class="loading">Không có cuộc hội thoại nào</div>';
+            return;
+          }
+
+          this.elements.conversationsList.innerHTML = conversations
+            .map((conv) => {
+              const isActive = conv.id === this.currentConversationId;
+              const time = this.formatTime(conv.latestMessage?.createdAt);
+              const preview =
+                conv.latestMessage?.content || 'Không có tin nhắn';
+
+              return `
+              <div class="conversation-item ${isActive ? 'active' : ''}" 
+                   onclick="selectConversation('${conv.id}')">
+                <div>
+                  <strong>Cuộc hội thoại #${conv.id.slice(-4)}</strong>
+                  <span class="conversation-time">${time}</span>
+                </div>
+                <div class="conversation-preview">${this.escapeHtml(
+                  preview
+                )}</div>
+              </div>
+            `;
+            })
+            .join('');
+        }
+
+        async selectConversation(conversationId) {
+          this.currentConversationId = conversationId;
+          this.renderConversations();
+
+          // Show chat interface
+          this.elements.chatHeader.style.display = 'flex';
+          this.elements.chatInput.style.display = 'block';
+
+          // Update header
+          this.elements.chatTitle.textContent = `Cuộc hội thoại #${conversationId.slice(
+            -4
+          )}`;
+          this.elements.chatSubtitle.textContent = 'Đang hỗ trợ khách hàng';
+
+          // Show take over button for pending conversations
+          if (this.currentTab === 'pending') {
+            this.elements.takeOverBtn.style.display = 'block';
+          } else {
+            this.elements.takeOverBtn.style.display = 'none';
+          }
+
+          // Load messages
+          await this.loadMessages(conversationId);
+        }
+
+        async loadMessages(conversationId) {
+          try {
+            // Clear current messages
+            this.elements.chatMessages.innerHTML =
+              '<div class="loading">Đang tải tin nhắn...</div>';
+
+            // Mock API call - in real app, call actual endpoint
+            const messages = await this.fetchMessages(conversationId);
+
+            this.elements.chatMessages.innerHTML = '';
+            messages.forEach((msg) => this.displayMessage(msg));
+
+            this.scrollToBottom();
+          } catch (error) {
+            console.error('Error loading messages:', error);
+            this.displaySystemMessage('Lỗi tải tin nhắn');
+          }
+        }
+
+        async fetchMessages(conversationId) {
+          // Mock messages - in real app, call API endpoint
+          return new Promise((resolve) => {
+            setTimeout(() => {
+              const mockMessages = [
+                {
+                  id: 'msg_1',
+                  content: 'Chào shop, tôi muốn hỏi về sản phẩm',
+                  senderType: 'user',
+                  sender: 'Khách hàng',
+                  createdAt: new Date(Date.now() - 900000).toISOString(),
+                },
+                {
+                  id: 'msg_2',
+                  content:
+                    'Xin chào! Tôi có thể giúp bạn tìm hiểu về các sản phẩm quần áo của chúng tôi. Bạn đang quan tâm đến loại sản phẩm nào?',
+                  senderType: 'assistant',
+                  sender: 'AI Assistant',
+                  createdAt: new Date(Date.now() - 880000).toISOString(),
+                },
+                {
+                  id: 'msg_3',
+                  content: 'Tôi cần tư vấn trực tiếp từ nhân viên',
+                  senderType: 'user',
+                  sender: 'Khách hàng',
+                  createdAt: new Date(Date.now() - 600000).toISOString(),
+                },
+              ];
+              resolve(mockMessages);
+            }, 300);
+          });
+        }
+
+        sendMessage() {
+          const content = this.elements.messageInput.value.trim();
+          if (!content || !this.currentConversationId || !this.isConnected)
+            return;
+
+          const messageData = {
+            conversationId: this.currentConversationId,
+            content: content,
+            imageUrls: [],
+            role: 'admin',
+            useAI: false,
+          };
+
+          console.log('Admin sending message:', messageData);
+          this.socket.emit('send_message', messageData);
+
+          this.elements.messageInput.value = '';
+          this.autoResize();
+
+          this.elements.sendBtn.disabled = true;
+          setTimeout(() => {
+            this.elements.sendBtn.disabled = false;
           }, 1000);
         }
-      });
 
-      document.getElementById('releaseBtn').addEventListener('click', () => {
-        if (currentConversationId) {
-          socket.emit('toggle_admin_mode', {
-            roomId: currentConversationId,
-            mode: 'AI',
-          });
-        }
-      });
+        displayMessage(message) {
+          const messageDiv = document.createElement('div');
+          messageDiv.className = `message ${message.senderType || 'user'}`;
 
-      document.getElementById('transferBtn').addEventListener('click', () => {
-        const toAdminId = prompt('Enter target admin ID:');
-        if (toAdminId && currentConversationId) {
-          socket.emit('transfer_conversation', {
-            conversationId: currentConversationId,
-            fromAdminId: adminId,
-            toAdminId,
-          });
-        }
-      });
+          const senderName = this.getSenderName(message);
+          const time = this.formatTime(message.createdAt);
 
-      /**
-       * Updates the conversation list UI
-       * @param {Array} conversations - Array of conversation objects
-       */
-      function updateConversationList(conversations) {
-        const conversationList = document.getElementById('conversationList');
-        conversationList.innerHTML = conversations.length
-          ? conversations
-              .map(
-                (conv) => `
-            <div class="p-2 cursor-pointer hover:bg-gray-100" onclick="selectConversation('${conv.conversationId}')">
-              Conversation ${conv.conversationId} (${conv.unreadCount} unread)
+          let content = '';
+          if (message.content) {
+            content += `<div>${this.escapeHtml(message.content)}</div>`;
+          }
+
+          if (message.image) {
+            content += `<img src="${message.image}" alt="Image" class="message-image">`;
+          }
+
+          messageDiv.innerHTML = `
+            <div class="message-content">
+              <div class="message-sender">${senderName}</div>
+              ${content}
+              <div class="message-time">${time}</div>
             </div>
-          `
-              )
-              .join('')
-          : '<p class="text-gray-500">No active conversations</p>';
+          `;
+
+          this.elements.chatMessages.appendChild(messageDiv);
+          this.scrollToBottom();
+        }
+
+        displaySystemMessage(content) {
+          const messageDiv = document.createElement('div');
+          messageDiv.className = 'message assistant';
+          messageDiv.innerHTML = `
+            <div class="message-content">
+              <div class="message-sender">Hệ thống</div>
+              <div>${this.escapeHtml(content)}</div>
+              <div class="message-time">Vừa xong</div>
+            </div>
+          `;
+          this.elements.chatMessages.appendChild(messageDiv);
+          this.scrollToBottom();
+        }
+
+        getSenderName(message) {
+          switch (message.senderType) {
+            case 'assistant':
+              return 'AI Assistant';
+            case 'admin':
+              return 'Admin Support';
+            case 'user':
+              return 'Khách hàng';
+            default:
+              return message.sender || 'Unknown';
+          }
+        }
+
+        formatTime(dateString) {
+          const date = new Date(dateString);
+          const now = new Date();
+          const diff = now - date;
+
+          if (diff < 60000) return 'Vừa xong';
+          if (diff < 3600000) return Math.floor(diff / 60000) + ' phút trước';
+          if (diff < 86400000) return Math.floor(diff / 3600000) + ' giờ trước';
+
+          return date.toLocaleDateString('vi-VN');
+        }
+
+        escapeHtml(text) {
+          const div = document.createElement('div');
+          div.textContent = text;
+          return div.innerHTML;
+        }
+
+        scrollToBottom() {
+          setTimeout(() => {
+            this.elements.chatMessages.scrollTop =
+              this.elements.chatMessages.scrollHeight;
+          }, 100);
+        }
+
+        updateConnectionStatus(message, connected) {
+          this.elements.connectionStatus.textContent = message;
+          this.elements.connectionStatus.className = connected
+            ? 'connection-status'
+            : 'connection-status disconnected';
+
+          if (connected) {
+            setTimeout(() => {
+              this.elements.connectionStatus.style.display = 'none';
+            }, 2000);
+          } else {
+            this.elements.connectionStatus.style.display = 'block';
+          }
+        }
       }
 
-      /**
-       * Selects a conversation and loads its history
-       * @param {string} conversationId - The conversation ID
-       */
+      // Global functions
+      function switchTab(tab) {
+        const adminChat = window.adminChatClient;
+        adminChat.currentTab = tab;
+
+        // Update tab buttons
+        document
+          .getElementById('pendingTab')
+          .classList.toggle('active', tab === 'pending');
+        document
+          .getElementById('mySupportTab')
+          .classList.toggle('active', tab === 'mySupport');
+
+        // Clear current selection and render new conversations
+        adminChat.currentConversationId = null;
+        adminChat.elements.chatHeader.style.display = 'none';
+        adminChat.elements.chatInput.style.display = 'none';
+        adminChat.elements.chatMessages.innerHTML = `
+          <div class="empty-state">
+            <h3>Chọn cuộc hội thoại</h3>
+            <p>Chọn một cuộc hội thoại từ danh sách để bắt đầu hỗ trợ.</p>
+          </div>
+        `;
+
+        adminChat.renderConversations();
+      }
+
       function selectConversation(conversationId) {
-        currentConversationId = conversationId;
-        socket.emit('get_conversation', { conversationId });
-        document.getElementById('chatHistory').classList.remove('hidden');
-        document.getElementById('messageInput').classList.remove('hidden');
-        document.getElementById('sendBtn').classList.remove('hidden');
-        document.getElementById('releaseBtn').classList.remove('hidden');
-        document.getElementById('transferBtn').classList.remove('hidden');
+        window.adminChatClient.selectConversation(conversationId);
       }
 
-      /**
-       * Updates the chat history UI
-       * @param {Array} messages - Array of message objects
-       */
-      function updateChatHistory(messages) {
-        const chatHistory = document.getElementById('chatHistory');
-        chatHistory.innerHTML = messages.length
-          ? messages
-              .map(
-                (msg) => `
-            <div class="p-2 ${
-              msg.msg_sender_type === 'user' ? 'text-right' : 'text-left'
-            }">
-              <span class="inline-block bg-${
-                msg.msg_sender_type === 'user'
-                  ? 'blue'
-                  : msg.msg_sender_type === 'AI'
-                  ? 'gray'
-                  : 'green'
-              }-100 rounded px-3 py-1">
-                ${
-                  msg.msg_content ||
-                  (msg.msg_image
-                    ? `<img src="${msg.msg_image}" class="max-w-xs">`
-                    : '')
-                }
-              </span>
-            </div>
-          `
-              )
-              .join('')
-          : '<p class="text-gray-500">No chat history available</p>';
+      function refreshConversations() {
+        window.adminChatClient.loadConversations();
       }
 
-      /**
-       * Updates the chat mode UI
-       * @param {string} mode - 'AI' or 'ADMIN'
-       */
-      function updateChatMode(mode) {
-        document.getElementById(
-          'newMessageStatus'
-        ).textContent = `Chatting in ${mode} mode`;
+      function takeOverConversation() {
+        if (!window.adminChatClient.currentConversationId) return;
+
+        // In real app, this would call API to assign admin to conversation
+        alert('Đã tiếp quản cuộc hội thoại này!');
+
+        // Move from pending to mySupport tab
+        switchTab('mySupport');
       }
+
+      // Initialize admin chat when page loads
+      document.addEventListener('DOMContentLoaded', () => {
+        window.adminChatClient = new AdminChatClient();
+      });
     </script>
   </body>
 </html>

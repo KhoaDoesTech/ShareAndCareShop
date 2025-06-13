@@ -197,6 +197,9 @@ class ChatService {
     const chatRooms = await this.roomRepository.getAll({
       filter,
       queryOptions: query,
+      populateOptions: [
+        { path: 'room_user_id', select: 'usr_name usr_avatar' },
+      ],
     });
 
     const conversations = await Promise.all(
@@ -208,6 +211,13 @@ class ChatService {
 
         return {
           id: room.id,
+          user: room.userId
+            ? {
+                id: room.userId.id,
+                name: room.userId.usr_name,
+                avatar: room.userId.usr_avatar,
+              }
+            : room.deviceToken,
           latestMessage: omitFields({
             fields: ['updatedAt', 'conversationId', 'senderType'],
             object: latestMessage,
@@ -256,6 +266,9 @@ class ChatService {
     const chatRooms = await this.roomRepository.getAll({
       filter,
       queryOptions: query,
+      populateOptions: [
+        { path: 'room_user_id', select: 'usr_name usr_avatar' },
+      ],
     });
 
     const conversations = await Promise.all(
@@ -267,6 +280,13 @@ class ChatService {
 
         return {
           id: room.id,
+          user: room.userId
+            ? {
+                id: room.userId.id,
+                name: room.userId.usr_name,
+                avatar: room.userId.usr_avatar,
+              }
+            : room.deviceToken,
           latestMessage: omitFields({
             fields: ['updatedAt', 'conversationId', 'senderType'],
             object: latestMessage,
