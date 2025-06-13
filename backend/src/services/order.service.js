@@ -301,6 +301,7 @@ class OrderService {
           refundMessage = 'Refund processed successfully';
         }
       } catch (error) {
+        console.log(error);
         refundStatus = 'FAILED';
         refundMessage = 'Refund processing error, please contact support';
         updates.ord_payment_status = PaymentStatus.PENDING_REFUND;
@@ -310,7 +311,7 @@ class OrderService {
     await this.orderRepository.updateById(orderId, updates);
 
     if (order.couponCode) {
-      await this.couponService.revokeCoupon(order.couponCode, userId);
+      await this.couponService.revokeCouponUsage(order.couponCode, userId);
     }
 
     await this._reverseStock(order.items);

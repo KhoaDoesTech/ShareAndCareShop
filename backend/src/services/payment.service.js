@@ -19,6 +19,8 @@ const {
   pickFields,
   omitFields,
   convertToObjectIdMongodb,
+  sortObjectV2,
+  buildQueryString,
 } = require('../utils/helpers');
 const {
   OrderStatus,
@@ -128,6 +130,7 @@ class PaymentService {
     const isSuccess = params.vnp_TransactionStatus === '00';
     const orderId = params.vnp_TxnRef.split('_')[1];
     const transId = params.vnp_TxnRef;
+    const transNo = params.vnp_TransactionNo || '';
     const amount = params.vnp_Amount / 100;
 
     const transaction = await this.paymentTransactionRepository.getByQuery({
@@ -143,6 +146,7 @@ class PaymentService {
       await this._updateOrderAndTransaction({
         orderId,
         transId,
+        transNo,
         transactionId: transaction.id,
         method: PaymentGateway.VNPAY,
         status: PaymentStatus.COMPLETED,
@@ -337,16 +341,19 @@ class PaymentService {
     const params = this._buildVNPayRefundParams({
       orderId,
       amount: totalRefundAmount,
-      transId: paymentTransaction.transactionId,
+      transNo: paymentTransaction.transactionNo,
       paidAt: order.paidAt,
       ipAddress,
-      refundTransactionId,
+      refundTransactionId: paymentTransaction.transactionId,
     });
 
     try {
       const refundUrl =
         'https://sandbox.vnpayment.vn/merchant_webapi/api/transaction';
       const { data } = await axios.post(refundUrl, params);
+
+      console.log(params);
+      console.log(data);
 
       return await this._processVNPayRefundResponse({
         data,
@@ -363,6 +370,8 @@ class PaymentService {
           adminId,
         }
       );
+
+      console.log(error);
 
       return {
         status: 'MANUAL_REQUIRED',
@@ -853,6 +862,7 @@ class PaymentService {
   async _updateOrderAndTransaction({
     orderId,
     transId,
+    transNo,
     transactionId,
     method,
     status,
@@ -863,6 +873,7 @@ class PaymentService {
       await this.paymentTransactionRepository.updateById(transactionId, {
         pmt_status: status,
         pmt_completed_at: paidAt,
+        pmt_transaction_no: transNo,
       });
       await this.paymentSessionRepository.updateByQuery(
         {
@@ -1061,7 +1072,7 @@ class PaymentService {
   _buildVNPayRefundParams({
     orderId,
     amount,
-    transId,
+    transNo,
     paidAt,
     ipAddress,
     refundTransactionId,
@@ -1070,22 +1081,23 @@ class PaymentService {
     const vnp_TransactionType = '02';
     const vnp_CreateBy = 'System';
 
-    const params = sortObject({
+    const params = sortObjectV2({
       vnp_Version: VNPAY_CONFIG.VERSION,
       vnp_Command: 'refund',
-      vnp_TmnCode: VNPAY_CONFIG.TMN_CODE.TPENDING,
+      vnp_TmnCode: VNPAY_CONFIG.TMN_CODE,
       vnp_TransactionType,
       vnp_TxnRef: refundTransactionId,
       vnp_Amount: amount * 100,
-      vnp_TransactionNo: transId,
+      vnp_TransactionNo: transNo,
       vnp_TransactionDate: moment(paidAt).format('YYYYMMDDHHmmss'),
       vnp_CreateBy: vnp_CreateBy,
       vnp_CreateDate: createDate,
-      vnp_IpAddr: ipAddress || '127.0.0.1',
+      vnp_IpAddr: '127.0.0.1',
       vnp_OrderInfo: `Refund for order ${orderId}`,
     });
 
-    const signData = querystring.stringify(params, { encode: false });
+    const signData = buildQueryString(params);
+    console.log(signData);
     params.vnp_SecureHash = generateHmacHash(signData, VNPAY_CONFIG.SECRET);
     return params;
   }
@@ -1219,13 +1231,9 @@ class PaymentService {
         pmt_status: PaymentStatus.PENDING,
       });
 
-    console.log(existingTransaction);
-
     if (existingTransaction) {
       return existingTransaction;
     }
-
-    console.log(orderId);
 
     const refundTransactionId = `MANUAL_REFUND_${orderId}_${Date.now()}`;
     const refund = await this.paymentTransactionRepository.create({

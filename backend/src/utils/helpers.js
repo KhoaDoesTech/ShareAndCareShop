@@ -114,6 +114,27 @@ const sortObject = (obj) => {
   return sorted;
 };
 
+const sortObjectV2 = (obj) => {
+  const sortedKeys = Object.keys(obj).sort();
+  const result = {};
+  sortedKeys.forEach((key) => {
+    result[key] = obj[key]; // không encode ở đây!
+  });
+  return result;
+};
+
+const buildQueryString = (obj) => {
+  return Object.entries(obj)
+    .map(
+      ([key, value]) =>
+        `${encodeURIComponent(key)}=${encodeURIComponent(value).replace(
+          /%20/g,
+          '+'
+        )}`
+    )
+    .join('&');
+};
+
 const listResponse = ({ items, total, page, size }) => {
   const totalPages = Math.ceil(total / size);
   const hasMore = page < totalPages;
@@ -207,7 +228,9 @@ module.exports = {
   getVariantImageOrDefault,
   parseJwt,
   sortObject,
+  sortObjectV2,
   listResponse,
   calculateProductPrice,
   calculateDiscountedValue,
+  buildQueryString,
 };

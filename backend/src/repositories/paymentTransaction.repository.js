@@ -17,6 +17,7 @@ class PaymentTransactionRepository extends BaseRepository {
       id: doc._id,
       orderId: doc.pmt_order_id?._id || doc.pmt_order_id,
       transactionId: doc.pmt_transaction_id,
+      transactionNo: doc.pmt_transaction_no || '',
       type: doc.pmt_type,
       method: doc.pmt_method,
       amount: doc.pmt_amount,

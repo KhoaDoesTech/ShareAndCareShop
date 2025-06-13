@@ -21,6 +21,7 @@ const PaymentTransactionSchema = new mongoose.Schema(
       unique: true,
       trim: true,
     },
+    pmt_transaction_no: { type: String, default: '' },
     pmt_type: { type: String, enum: AvailableTransactionType, required: true },
     pmt_method: { type: String, enum: AvailablePaymentMethod, required: true },
     pmt_amount: { type: Number, required: true, min: 0 },
