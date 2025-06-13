@@ -41,6 +41,7 @@ class ChatSocketHandler {
 
         if (!isAnonymous) {
           socket.join(user.id.toString());
+          logger.info(`User ${user.id} (${role}) joined room ${user.id}`);
           await this.joinChatRooms(socket, user, role);
         } else {
           socket.join(deviceToken.toString());
