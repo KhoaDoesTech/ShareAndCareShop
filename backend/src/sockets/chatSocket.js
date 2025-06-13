@@ -69,6 +69,16 @@ class ChatSocketHandler {
           await this.handleMarkMessageSeen(socket, data);
         });
 
+        // Xử lý sự kiện typing
+        socket.on(ChatEventEnum.TYPING, async (data) => {
+          await this.handleTyping(socket, data);
+        });
+
+        // Xử lý sự kiện stop typing
+        socket.on(ChatEventEnum.STOP_TYPING, async (data) => {
+          await this.handleStopTyping(socket, data);
+        });
+
         // Xử lý sự kiện ngắt kết nối
         socket.on(ChatEventEnum.DISCONNECT_EVENT, () => {
           logger.info(`User disconnected: ${socket.user?.id} (${socket.role})`);
@@ -178,14 +188,6 @@ class ChatSocketHandler {
       logger.info(
         `User ${socket.user.id} (${socket.role}) joined room ${response.conversationId}`
       );
-
-      // If user requests admin support (useAI=false), notify admin room
-      if (!useAI && socket.role === 'user') {
-        this.io.to('admin_room').emit(ChatEventEnum.REFRESH_CONVERSATIONS, {
-          conversationId: response.conversationId,
-          message: 'New message in your conversation',
-        });
-      }
     } catch (error) {
       logger.error('Send message error:', error);
       socket.emit(ChatEventEnum.SOCKET_ERROR_EVENT, {
@@ -214,6 +216,46 @@ class ChatSocketHandler {
       logger.error('Mark message seen error:', error);
       socket.emit(ChatEventEnum.SOCKET_ERROR_EVENT, {
         message: error.message || 'Failed to mark message as seen',
+      });
+    }
+  }
+
+  async handleTyping(socket, data) {
+    try {
+      const { conversationId } = data;
+      if (!conversationId) {
+        throw new BadRequestError('Conversation ID is required');
+      }
+
+      this.io.to(conversationId.toString()).emit(ChatEventEnum.TYPING, {
+        conversationId,
+        userId: socket.user.id,
+        role: socket.role,
+      });
+    } catch (error) {
+      logger.error('Typing event error:', error);
+      socket.emit(ChatEventEnum.SOCKET_ERROR_EVENT, {
+        message: error.message || 'Failed to process typing event',
+      });
+    }
+  }
+
+  async handleStopTyping(socket, data) {
+    try {
+      const { conversationId } = data;
+      if (!conversationId) {
+        throw new BadRequestError('Conversation ID is required');
+      }
+
+      this.io.to(conversationId.toString()).emit(ChatEventEnum.STOP_TYPING, {
+        conversationId,
+        userId: socket.user.id,
+        role: socket.role,
+      });
+    } catch (error) {
+      logger.error('Stop typing event error:', error);
+      socket.emit(ChatEventEnum.SOCKET_ERROR_EVENT, {
+        message: error.message || 'Failed to process stop typing event',
       });
     }
   }

@@ -9,6 +9,8 @@ const ChatEventEnum = {
   MARK_MESSAGE_SEEN: 'mark_message_seen',
   MESSAGE_SEEN: 'message_seen',
   REFRESH_CONVERSATIONS: 'refresh_conversations',
+  TYPING: 'typing',
+  STOP_TYPING: 'stop_typing',
 };
 
 const AvailableChatEvents = Object.values(ChatEventEnum);

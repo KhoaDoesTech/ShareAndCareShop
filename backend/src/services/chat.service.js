@@ -86,6 +86,13 @@ class ChatService {
               })
             : null,
         });
+
+      if (!chatRoom.supporters || chatRoom.supporters.length === 0) {
+        console.log('Sending to admin room');
+        this.io.to('admin_room').emit(ChatEventEnum.REFRESH_CONVERSATIONS, {
+          conversationId: chatRoom.id,
+        });
+      }
     }
 
     return {
@@ -150,21 +157,33 @@ class ChatService {
     }
 
     if (this.io) {
-      this.io.to(chatRoom.id.toString()).emit(ChatEventEnum.NEW_MESSAGE, {
-        conversationId: chatRoom.id,
-        userMessages: userMessage.map((msg) =>
-          omitFields({
-            fields: ['updatedAt', 'conversationId'],
-            object: msg,
-          })
-        ),
-        aiResponse: aiResponse
-          ? omitFields({
+      this.io
+        .to([chatRoom.id.toString(), chatRoom.userId.toString()])
+        .emit(ChatEventEnum.NEW_MESSAGE, {
+          conversationId: chatRoom.id,
+          userMessages: userMessage.map((msg) =>
+            omitFields({
               fields: ['updatedAt', 'conversationId'],
-              object: aiResponse,
+              object: msg,
             })
-          : null,
-      });
+          ),
+          aiResponse: aiResponse
+            ? omitFields({
+                fields: ['updatedAt', 'conversationId'],
+                object: aiResponse,
+              })
+            : null,
+        });
+
+      if (
+        role === 'user' &&
+        (!chatRoom.supporters || chatRoom.supporters.length === 0)
+      ) {
+        console.log('Sending to admin room');
+        this.io.to('admin_room').emit(ChatEventEnum.REFRESH_CONVERSATIONS, {
+          conversationId: chatRoom.id,
+        });
+      }
     }
 
     return {
