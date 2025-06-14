@@ -101,7 +101,7 @@ class ChatService {
           `Giá thấp nhất: ${product.minPrice} ₫`,
           `Giá cao nhất: ${product.maxPrice} ₫`,
           `Tình trạng kho: Còn ${product.quantity || 0} sản phẩm`,
-        ].join('\n'),
+        ].join(' '),
         metadata: {
           source: `https://share-and-care-client.vercel.app/products/${product.code}`,
           type: 'product',
@@ -583,42 +583,6 @@ class ChatService {
     return messages;
   }
 
-  // async _generateEnhancedAIResponse(conversationId) {
-  //   console.log(conversationId);
-  //   const previousMessages = await this.messageRepository.getAll({
-  //     filter: { msg_conversation_id: conversationId },
-  //     queryOptions: { sort: 'createdAt', size: 20 },
-  //   });
-
-  //   console.log(previousMessages);
-
-  //   const systemPrompt = await this._buildSystemPrompt();
-
-  //   const messages = [
-  //     { role: 'system', content: systemPrompt },
-  //     ...previousMessages.map((msg) => this._normalizeMessageRole(msg)),
-  //   ];
-
-  //   console.log(messages);
-
-  //   const aiResponse = await this.openai.chat.completions.create({
-  //     model: 'gpt-3.5-turbo',
-  //     messages,
-  //     max_tokens: 500,
-  //     temperature: 0.7,
-  //   });
-
-  //   const aiContent = aiResponse.choices[0].message.content;
-
-  //   return await this.messageRepository.create({
-  //     msg_conversation_id: conversationId,
-  //     msg_sender: 'AI_Assistant',
-  //     msg_sender_type: 'assistant',
-  //     msg_content: aiContent,
-  //     msg_seen: false,
-  //   });
-  // }
-
   async _generateEnhancedAIResponse(conversationId) {
     // Get the latest user message to use as the query
     const latestMessage =
@@ -648,7 +612,12 @@ class ChatService {
     // Format documents for the prompt
     const formatDocuments = (docs) => {
       return docs
-        .map((doc, index) => `Tai lieu ${index + 1}: ${doc.pageContent}`)
+        .map(
+          (doc, index) =>
+            `Tài liệu ${index + 1}: ${
+              doc.pageContent
+            }\nThông tin thêm: ${JSON.stringify(doc.metadata)}`
+        )
         .join('\n\n');
     };
 
@@ -722,58 +691,6 @@ class ChatService {
     }
 
     return { role, content };
-  }
-
-  async _buildSystemPrompt() {
-    //   const products = await this.productRepository.getAll({
-    //     filter: { prd_status: ProductStatus.PUBLISHED },
-    //   });
-
-    //   console.log(products);
-
-    //   const productDescriptions = products
-    //     .map(
-    //       (p) => `- ${p.name} (Giá: ${p.price}đ)
-    // + Hình ảnh: ${p.mainImage}
-    // + Xem chi tiết: https://share-and-care-client.vercel.app/products/${p.slug}
-    // + Mô tả: ${p.description || 'Không có mô tả'}`
-    //     )
-    //     .join('\n\n');
-
-    //   console.log(productDescriptions);
-
-    return `
-      Bạn là trợ lý mua sắm ảo của cửa hàng ShareAndCare, chuyên cung cấp quần áo cho mọi lứa tuổi và phong cách.
-
-      Yêu cầu bắt buộc:
-      - Chỉ sử dụng văn bản thuần túy (plain text). Tuyệt đối không sử dụng:
-        + Emoji hoặc biểu tượng cảm xúc.
-        + Ký tự đặc biệt (như [0], [*], v.v.).
-        + Liên kết hình ảnh hoặc thẻ [Image: ...].
-        + HTML, Markdown, hoặc bất kỳ định dạng nào khác ngoài văn bản thô.
-      - Luôn lịch sự, thân thiện, ngắn gọn và dễ hiểu.
-      - Trả lời theo cách tự nhiên như một nhân viên tư vấn thực thụ.
-
-      Bạn cần hỗ trợ khách hàng trong các nội dung sau:
-      1. Tư vấn chọn quần áo:
-        - Theo độ tuổi, giới tính, phong cách (năng động, thanh lịch, công sở, v.v.).
-        - Theo kích cỡ và chất liệu phù hợp với thời tiết hoặc sở thích.
-        - Gợi ý các sản phẩm phù hợp nếu có đủ thông tin từ khách hàng.
-
-      2. Hướng dẫn mua hàng:
-        - Cách đặt hàng trên hệ thống.
-        - Phương thức thanh toán.
-        - Kiểm tra và theo dõi đơn hàng.
-
-      3. Thông tin về cửa hàng ShareAndCare:
-        - Giờ mở cửa, địa chỉ chi nhánh.
-        - Chính sách đổi trả, bảo hành.
-
-      Lưu ý bổ sung:
-      - Nếu thông tin khách hàng đưa ra chưa đủ rõ, hãy đặt một câu hỏi đơn giản để tìm hiểu thêm nhu cầu trước khi đưa ra tư vấn.
-      - Tránh trả lời quá dài dòng hoặc lặp lại nội dung.
-      - Không đưa ra nội dung không liên quan đến lĩnh vực thời trang và mua sắm.
-      `.trim();
   }
 }
 
