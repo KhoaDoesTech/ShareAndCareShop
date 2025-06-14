@@ -98,7 +98,8 @@ class ChatService {
         pageContent: [
           `Sản phẩm: ${product.name}`,
           `Mã sản phẩm: ${product.code}`,
-          `Giá: ${product.price} ₫`,
+          `Giá thấp nhất: ${product.minPrice} ₫`,
+          `Giá cao nhất: ${product.maxPrice} ₫`,
           `Tình trạng kho: Còn ${product.quantity || 0} sản phẩm`,
         ].join('\n'),
         metadata: {
@@ -653,22 +654,20 @@ class ChatService {
 
     // Define the prompt template
     const promptTemplate = ChatPromptTemplate.fromTemplate(`
-      Ban la tro ly mua sam ao cua cua hang ShareAndCare, chuyen cung cap quan ao cho moi lua tuoi va phong cach.
+      Bạn là trợ lý AI chuyên nghiệp. Hãy trả lời câu hỏi dựa trên thông tin được cung cấp.
 
-      Thong tin tham khao:
+      Thông tin tham khảo:
       {context}
 
-      Cau hoi: {question}
+      Câu hỏi: {question}
 
-      Yeu cau bat buoc:
-      - Chi su dung van ban thuan tuy (plain text). Tuyet doi khong su dung emoji, ky tu dac biet, HTML, Markdown, hoac lien ket hinh anh.
-      - Luon lich su, than thien, ngan gon va de hieu.
-      - Tra loi theo cach tu nhien nhu mot nhan vien tu van thuc thu.
-      - Chi tra loi dua tren thong tin duoc cung cap. Neu khong co thong tin lien quan, hay thong bao khong du du lieu.
-      - Neu thong tin khach hang chua ro, hay dat mot cau hoi don gian de tim hieu them nhu cau truoc khi dua ra tu van.
-      - Tra loi bang tieng Viet ro rang va chinh xac.
+      Yêu cầu:
+      - Chỉ trả lời dựa trên thông tin được cung cấp
+      - Nếu không có thông tin liên quan, hãy thông báo không đủ dữ liệu
+      - Trả lời bằng tiếng Việt rõ ràng và chính xác
+      - Giữ thái độ chuyên nghiệp và thân thiện
 
-      Cau tra loi:
+      Câu trả lời:
     `);
 
     // Create the RAG chain
