@@ -14,28 +14,28 @@ class AttributeController {
 
   createAttribute = async (req, res, next) => {
     new CreateSuccess({
-      message: 'Attribute created successfully',
+      message: 'Tạo thuộc tính thành công',
       metadata: await this.attributeService.createAttribute(req.body),
     }).send(res);
   };
 
   addValuesToAttribute = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Value added to attribute successfully',
+      message: 'Thêm giá trị vào thuộc tính thành công',
       metadata: await this.attributeService.addValuesToAttribute(req.body),
     }).send(res);
   };
 
   getAllAttributes = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Attributes retrieved successfully',
+      message: 'Lấy danh sách thuộc tính thành công',
       metadata: await this.attributeService.getAllAttributes(req.query),
     }).send(res);
   };
 
   getAttributesByUser = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Attributes retrieved successfully',
+      message: 'Lấy thuộc tính theo người dùng thành công',
       metadata: await this.attributeService.getAttributesByUser(),
     }).send(res);
   };

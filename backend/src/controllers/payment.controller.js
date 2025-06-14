@@ -64,7 +64,7 @@ class PaymentController {
     });
 
     new CreateSuccess({
-      message: 'VNPay payment URL created successfully',
+      message: 'Tạo liên kết thanh toán VNPay thành công',
       metadata: paymentUrl,
     }).send(res);
   };
@@ -78,14 +78,14 @@ class PaymentController {
     });
 
     new CreateSuccess({
-      message: 'MoMo payment URL created successfully',
+      message: 'Tạo liên kết thanh toán MoMo thành công',
       metadata: paymentUrl,
     }).send(res);
   };
 
   confirmCODPayment = async (req, res, next) => {
     new ActionSuccess({
-      message: 'COD payment confirmed successfully',
+      message: 'Xác nhận thanh toán COD thành công',
       metadata: await this.paymentService.confirmCODPayment({
         orderId: req.params.orderId,
         adminId: req.user.id,
@@ -95,7 +95,7 @@ class PaymentController {
 
   processManualRefund = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Manual refund processed successfully',
+      message: 'Hoàn tiền thủ công thành công',
       metadata: await this.paymentService.processManualRefund({
         paymentTransactionId: req.params.paymentTransactionId,
         adminId: req.user.id,
@@ -109,7 +109,7 @@ class PaymentController {
 
   processManualPayment = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Manual refund processed successfully',
+      message: 'Thanh toán thủ công thành công',
       metadata: await this.paymentService.processManualPayment({
         orderId: req.params.orderId,
         adminId: req.user.id,
@@ -123,7 +123,7 @@ class PaymentController {
 
   getTransactionDetail = async (req, res) => {
     new ActionSuccess({
-      message: 'Transaction details retrieved successfully',
+      message: 'Lấy chi tiết giao dịch thành công',
       metadata: await this.paymentService.getTransactionDetails(
         req.params.transactionId
       ),
@@ -132,7 +132,7 @@ class PaymentController {
 
   getTransactionsByAdmin = async (req, res) => {
     new ActionSuccess({
-      message: 'Transactions retrieved successfully',
+      message: 'Lấy danh sách giao dịch thành công',
       metadata: await this.paymentService.getTransactionByAdmin(req.query),
     }).send(res);
   };

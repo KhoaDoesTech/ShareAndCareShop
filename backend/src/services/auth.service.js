@@ -35,12 +35,12 @@ class AuthService {
 
     if (foundUser) {
       if (foundUser.status === UserStatus.PENDING)
-        throw new BadRequestError('User has not verified email');
+        throw new BadRequestError('Người dùng chưa xác thực email');
 
       if (foundUser.status === UserStatus.BLOCKED)
-        throw new BadRequestError('User is blocked');
+        throw new BadRequestError('Tài khoản đã bị khóa');
 
-      throw new AlreadyExistError('User with email or username already exists');
+      throw new AlreadyExistError('Email hoặc tên đăng nhập đã tồn tại');
     }
 
     const { unHashedToken, hashedToken, tokenExpiry } =
@@ -52,7 +52,7 @@ class AuthService {
       rol_name: UserRoles.BASIC,
     });
 
-    if (!basicRole) throw new InternalServerError('Role not found');
+    if (!basicRole) throw new InternalServerError('Không tìm thấy vai trò');
 
     const newUser = await this.userRepository.create({
       usr_email: email,
@@ -64,9 +64,7 @@ class AuthService {
     });
 
     if (!newUser)
-      throw new InternalServerError(
-        'Something went wrong while registering the user'
-      );
+      throw new InternalServerError('Đã xảy ra lỗi khi đăng ký người dùng');
 
     const verificationUrl = `${process.env.BACKEND_URL}/api/v1/auth/verify-email/${unHashedToken}`;
 
@@ -84,7 +82,7 @@ class AuthService {
   }
 
   async verifyEmail({ verificationToken }) {
-    if (!verificationToken) throw new BadRequestError('Invalid token');
+    if (!verificationToken) throw new BadRequestError('Token không hợp lệ');
 
     // generate a hash from the token that we are receiving
     let hashedToken = hashToken(verificationToken);
@@ -94,7 +92,8 @@ class AuthService {
       verification_expiry: { $gte: Date.now() },
     });
 
-    if (!foundUser) throw new BadRequestError('Invalid token or token expired');
+    if (!foundUser)
+      throw new BadRequestError('Token không hợp lệ hoặc đã hết hạn');
 
     const updatedUser = await this.userRepository.updateById(foundUser.id, {
       verification_token: null,
@@ -102,7 +101,7 @@ class AuthService {
       usr_status: UserStatus.ACTIVE,
     });
 
-    if (!updatedUser) throw new InternalServerError('Failed to verify email');
+    if (!updatedUser) throw new InternalServerError('Xác thực email thất bại');
 
     return pickFields({
       fields: ['id', 'email', 'name'],
@@ -115,13 +114,13 @@ class AuthService {
       usr_email: email,
     });
 
-    if (!foundUser) throw new BadRequestError('User not found');
+    if (!foundUser) throw new BadRequestError('Không tìm thấy người dùng');
 
     if (foundUser.status === UserStatus.BLOCKED)
-      throw new BadRequestError('User is blocked');
+      throw new BadRequestError('Tài khoản đã bị khóa');
 
     if (foundUser.status === UserStatus.ACTIVE)
-      throw new BadRequestError('User is already verified');
+      throw new BadRequestError('Tài khoản đã được xác thực');
 
     const { unHashedToken, hashedToken, tokenExpiry } =
       generateTemporaryToken();
@@ -132,7 +131,7 @@ class AuthService {
     });
 
     if (!updatedUser)
-      throw new InternalServerError('Failed to resend verification email');
+      throw new InternalServerError('Gửi lại email xác thực thất bại');
 
     const verificationUrl = `${process.env.BACKEND_URL}/api/v1/auth/verify-email/${unHashedToken}`;
 
@@ -158,7 +157,7 @@ class AuthService {
     const isPasswordValid = await comparePassword(password, foundUser.password);
 
     if (!isPasswordValid)
-      throw new BadRequestError('Invalid email or password');
+      throw new BadRequestError('Email hoặc mật khẩu không đúng');
 
     const tokens = await this.tokenService.createTokensForDevice({
       user: foundUser,
@@ -190,7 +189,7 @@ class AuthService {
       rol_name: UserRoles.BASIC,
     });
 
-    if (!basicRole) throw new InternalServerError('Role not found');
+    if (!basicRole) throw new InternalServerError('Không tìm thấy vai trò');
 
     if (!user) {
       user = await this.userRepository.create({
@@ -205,7 +204,7 @@ class AuthService {
     }
 
     if (user.status === UserStatus.BLOCKED) {
-      throw new BadRequestError('User is blocked');
+      throw new BadRequestError('Tài khoản đã bị khóa');
     }
 
     const tokens = await this.tokenService.createTokensForDevice({
@@ -226,21 +225,21 @@ class AuthService {
       deviceToken: deviceToken,
     });
 
-    if (!deleteToken) throw new InternalServerError('Failed to logout user');
+    if (!deleteToken) throw new InternalServerError('Đăng xuất thất bại');
   }
 
   _checkUserStatus(foundUser) {
-    if (!foundUser) throw new BadRequestError('User not found');
+    if (!foundUser) throw new BadRequestError('Không tìm thấy người dùng');
 
     if (foundUser.status === UserStatus.PENDING) {
-      throw new EmailNotVerifiedError('User has not verified email', {
+      throw new EmailNotVerifiedError('Người dùng chưa xác thực email', {
         email: foundUser.email,
         name: foundUser.name,
       });
     }
 
     if (foundUser.status === UserStatus.BLOCKED)
-      throw new BadRequestError('User is blocked');
+      throw new BadRequestError('Tài khoản đã bị khóa');
   }
 
   async forgotPasswordRequest({ email, isPanel }) {
@@ -259,7 +258,7 @@ class AuthService {
     });
 
     if (!updatedUser)
-      throw new InternalServerError('Failed to request password reset');
+      throw new InternalServerError('Yêu cầu đặt lại mật khẩu thất bại');
 
     let resetUrl = `${process.env.FRONTEND_URL}/reset-password/${unHashedToken}`;
     if (isPanel) {
@@ -274,7 +273,7 @@ class AuthService {
   }
 
   async resetForgottenPassword({ resetToken, newPassword }) {
-    if (!resetToken) throw new BadRequestError('Invalid token');
+    if (!resetToken) throw new BadRequestError('Token không hợp lệ');
 
     const hashedToken = hashToken(resetToken);
 
@@ -291,12 +290,13 @@ class AuthService {
       forgot_password_expiry: null,
     });
 
-    if (!updatedUser) throw new InternalServerError('Failed to reset password');
+    if (!updatedUser)
+      throw new InternalServerError('Đặt lại mật khẩu thất bại');
   }
 
   async updateUserAvatar({ file, user }) {
     if (!file) {
-      throw new BadRequestError('Please upload a file');
+      throw new BadRequestError('Vui lòng tải lên tệp ảnh');
     }
 
     try {
@@ -317,7 +317,7 @@ class AuthService {
         image_url: updatedUser.avatar,
       };
     } catch (error) {
-      throw new InternalServerError('Failed to upload avatar');
+      throw new InternalServerError('Tải ảnh đại diện thất bại');
     } finally {
       removeLocalFile(file.path);
     }

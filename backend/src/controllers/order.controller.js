@@ -14,7 +14,7 @@ class OrderController {
 
   reviewOrder = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Order reviewed successfully',
+      message: 'Đánh giá đơn hàng thành công',
       metadata: await this.orderService.reviewOrder({
         ...req.body,
         userId: req.user.id,
@@ -26,7 +26,7 @@ class OrderController {
     const ipAddress =
       req.headers['x-forwarded-for'] || req.connection.remoteAddress;
     new CreateSuccess({
-      message: 'Order created successfully',
+      message: 'Tạo đơn hàng thành công',
       metadata: await this.orderService.createOrder({
         ...req.body,
         userId: req.user.id,
@@ -37,7 +37,7 @@ class OrderController {
 
   updateOrderStatus = async (req, res, next) => {
     new NoContentSuccess({
-      message: 'Order updated successfully',
+      message: 'Cập nhật trạng thái đơn hàng thành công',
       metadata: await this.orderService.updateOrderStatus({
         orderId: req.params.orderId,
         adminId: req.user.id,
@@ -49,7 +49,7 @@ class OrderController {
     const ipAddress =
       req.headers['x-forwarded-for'] || req.connection.remoteAddress;
     new ActionSuccess({
-      message: 'Order details retrieved successfully',
+      message: 'Lấy chi tiết đơn hàng thành công',
       metadata: await this.orderService.getOrderDetailsForUser({
         userId: req.user.id,
         orderId: req.params.orderId,
@@ -60,7 +60,7 @@ class OrderController {
 
   getOrderDetailsForAdmin = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Order details retrieved successfully',
+      message: 'Lấy chi tiết đơn hàng thành công',
       metadata: await this.orderService.getOrderDetailsForAdmin({
         orderId: req.params.orderId,
       }),
@@ -69,7 +69,7 @@ class OrderController {
 
   getOrdersListForUser = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Orders retrieved successfully',
+      message: 'Lấy danh sách đơn hàng thành công',
       metadata: await this.orderService.getOrdersListForUser({
         userId: req.user.id,
         ...req.query,
@@ -79,14 +79,14 @@ class OrderController {
 
   getOrdersListForAdmin = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Orders retrieved successfully',
+      message: 'Lấy danh sách đơn hàng thành công',
       metadata: await this.orderService.getOrdersListForAdmin(req.query),
     }).send(res);
   };
 
   reviewNextStatus = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Order status reviewed successfully',
+      message: 'Đánh giá trạng thái tiếp theo của đơn hàng thành công',
       metadata: await this.orderService.reviewNextStatus(req.params.orderId),
     }).send(res);
   };
@@ -95,7 +95,7 @@ class OrderController {
     const ipAddress =
       req.headers['x-forwarded-for'] || req.connection.remoteAddress;
     new ActionSuccess({
-      message: 'Order canceled successfully',
+      message: 'Hủy đơn hàng thành công',
       metadata: await this.orderService.cancelOrder({
         orderId: req.params.orderId,
         userId: req.user.id,
@@ -106,7 +106,7 @@ class OrderController {
 
   requestReturn = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Return request submitted successfully',
+      message: 'Gửi yêu cầu trả hàng thành công',
       metadata: await this.orderService.requestReturn({
         userId: req.user.id,
         orderId: req.params.orderId,
@@ -119,7 +119,7 @@ class OrderController {
     const ipAddress =
       req.headers['x-forwarded-for'] || req.connection.remoteAddress;
     new ActionSuccess({
-      message: 'Return request approved successfully',
+      message: 'Duyệt yêu cầu trả hàng thành công',
       metadata: await this.orderService.approveReturn({
         orderId: req.params.orderId,
         adminId: req.user.id,

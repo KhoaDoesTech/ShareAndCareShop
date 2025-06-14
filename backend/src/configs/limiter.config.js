@@ -10,9 +10,9 @@ const limiter = {
   },
   handler: (_, __, ___, options) => {
     throw new InternalServerError(
-      `There are too many requests. You are only allowed ${
+      `Quá nhiều yêu cầu. Bạn chỉ được phép gửi tối đa ${
         options.max
-      } requests per ${options.windowMs / 60000} minutes`
+      } yêu cầu trong mỗi ${options.windowMs / 60000} phút`
     );
   },
 };

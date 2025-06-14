@@ -101,10 +101,11 @@ class ChatSocketHandler {
       const decoded = parseJwt(token);
       const userId = decoded.userId;
 
-      if (!userId || !deviceToken) throw new UnauthorizedError('Invalid token');
+      if (!userId || !deviceToken)
+        throw new UnauthorizedError('Token không hợp lệ');
 
       const keyStore = await tokenRepository.getToken({ userId, deviceToken });
-      if (!keyStore) throw new UnauthorizedError('Token not found');
+      if (!keyStore) throw new UnauthorizedError('Không tìm thấy token');
 
       await validateToken(token, keyStore.publicKey, userId);
 
@@ -113,14 +114,14 @@ class ChatSocketHandler {
         { path: 'usr_role', select: 'rol_name rol_permissions' }
       );
 
-      if (!user) throw new NotFoundError('User not found');
+      if (!user) throw new NotFoundError('Không tìm thấy người dùng');
 
       return { user, isAnonymous: false };
     }
 
     // Anonymous logic
     if (!deviceToken)
-      throw new UnauthorizedError('DeviceToken required for anonymous users');
+      throw new UnauthorizedError('Thiếu DeviceToken cho người dùng ẩn danh');
 
     return {
       user: {
@@ -202,7 +203,7 @@ class ChatSocketHandler {
     try {
       const { conversationId } = data;
       if (!conversationId) {
-        throw new BadRequestError('Conversation ID is required');
+        throw new BadRequestError('Vui lòng cung cấp Conversation ID');
       }
 
       const updatedMessages = await this.chatService.markMessageAsSeen({
@@ -226,7 +227,7 @@ class ChatSocketHandler {
     try {
       const { conversationId } = data;
       if (!conversationId) {
-        throw new BadRequestError('Conversation ID is required');
+        throw new BadRequestError('Vui lòng cung cấp Conversation ID');
       }
 
       this.io.to(conversationId.toString()).emit(ChatEventEnum.TYPING, {
@@ -246,7 +247,7 @@ class ChatSocketHandler {
     try {
       const { conversationId } = data;
       if (!conversationId) {
-        throw new BadRequestError('Conversation ID is required');
+        throw new BadRequestError('Vui lòng cung cấp Conversation ID');
       }
 
       this.io.to(conversationId.toString()).emit(ChatEventEnum.STOP_TYPING, {

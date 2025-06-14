@@ -65,7 +65,7 @@ class ChatService {
 
   getSocketIO() {
     if (!this.io) {
-      throw new Error('Socket.IO instance is not initialized');
+      throw new BadRequestError('Socket.IO chưa được khởi tạo');
     }
     return this.io;
   }
@@ -128,7 +128,9 @@ class ChatService {
       return { status: 'success', documentCount: allDocuments.length };
     } catch (error) {
       console.error('Error in textToNoSQL:', error.message);
-      throw new Error(`Failed to add documents to Qdrant: ${error.message}`);
+      throw new BadRequestError(
+        `Thêm tài liệu vào Qdrant thất bại: ${error.message}`
+      );
     }
   }
 
@@ -140,12 +142,12 @@ class ChatService {
   }) {
     if (!deviceToken) {
       throw new BadRequestError(
-        'Missing required identifier: deviceToken, userId, or adminId'
+        'Thiếu mã định danh: deviceToken, userId hoặc adminId'
       );
     }
     if (!content && imageUrls.length === 0) {
       throw new BadRequestError(
-        'Missing required fields: role, and at least content or imageUrls'
+        'Thiếu trường bắt buộc: vai trò, nội dung hoặc hình ảnh'
       );
     }
 
@@ -220,14 +222,14 @@ class ChatService {
   }) {
     if (!content && imageUrls.length === 0) {
       throw new BadRequestError(
-        'Missing required fields: role, and at least content or imageUrls'
+        'Thiếu trường bắt buộc: vai trò, nội dung hoặc hình ảnh'
       );
     }
     let chatRoom;
     if (conversationId) {
       chatRoom = await this.roomRepository.getById(conversationId);
       if (!chatRoom) {
-        throw new BadRequestError('Chat room not found');
+        throw new BadRequestError('Không tìm thấy phòng chat');
       }
     } else {
       chatRoom = await this._getOrCreateChatRoom({
@@ -477,7 +479,9 @@ class ChatService {
     });
 
     if (!chatRoom) {
-      throw new BadRequestError('No anonymous chat room found for this device');
+      throw new BadRequestError(
+        'Không tìm thấy phòng chat ẩn danh cho thiết bị này'
+      );
     }
 
     await this.messageRepository.updateMany(
@@ -499,7 +503,7 @@ class ChatService {
   async markMessageAsSeen({ conversationId, userId }) {
     const chatRoom = await this.roomRepository.getById(conversationId);
     if (!chatRoom) {
-      throw new BadRequestError('Chat room not found');
+      throw new BadRequestError('Không tìm thấy phòng chat');
     }
 
     const updatedMessages = await this.messageRepository.updateMany(

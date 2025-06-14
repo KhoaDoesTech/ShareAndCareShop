@@ -102,7 +102,7 @@ class ProductService {
       updatedBy: userId,
     });
 
-    if (!newProduct) throw new BadRequestError('Failed to create product');
+    if (!newProduct) throw new BadRequestError('Tạo sản phẩm thất bại');
 
     const convertSkuList = skuList.map((sku, index) => ({
       prd_id: newProduct.id,
@@ -116,7 +116,7 @@ class ProductService {
     }));
 
     const variant = await this.variantRepository.create(convertSkuList);
-    if (!variant) throw new BadRequestError('Failed to create variant');
+    if (!variant) throw new BadRequestError('Tạo biến thể thất bại');
 
     this.uploadService.deleteUsedImages([mainImage, ...subImages, qrCodeUrl]);
 
@@ -147,7 +147,7 @@ class ProductService {
     status,
   }) {
     const foundProduct = await this.productRepository.getProduct(productKey);
-    if (!foundProduct) throw new BadRequestError('Product not found');
+    if (!foundProduct) throw new BadRequestError('Không tìm thấy sản phẩm');
 
     let updatedAttributes = attributes
       ? await this._validateAttributes(attributes)
@@ -379,7 +379,7 @@ class ProductService {
     const deletedProduct = await this.productRepository.deleteById(productId);
 
     if (!deletedProduct) {
-      throw new BadRequestError('Product not found');
+      throw new BadRequestError('Không tìm thấy sản phẩm');
     }
 
     await this.variantService.deleteVariants(productId);
@@ -398,7 +398,7 @@ class ProductService {
     );
 
     if (!foundProduct) {
-      throw new BadRequestError('Product not found');
+      throw new BadRequestError('Không tìm thấy sản phẩm');
     }
 
     const skuList = await this.variantService.getPublicVariantByProductId(
@@ -453,7 +453,7 @@ class ProductService {
     );
 
     if (!foundProduct) {
-      throw new BadRequestError('Product not found');
+      throw new BadRequestError('Không tìm thấy sản phẩm');
     }
 
     const skuList = await this.variantService.getVariantByProductId(
@@ -486,7 +486,7 @@ class ProductService {
     const foundProduct = await this.productRepository.getProduct(productKey);
 
     if (!foundProduct) {
-      throw new BadRequestError('Product not found');
+      throw new BadRequestError('Không tìm thấy sản phẩm');
     }
 
     const updatedProduct = await this.productRepository.updateById(
@@ -508,7 +508,7 @@ class ProductService {
     const foundProduct = await this.productRepository.getProduct(productKey);
 
     if (!foundProduct) {
-      throw new BadRequestError('Product not found');
+      throw new BadRequestError('Không tìm thấy sản phẩm');
     }
 
     const updatedProduct = await this.productRepository.updateById(
@@ -528,11 +528,11 @@ class ProductService {
 
   async importStock({ items, userId }) {
     if (!Array.isArray(items) || items.length === 0) {
-      throw new BadRequestError('Items array is required and cannot be empty');
+      throw new BadRequestError('Danh sách sản phẩm không được để trống');
     }
 
     if (!userId) {
-      throw new BadRequestError('User ID is required');
+      throw new BadRequestError('Thiếu thông tin người dùng');
     }
 
     const updatedData = [];
@@ -542,13 +542,13 @@ class ProductService {
 
       if (!productId || quantity === undefined || quantity <= 0) {
         throw new BadRequestError(
-          `Invalid item: productId and quantity (>0) are required`
+          `Dữ liệu không hợp lệ: cần có productId và số lượng > 0`
         );
       }
 
       const foundProduct = await this.productRepository.getById(productId);
       if (!foundProduct) {
-        throw new NotFoundError(`Product ${productId} not found`);
+        throw new NotFoundError(`Không tìm thấy sản phẩm với ID ${productId}`);
       }
 
       let updateData = { updatedBy: userId };
@@ -557,7 +557,7 @@ class ProductService {
         const variant = await this.variantRepository.getById(variantId);
         if (!variant || variant.productId.toString() !== productId.toString()) {
           throw new NotFoundError(
-            `Variant ${variantId} not found or does not belong to product ${productId}`
+            `Không tìm thấy biến thể hoặc biến thể không thuộc về sản phẩm ${productId}`
           );
         }
 
@@ -612,7 +612,7 @@ class ProductService {
       } else {
         if (foundProduct.variants.length > 0) {
           throw new BadRequestError(
-            `Product ${productId} has variants; variantId is required`
+            `Sản phẩm ${productId} có biến thể, vui lòng cung cấp variantId`
           );
         }
 
@@ -659,11 +659,11 @@ class ProductService {
 
   async applyDiscounts({ items, userId }) {
     if (!Array.isArray(items) || items.length === 0) {
-      throw new BadRequestError('Items array is required and cannot be empty');
+      throw new BadRequestError('Danh sách sản phẩm không được để trống');
     }
 
     if (!userId) {
-      throw new BadRequestError('User ID is required');
+      throw new BadRequestError('Thiếu thông tin người dùng');
     }
 
     const updatedData = [];
@@ -686,34 +686,38 @@ class ProductService {
         !discountEnd
       ) {
         throw new BadRequestError(
-          `Invalid item: productId, discountType, discountValue, discountStart, and discountEnd are required`
+          `Dữ liệu không hợp lệ: cần có productId, discountType, discountValue, discountStart và discountEnd`
         );
       }
 
       if (!['AMOUNT', 'PERCENT'].includes(discountType)) {
         throw new BadRequestError(
-          `Invalid discountType: must be AMOUNT or PERCENT`
+          `Loại giảm giá không hợp lệ: chỉ chấp nhận AMOUNT hoặc PERCENT`
         );
       }
 
       if (discountValue < 0) {
-        throw new BadRequestError(`discountValue must be non-negative`);
+        throw new BadRequestError(`Giá trị giảm giá phải lớn hơn hoặc bằng 0`);
       }
 
       const startDate = new Date(discountStart);
       const endDate = new Date(discountEnd);
       if (isNaN(startDate) || isNaN(endDate)) {
-        throw new BadRequestError(`Invalid discountStart or discountEnd date`);
+        throw new BadRequestError(
+          `Ngày bắt đầu hoặc kết thúc giảm giá không hợp lệ`
+        );
       }
 
       if (startDate >= endDate) {
-        throw new BadRequestError(`discountStart must be before discountEnd`);
+        throw new BadRequestError(
+          `Ngày bắt đầu phải trước ngày kết thúc giảm giá`
+        );
       }
 
       // Fetch product
       const foundProduct = await this.productRepository.getById(productId);
       if (!foundProduct) {
-        throw new NotFoundError(`Product ${productId} not found`);
+        throw new NotFoundError(`Không tìm thấy sản phẩm với ID ${productId}`);
       }
 
       // Prepare update data
@@ -764,7 +768,7 @@ class ProductService {
       categories.map(async (id) => {
         const categoryData = await this.categoryRepository.getById(id);
         if (!categoryData) {
-          throw new BadRequestError(`Category with ID ${id} not found`);
+          throw new BadRequestError(`Không tìm thấy danh mục với ID ${id}`);
         }
         validCategories.push(categoryData);
       })
@@ -778,7 +782,9 @@ class ProductService {
 
   async _validateAttributes(attributes) {
     if (!Array.isArray(attributes) || attributes.length === 0) {
-      throw new BadRequestError('Attributes must be a non-empty array.');
+      throw new BadRequestError(
+        'Thuộc tính phải là một mảng và không được để trống.'
+      );
     }
 
     const attributeIds = attributes.map((attr) => attr.id);
@@ -801,7 +807,7 @@ class ProductService {
     );
     if (missingAttributes.length) {
       throw new BadRequestError(
-        `Attributes not found: ${missingAttributes.join(', ')}`
+        `Không tìm thấy thuộc tính: ${missingAttributes.join(', ')}`
       );
     }
   }
@@ -811,7 +817,7 @@ class ProductService {
       const attribute = attributeMap.get(attr.id);
       if (!Array.isArray(attr.values) || attr.values.length === 0) {
         throw new BadRequestError(
-          `Values for attribute ${attr.id} must be a non-empty array.`
+          `Giá trị của thuộc tính ${attr.id} phải là một mảng và không được để trống.`
         );
       }
 
@@ -827,7 +833,9 @@ class ProductService {
 
       if (invalidValues.length) {
         throw new BadRequestError(
-          `Invalid values for attribute ${attr.id}: ${invalidValues.join(', ')}`
+          `Giá trị không hợp lệ cho thuộc tính ${attr.id}: ${invalidValues.join(
+            ', '
+          )}`
         );
       }
 
@@ -910,14 +918,14 @@ class ProductService {
         }
       } catch (error) {
         throw new BadRequestError(
-          'Invalid attributes format: must be valid JSON'
+          'Định dạng thuộc tính không hợp lệ: phải là JSON hợp lệ'
         );
       }
     } else if (Array.isArray(attributes)) {
       parsedAttributes = attributes;
     } else {
       throw new BadRequestError(
-        'Attributes must be a string, array, or object'
+        'Thuộc tính phải là chuỗi, mảng hoặc đối tượng'
       );
     }
 
@@ -934,13 +942,13 @@ class ProductService {
         !attr.values.length
       ) {
         throw new BadRequestError(
-          `Invalid attribute at index ${index}: must have id and non-empty values array`
+          `Thuộc tính không hợp lệ tại vị trí ${index}: phải có id và mảng giá trị không rỗng`
         );
       }
       attr.values.forEach((val, valIdx) => {
         if (!val) {
           throw new BadRequestError(
-            `Invalid value at index ${valIdx} for attribute ${attr.id}`
+            `Giá trị không hợp lệ tại vị trí ${valIdx} cho thuộc tính ${attr.id}`
           );
         }
       });
@@ -1043,7 +1051,7 @@ class ProductService {
     });
 
     if (!updatedProduct) {
-      throw new BadRequestError('Product not found');
+      throw new BadRequestError('Không tìm thấy sản phẩm');
     }
   }
 
@@ -1053,19 +1061,19 @@ class ProductService {
     });
 
     if (!updatedProduct) {
-      throw new BadRequestError('Failed to update product views');
+      throw new BadRequestError('Cập nhật lượt xem sản phẩm thất bại');
     }
   }
 
   async updateProductQuantity({ id, quantity = null, skuList }) {
     const foundProduct = await this.productRepository.getById(id);
-    if (!foundProduct) throw new NotFoundError('Product not found');
+    if (!foundProduct) throw new NotFoundError('Không tìm thấy sản phẩm');
 
     // Handle product without variants
     if (foundProduct.variants && foundProduct.variants.length > 0) {
       if (!skuList || skuList.length === 0) {
         throw new BadRequestError(
-          'This product has variants. Please update quantities via skuList.'
+          'Sản phẩm này có biến thể. Vui lòng cập nhật số lượng qua skuList.'
         );
       }
       return this._handleProductWithVariants({
@@ -1082,7 +1090,7 @@ class ProductService {
     }
 
     throw new BadRequestError(
-      'Invalid request: quantity or skuList must be provided'
+      'Yêu cầu không hợp lệ: cần cung cấp quantity hoặc skuList'
     );
   }
 

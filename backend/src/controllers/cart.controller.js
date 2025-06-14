@@ -12,7 +12,7 @@ class CartController {
 
   addToCart = async (req, res, next) => {
     new CreateSuccess({
-      message: 'Item added to cart successfully',
+      message: 'Thêm sản phẩm vào giỏ hàng thành công',
       metadata: await this.cartService.addToCart({
         user: req.user,
         ...req.body,
@@ -22,7 +22,7 @@ class CartController {
 
   updateCartItems = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Cart updated successfully',
+      message: 'Cập nhật giỏ hàng thành công',
       metadata: await this.cartService.updateCartItems({
         user: req.user,
         ...req.body,
@@ -32,7 +32,7 @@ class CartController {
 
   removeItemFromCart = async (req, res, next) => {
     new NoContentSuccess({
-      message: 'Item removed from cart successfully',
+      message: 'Xóa sản phẩm khỏi giỏ hàng thành công',
       metadata: await this.cartService.removeCartItem({
         user: req.user,
         ...req.body,
@@ -42,14 +42,14 @@ class CartController {
 
   clearCart = async (req, res, next) => {
     new NoContentSuccess({
-      message: 'Cart cleared successfully',
+      message: 'Xóa toàn bộ giỏ hàng thành công',
       metadata: await this.cartService.clearCart(req.user),
     }).send(res);
   };
 
   getCart = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Cart retrieved successfully',
+      message: 'Lấy giỏ hàng thành công',
       metadata: await this.cartService.getCart(req.user),
     }).send(res);
   };

@@ -53,7 +53,7 @@ class RoleService {
 
     if (protectedRolesLower.includes(trimmedNameLower)) {
       throw new ForbiddenError(
-        `The role '${trimmedName}' is protected and cannot be created`
+        `Vai trò '${trimmedName}' là vai trò hệ thống và không thể tạo mới`
       );
     }
 
@@ -61,7 +61,7 @@ class RoleService {
       rol_name: trimmedName,
     });
     if (existingRole) {
-      throw new BadRequestError('Role name already exists');
+      throw new BadRequestError('Tên vai trò đã tồn tại');
     }
 
     const newRole = await this.roleRepository.create({
@@ -70,7 +70,7 @@ class RoleService {
     });
 
     if (!newRole) {
-      throw new InternalServerError('Role creation failed');
+      throw new InternalServerError('Tạo vai trò thất bại');
     }
 
     return {
@@ -83,7 +83,7 @@ class RoleService {
   async getRoleById(roleId) {
     const foundRole = await this.roleRepository.getById(roleId);
     if (!foundRole) {
-      throw new BadRequestError('Role not found');
+      throw new BadRequestError('Không tìm thấy vai trò');
     }
 
     return {
@@ -133,12 +133,12 @@ class RoleService {
   async updateRole({ roleId, name, permissions }) {
     const foundRole = await this.roleRepository.getById(roleId);
     if (!foundRole) {
-      throw new BadRequestError('Role not found');
+      throw new BadRequestError('Không tìm thấy vai trò');
     }
 
     if (PROTECTED_ROLES.includes(foundRole.rol_name)) {
       throw new ForbiddenError(
-        `The role '${foundRole.rol_name}' is protected and cannot be updated`
+        `Vai trò '${foundRole.rol_name}' là vai trò hệ thống và không thể chỉnh sửa`
       );
     }
 
@@ -149,7 +149,7 @@ class RoleService {
     );
     if (protectedRolesLower.includes(trimmedNameLower)) {
       throw new ForbiddenError(
-        `The role '${trimmedName}' is protected and cannot be updated`
+        `Vai trò '${trimmedName}' là vai trò hệ thống và không thể chỉnh sửa`
       );
     }
 
@@ -159,7 +159,7 @@ class RoleService {
     });
 
     if (existingRole) {
-      throw new BadRequestError('Role name already exists');
+      throw new BadRequestError('Tên vai trò đã tồn tại');
     }
 
     const updatedRole = await this.roleRepository.updateById(roleId, {
@@ -168,7 +168,7 @@ class RoleService {
     });
 
     if (!updatedRole) {
-      throw new InternalServerError('Role update failed');
+      throw new InternalServerError('Cập nhật vai trò thất bại');
     }
 
     return {
@@ -182,19 +182,19 @@ class RoleService {
     console.log(roleId);
     const foundRole = await this.roleRepository.getById(roleId);
     if (!foundRole) {
-      throw new BadRequestError('Role not found');
+      throw new BadRequestError('Không tìm thấy vai trò');
     }
 
     if (PROTECTED_ROLES.includes(foundRole.name)) {
       throw new ForbiddenError(
-        `The role '${foundRole.name}' is protected and cannot be deleted`
+        `Vai trò '${foundRole.name}' là vai trò hệ thống và không thể xóa`
       );
     }
 
     const deletedRole = await this.roleRepository.deleteById(roleId);
 
     if (!deletedRole) {
-      throw new InternalServerError('Role deletion failed');
+      throw new InternalServerError('Xóa vai trò thất bại');
     }
   }
 }

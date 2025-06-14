@@ -8,14 +8,14 @@ class StatisticsController {
 
   getReportCountRecords = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Report count records retrieved successfully',
+      message: 'Lấy thống kê tổng quan thành công',
       metadata: await this.statisticsService.getReportCountRecords(),
     }).send(res);
   };
 
   getReviewStats = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Review statistics retrieved successfully',
+      message: 'Lấy thống kê đánh giá thành công',
       metadata: await this.statisticsService.getReviewStats(req.query),
     }).send(res);
   };

@@ -11,7 +11,7 @@ class ChatController {
 
   postMessageByUser = async (req, res, next) => {
     new CreateSuccess({
-      message: 'Message posted successfully',
+      message: 'Gửi tin nhắn thành công',
       metadata: await this.chatService.postMessageByUser({
         ...req.body,
         user: req.user,
@@ -22,14 +22,14 @@ class ChatController {
 
   postMessageByAnonymous = async (req, res, next) => {
     new CreateSuccess({
-      message: 'Message posted successfully',
+      message: 'Gửi tin nhắn thành công',
       metadata: await this.chatService.postMessageByAnonymous(req.body),
     }).send(res);
   };
 
   getAllConversationsByUser = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Conversation retrieved successfully',
+      message: 'Lấy hội thoại thành công',
       metadata: await this.chatService.getAllConversationsByUser({
         userId: req.user.id,
         ...req.query,
@@ -39,7 +39,7 @@ class ChatController {
 
   getAllConversationsByAdmin = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Conversation retrieved successfully',
+      message: 'Lấy hội thoại thành công',
       metadata: await this.chatService.getAllConversationsByAdmin({
         userId: req.user.id,
         ...req.query,
@@ -49,7 +49,7 @@ class ChatController {
 
   getMessageByConversationId = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Messages retrieved successfully',
+      message: 'Lấy tin nhắn thành công',
       metadata: await this.chatService.getMessageByConversationId({
         conversationId: req.params.conversationId,
         userId: req.user.id,
@@ -60,7 +60,7 @@ class ChatController {
 
   mergeAnonymousChatToUser = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Anonymous chat merged successfully',
+      message: 'Gộp hội thoại ẩn danh thành công',
       metadata: await this.chatService.mergeAnonymousChatToUser({
         user: req.user,
         deviceToken: req.body.deviceToken,
@@ -70,7 +70,7 @@ class ChatController {
 
   markMessageAsSeen = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Messages seen status updated successfully',
+      message: 'Cập nhật trạng thái đã xem tin nhắn thành công',
       metadata: await this.chatService.markMessageAsSeen({
         conversationId: req.params.conversationId,
         userId: req.user.id,
@@ -80,7 +80,7 @@ class ChatController {
 
   syncQdrant = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Qdrant sync completed successfully',
+      message: 'Đồng bộ Qdrant thành công',
       metadata: await this.chatService.textToNoSQL(),
     }).send(res);
   };

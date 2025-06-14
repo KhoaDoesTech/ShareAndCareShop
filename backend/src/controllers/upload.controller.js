@@ -8,7 +8,7 @@ class UploadController {
 
   uploadProductImage = async (req, res, next) => {
     new CreateSuccess({
-      message: 'Image uploaded successfully',
+      message: 'Tải ảnh sản phẩm thành công',
       metadata: await this.uploadService.uploadProductImage({
         file: req.file,
         temporary: true,
@@ -18,21 +18,21 @@ class UploadController {
 
   uploadChatImage = async (req, res, next) => {
     new CreateSuccess({
-      message: 'Chat image uploaded successfully',
+      message: 'Tải ảnh chat thành công',
       metadata: await this.uploadService.uploadChatImage({ file: req.file }),
     }).send(res);
   };
 
   uploadReviewImage = async (req, res, next) => {
     new CreateSuccess({
-      message: 'Review image uploaded successfully',
+      message: 'Tải ảnh đánh giá thành công',
       metadata: await this.uploadService.uploadReviewImage({ file: req.file }),
     }).send(res);
   };
 
   uploadTransferImage = async (req, res, next) => {
     new CreateSuccess({
-      message: 'Transfer image uploaded successfully',
+      message: 'Tải ảnh chuyển khoản thành công',
       metadata: await this.uploadService.uploadTransferImage({
         file: req.file,
       }),
@@ -42,7 +42,7 @@ class UploadController {
   deleteImageByUrl = async (req, res, next) => {
     await this.uploadService.deleteImageByUrl(req.body.url);
     new NoContentSuccess({
-      message: 'Image deleted successfully',
+      message: 'Xóa ảnh thành công',
     }).send(res);
   };
 }

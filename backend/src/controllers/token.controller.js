@@ -12,7 +12,7 @@ class TokenController {
 
   refreshAccessToken = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Access token refreshed successfully',
+      message: 'Làm mới access token thành công',
       metadata: await this.tokenService.refreshAccessToken({
         user: req.user,
         keyStore: req.keyStore,
@@ -22,7 +22,7 @@ class TokenController {
 
   getTokens = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Tokens retrieved successfully',
+      message: 'Lấy danh sách thiết bị thành công',
       metadata: await this.tokenService.getDeviceTokens({
         user: req.user,
         currentToken: req.keyStore.deviceToken,
@@ -32,7 +32,7 @@ class TokenController {
 
   updateDeviceName = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Device name updated successfully',
+      message: 'Cập nhật tên thiết bị thành công',
       metadata: await this.tokenService.updateDeviceName({
         user: req.user,
         deviceToken: req.body.deviceToken,
@@ -43,7 +43,7 @@ class TokenController {
 
   deleteToken = async (req, res, next) => {
     new NoContentSuccess({
-      message: 'Token deleted successfully',
+      message: 'Xóa thiết bị thành công',
       metadata: await this.tokenService.deleteToken({
         user: req.user,
         deviceToken: req.body.deviceToken,
@@ -53,7 +53,7 @@ class TokenController {
 
   deleteAllTokens = async (req, res, next) => {
     new NoContentSuccess({
-      message: 'All tokens deleted successfully',
+      message: 'Xóa tất cả thiết bị thành công',
       metadata: await this.tokenService.deleteAllTokens({
         user: req.user,
         currentToken: req.keyStore.deviceToken,

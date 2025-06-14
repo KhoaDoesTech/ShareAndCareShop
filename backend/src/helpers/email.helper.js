@@ -60,10 +60,10 @@ class EmailHelper {
 
     try {
       await this.transporter.sendMail(mailOptions);
-      logger.info(`Email sent to ${to}`);
+      logger.info(`Đã gửi email tới ${to}`);
     } catch (error) {
-      logger.error('Failed to send email:', error);
-      throw new InternalServerError('Error while sending email');
+      logger.error('Gửi email thất bại:', error);
+      throw new InternalServerError('Gửi email thất bại');
     }
   }
 
@@ -71,24 +71,24 @@ class EmailHelper {
     const content = {
       body: {
         name: username,
-        intro: "Welcome to our app! We're very excited to have you on board.",
+        intro:
+          'Chào mừng bạn đến với Share And Care! Chúng tôi rất vui khi bạn tham gia.',
         action: {
-          instructions:
-            'To verify your email please click on the following button:',
+          instructions: 'Để xác thực email, vui lòng nhấn vào nút bên dưới:',
           button: {
-            color: '#22BC66', // Optional action button color
-            text: 'Verify your email',
+            color: '#22BC66',
+            text: 'Xác thực email',
             link: verificationUrl,
           },
         },
         outro:
-          "Need help, or have questions? Just reply to this email, we'd love to help.",
+          'Nếu bạn cần hỗ trợ hoặc có thắc mắc, chỉ cần trả lời email này. Chúng tôi luôn sẵn sàng giúp đỡ.',
       },
     };
 
     await this.sendEmail({
       to: email,
-      subject: 'Please verify your email',
+      subject: 'Xác thực địa chỉ email',
       templateContent: content,
     });
   }
@@ -98,24 +98,23 @@ class EmailHelper {
       body: {
         name: username,
         intro:
-          'You have received this email because a password reset request for your account was received.',
+          'Bạn nhận được email này vì đã yêu cầu đặt lại mật khẩu cho tài khoản của mình.',
         action: {
-          instructions:
-            'To reset your password, please click on the following button:',
+          instructions: 'Để đặt lại mật khẩu, vui lòng nhấn vào nút bên dưới:',
           button: {
             color: '#DC4D2F',
-            text: 'Reset your password',
+            text: 'Đặt lại mật khẩu',
             link: resetUrl,
           },
         },
         outro:
-          'If you did not request a password reset, no further action is required on your part.',
+          'Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.',
       },
     };
 
     await this.sendEmail({
       to: email,
-      subject: 'Password reset request',
+      subject: 'Yêu cầu đặt lại mật khẩu',
       templateContent: content,
     });
   }

@@ -115,7 +115,7 @@ class App {
     this.app.all(
       '*',
       asyncHandler(async () => {
-        throw new NotFoundError('The requested resource was not found');
+        throw new NotFoundError('Không tìm thấy URL bạn yêu cầu');
       })
     );
   }

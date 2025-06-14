@@ -12,7 +12,7 @@ class ProductController {
 
   createProduct = async (req, res, next) => {
     new CreateSuccess({
-      message: 'Product created successfully',
+      message: 'Tạo sản phẩm thành công',
       metadata: await this.productService.createProduct({
         userId: req.user.id,
         ...req.body,
@@ -22,7 +22,7 @@ class ProductController {
 
   updateProduct = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Product updated successfully',
+      message: 'Cập nhật sản phẩm thành công',
       metadata: await this.productService.updateProduct({
         userId: req.user.id,
         ...req.body,
@@ -32,63 +32,63 @@ class ProductController {
 
   getAllProductsByUser = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Products retrieved successfully',
+      message: 'Lấy danh sách sản phẩm thành công',
       metadata: await this.productService.getAllProductsPublic(req.query),
     }).send(res);
   };
 
   getAllProducts = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Products retrieved successfully',
+      message: 'Lấy danh sách sản phẩm thành công',
       metadata: await this.productService.getAllProducts(req.query),
     }).send(res);
   };
 
   getProductDetailsByUser = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Product details retrieved successfully',
+      message: 'Lấy chi tiết sản phẩm thành công',
       metadata: await this.productService.getProductDetailsPublic(req.params),
     }).send(res);
   };
 
   getProductDetails = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Product details retrieved successfully',
+      message: 'Lấy chi tiết sản phẩm thành công',
       metadata: await this.productService.getProductDetails(req.params),
     }).send(res);
   };
 
   publishProduct = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Product published successfully',
+      message: 'Đăng bán sản phẩm thành công',
       metadata: await this.productService.publishProduct(req.params),
     }).send(res);
   };
 
   unpublishProduct = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Product unpublished successfully',
+      message: 'Ngừng đăng bán sản phẩm thành công',
       metadata: await this.productService.unpublishProduct(req.params),
     }).send(res);
   };
 
   updateProductViews = async (req, res, next) => {
     new NoContentSuccess({
-      message: 'Product views updated successfully',
+      message: 'Cập nhật lượt xem sản phẩm thành công',
       metadata: await this.productService.updateProductUniqueViews(req.body),
     }).send(res);
   };
 
   updateProductQuantity = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Product quantity updated successfully',
+      message: 'Cập nhật số lượng sản phẩm thành công',
       metadata: await this.productService.updateProductQuantity(req.body),
     }).send(res);
   };
 
   deleteProduct = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Product deleted successfully',
+      message: 'Xóa sản phẩm thành công',
       metadata: await this.productService.deleteProduct(req.params),
     }).send(res);
   };

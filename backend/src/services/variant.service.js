@@ -17,7 +17,9 @@ class VariantService {
   async createVariants({ productKey, skuList }) {
     const foundProduct = await this.productRepository.getProduct(productKey);
     if (!foundProduct) {
-      throw new BadRequestError(`Product with ID: ${productKey} not found`);
+      throw new BadRequestError(
+        `Không tìm thấy sản phẩm với ID: ${productKey}`
+      );
     }
 
     const convertSkuList = skuList.map((sku, index) => ({
@@ -30,7 +32,7 @@ class VariantService {
     }));
 
     const variant = await this.variantRepository.create(convertSkuList);
-    if (!variant) throw new BadRequestError('Failed to create variant');
+    if (!variant) throw new BadRequestError('Tạo biến thể thất bại');
 
     return foundProduct.code;
   }
@@ -81,13 +83,13 @@ class VariantService {
     skuList.forEach((sku) => {
       if (sku.tierIndex.length !== numOfTiers) {
         throw new BadRequestError(
-          `Invalid tierIndex length for SKU: ${JSON.stringify(sku)}`
+          `Độ dài tierIndex không hợp lệ cho SKU: ${JSON.stringify(sku)}`
         );
       }
       sku.tierIndex.forEach((tier, idx) => {
         if (tier < 0 || tier >= variants[idx].options.length) {
           throw new BadRequestError(
-            `Invalid tierIndex value: ${tier} for variant "${variants[idx].name}"`
+            `Giá trị tierIndex không hợp lệ: ${tier} cho biến thể "${variants[idx].name}"`
           );
         }
       });
@@ -185,7 +187,7 @@ class VariantService {
 
       const foundVariant = await this.variantRepository.getById(skuId);
       if (!foundVariant) {
-        throw new BadRequestError(`Variant with ID: ${skuId} not found`);
+        throw new BadRequestError(`Không tìm thấy biến thể với ID: ${skuId}`);
       }
 
       const totalVariantQuantity = quantity + foundVariant.quantity;
@@ -200,7 +202,9 @@ class VariantService {
       });
 
       if (!updatedVariant) {
-        throw new BadRequestError(`Failed to update variant with ID: ${skuId}`);
+        throw new BadRequestError(
+          `Cập nhật biến thể với ID: ${skuId} thất bại`
+        );
       }
     }
   }

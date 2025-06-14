@@ -15,7 +15,7 @@ class AuthController {
   registerUser = async (req, res, next) => {
     new CreateSuccess({
       message:
-        'Users registered successfully and verification email has been sent on your email',
+        'Đăng ký tài khoản thành công, email xác thực đã được gửi đến địa chỉ email của bạn',
       metadata: await this.authService.registerUser(req.body),
     }).send(res);
   };
@@ -35,7 +35,7 @@ class AuthController {
 
   resendVerificationEmail = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Verification email sent successfully',
+      message: 'Gửi lại email xác thực thành công',
       metadata: await this.authService.resendVerificationEmail(req.body),
     }).send(res);
   };
@@ -66,7 +66,7 @@ class AuthController {
 
   logIn = async (req, res, next) => {
     new ActionSuccess({
-      message: 'User logged in successfully',
+      message: 'Đăng nhập thành công',
       metadata: await this.authService.loginUser({
         ...req.body,
         user: req.user,
@@ -76,7 +76,7 @@ class AuthController {
 
   panelLogin = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Access to admin panel granted',
+      message: 'Truy cập trang quản trị thành công',
       metadata: pickFields({
         fields: ['id', 'avatar', 'name', 'email', 'phone'],
         object: req.user,
@@ -86,7 +86,7 @@ class AuthController {
 
   logOut = async (req, res, next) => {
     new NoContentSuccess({
-      message: 'User logged out successfully',
+      message: 'Đăng xuất thành công',
       metadata: await this.authService.logoutUser({
         userId: req.user.id,
         deviceToken: req.keyStore.deviceToken,
@@ -96,21 +96,21 @@ class AuthController {
 
   forgotPassword = async (req, res, next) => {
     new NoContentSuccess({
-      message: 'Password reset email sent successfully',
+      message: 'Gửi email đặt lại mật khẩu thành công',
       metadata: await this.authService.forgotPasswordRequest(req.body),
     }).send(res);
   };
 
   resetPassword = async (req, res, next) => {
     new NoContentSuccess({
-      message: 'Password reset successfully',
+      message: 'Đặt lại mật khẩu thành công',
       metadata: await this.authService.resetForgottenPassword(req.body),
     }).send(res);
   };
 
   updateUserAvatar = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Avatar uploaded successfully',
+      message: 'Cập nhật ảnh đại diện thành công',
       metadata: await this.authService.updateUserAvatar({
         file: req.file,
         user: req.user,

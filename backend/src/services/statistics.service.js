@@ -64,13 +64,13 @@ class StatisticsService {
 
   _validateDateRange(startDate, endDate) {
     if (!startDate || !endDate) {
-      throw new Error('Start date and end date are required');
+      throw new Error('Vui lòng nhập đầy đủ ngày bắt đầu và ngày kết thúc');
     }
     if (new Date(startDate) >= new Date(endDate)) {
-      throw new Error('Start date must be before end date');
+      throw new Error('Ngày bắt đầu phải trước ngày kết thúc');
     }
     if (new Date(endDate) <= new Date()) {
-      throw new Error('End date must be in the future');
+      throw new Error('Ngày kết thúc phải lớn hơn ngày hiện tại');
     }
   }
 }

@@ -13,7 +13,7 @@ class CategoryService {
     if (parentId) {
       const parentCategory = await this.categoryRepository.getById(parentId);
       if (!parentCategory) {
-        throw new BadRequestError('Parent category not found');
+        throw new BadRequestError('Không tìm thấy danh mục cha');
       }
       rightValue = parentCategory.right;
       await this.categoryRepository.updateManyCategories(rightValue, 2);
@@ -32,7 +32,7 @@ class CategoryService {
       cat_parent_id: parentId || null,
     });
 
-    if (!newCategory) throw new BadRequestError('Failed to create category');
+    if (!newCategory) throw new BadRequestError('Tạo danh mục thất bại');
 
     return pickFields({
       fields: ['name', 'parentId', 'id'],
@@ -44,7 +44,7 @@ class CategoryService {
     try {
       return this.categoryRepository.deleteCategoryById(categoryId);
     } catch (error) {
-      throw new BadRequestError('Delete category failed');
+      throw new BadRequestError('Xóa danh mục thất bại');
     }
   }
 
@@ -62,7 +62,7 @@ class CategoryService {
         object: updatedCategory,
       });
     } catch (error) {
-      throw new BadRequestError('Update category failed');
+      throw new BadRequestError('Cập nhật danh mục thất bại');
     }
   }
 
@@ -70,7 +70,7 @@ class CategoryService {
     if (parentId) {
       const parentCategory = await this.categoryRepository.getById(parentId);
       if (!parentCategory) {
-        throw new BadRequestError('Parent category not found');
+        throw new BadRequestError('Không tìm thấy danh mục cha');
       }
     }
 
@@ -123,7 +123,7 @@ class CategoryService {
         cat_right: { $lte: parentCategory.right },
       };
     } catch (error) {
-      throw new BadRequestError('Parent category not found');
+      throw new BadRequestError('Không tìm thấy danh mục cha');
     }
   }
 

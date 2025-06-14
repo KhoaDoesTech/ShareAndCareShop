@@ -8,7 +8,7 @@ class ReviewController {
 
   createReview = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Review created successfully',
+      message: 'Tạo đánh giá thành công',
       metadata: await this.reviewService.createReview({
         userId: req.user.id,
         ...req.body,
@@ -18,7 +18,7 @@ class ReviewController {
 
   replyReview = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Review replied successfully',
+      message: 'Phản hồi đánh giá thành công',
       metadata: await this.reviewService.replyReview({
         userId: req.user.id,
         reviewId: req.params.reviewId,
@@ -29,7 +29,7 @@ class ReviewController {
 
   reportReview = async (req, res) => {
     new ActionSuccess({
-      message: 'Review reported successfully',
+      message: 'Báo cáo đánh giá thành công',
       metadata: await this.reviewService.reportReview({
         userId: req.user.id,
         reviewId: req.params.reviewId,
@@ -43,7 +43,7 @@ class ReviewController {
     const { sort, page = 1, size = 10, rating, hasImage } = req.query;
 
     new ActionSuccess({
-      message: 'Reviews retrieved successfully',
+      message: 'Lấy danh sách đánh giá thành công',
       metadata: await this.reviewService.getReviewsByProduct({
         productId,
         sort,
@@ -57,7 +57,7 @@ class ReviewController {
 
   getReviewsDetailsByUser = async (req, res) => {
     new ActionSuccess({
-      message: 'User reviews retrieved successfully',
+      message: 'Lấy chi tiết đánh giá của người dùng thành công',
       metadata: await this.reviewService.getReviewsDetailsByUser({
         userId: req.user.id,
         ...req.query,
@@ -67,21 +67,21 @@ class ReviewController {
 
   getUnrepliedReviews = async (req, res) => {
     new ActionSuccess({
-      message: 'User reviews retrieved successfully',
+      message: 'Lấy danh sách đánh giá chưa phản hồi thành công',
       metadata: await this.reviewService.getUnrepliedReviews(req.query),
     }).send(res);
   };
 
   getReviewById = async (req, res) => {
     new ActionSuccess({
-      message: 'Review retrieved successfully',
+      message: 'Lấy đánh giá thành công',
       metadata: await this.reviewService.getReviewById(req.params),
     }).send(res);
   };
 
   hideReview = async (req, res) => {
     new ActionSuccess({
-      message: 'Review hidden successfully',
+      message: 'Ẩn đánh giá thành công',
       metadata: await this.reviewService.hideReview(req.params),
     }).send(res);
   };

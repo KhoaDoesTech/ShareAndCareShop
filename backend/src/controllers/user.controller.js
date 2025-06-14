@@ -12,7 +12,7 @@ class UserController {
 
   getAllUsers = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Users retrieved successfully',
+      message: 'Lấy danh sách người dùng thành công',
       metadata: await this.userService.getAllUsers(req.query),
     }).send(res);
   };
@@ -23,13 +23,13 @@ class UserController {
       ...req.body,
     });
     new ActionSuccess({
-      message: 'Password changed successfully',
+      message: 'Đổi mật khẩu thành công',
     }).send(res);
   };
 
   changeRole = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Role changed successfully',
+      message: 'Thay đổi vai trò thành công',
       metadata: await this.userService.assignRoleToUser({
         userId: req.params.userId,
         ...req.body,
@@ -39,14 +39,14 @@ class UserController {
 
   blockUser = async (req, res, next) => {
     new ActionSuccess({
-      message: 'User blocked successfully',
+      message: 'Khóa người dùng thành công',
       metadata: await this.userService.blockUser(req.params.userId),
     }).send(res);
   };
 
   unBlockUser = async (req, res, next) => {
     new ActionSuccess({
-      message: 'User unblocked successfully',
+      message: 'Mở khóa người dùng thành công',
       metadata: await this.userService.unblockUser(req.params.userId),
     }).send(res);
   };

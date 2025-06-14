@@ -24,12 +24,14 @@ class AttributeService {
   }) {
     // Validate required fields
     if (!name || !type) {
-      throw new BadRequestError('Attribute name and type are required');
+      throw new BadRequestError(
+        'Tên thuộc tính và loại thuộc tính là bắt buộc'
+      );
     }
 
     // Check if attribute type is valid
     if (!AvailableAttributeTypes.includes(type)) {
-      throw new BadRequestError('Invalid attribute type');
+      throw new BadRequestError('Loại thuộc tính không hợp lệ');
     }
 
     const newAttribute = await this.attributeRepository.create({
@@ -65,7 +67,7 @@ class AttributeService {
   async addValuesToAttribute({ attributeId, values }) {
     // Validate required fields
     if (!attributeId || !Array.isArray(values) || values.length === 0) {
-      throw new BadRequestError('Attribute ID and values are required');
+      throw new BadRequestError('ID thuộc tính và giá trị là bắt buộc');
     }
 
     // Check if attribute exists and populate values
@@ -74,7 +76,7 @@ class AttributeService {
       'attr_values'
     );
     if (!attribute) {
-      throw new NotFoundError('Attribute not found');
+      throw new NotFoundError('Không tìm thấy thuộc tính');
     }
 
     // Get existing attribute values
@@ -86,7 +88,7 @@ class AttributeService {
     );
 
     if (newValues.length === 0) {
-      throw new BadRequestError('All provided values already exist');
+      throw new BadRequestError('Tất cả giá trị đã tồn tại trong thuộc tính');
     }
 
     // Create new attribute values

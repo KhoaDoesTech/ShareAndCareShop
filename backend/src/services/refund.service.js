@@ -44,7 +44,7 @@ class RefundService {
 
     if (missingParams.length > 0) {
       throw new BadRequestError(
-        `Missing required parameters: ${missingParams.join(', ')}`
+        `Thiếu tham số bắt buộc: ${missingParams.join(', ')}`
       );
     }
 
@@ -62,7 +62,7 @@ class RefundService {
     );
 
     if (!orderItem) {
-      throw new BadRequestError('Item not found in order');
+      throw new BadRequestError('Không tìm thấy sản phẩm trong đơn hàng');
     }
 
     // 4. Kiểm tra thời hạn trả hàng sớm
@@ -71,7 +71,7 @@ class RefundService {
       returnDeadline.setDate(returnDeadline.getDate() + orderItem.returnDays);
 
       if (Date.now() > returnDeadline.getTime()) {
-        throw new BadRequestError('Return period has expired');
+        throw new BadRequestError('Đã hết thời gian trả hàng cho sản phẩm này');
       }
     }
 
@@ -88,9 +88,7 @@ class RefundService {
     });
 
     if (existingRefund) {
-      throw new BadRequestError(
-        'A refund request for this item already exists'
-      );
+      throw new BadRequestError('Yêu cầu hoàn trả cho sản phẩm này đã tồn tại');
     }
 
     // 7. Tạo refund log với cấu trúc rõ ràng
@@ -144,11 +142,15 @@ class RefundService {
       convertToObjectIdMongodb(refundLogId)
     );
     if (!refundLog) {
-      throw new NotFoundError(`Refund request ${refundLogId} not found`);
+      throw new NotFoundError(
+        `Không tìm thấy yêu cầu hoàn trả với mã ${refundLogId}`
+      );
     }
 
     if (refundLog.status !== RefundStatus.PENDING) {
-      throw new BadRequestError('Refund request is not in PENDING status');
+      throw new BadRequestError(
+        'Yêu cầu hoàn trả không ở trạng thái chờ xử lý'
+      );
     }
 
     const updatedRefundLog = await this.refundLogRepository.updateById(
@@ -170,11 +172,15 @@ class RefundService {
   async rejectRefundRequest({ refundLogId, adminId, rejectReason }) {
     const refundLog = await this.refundLogRepository.getById(refundLogId);
     if (!refundLog) {
-      throw new NotFoundError(`Refund request ${refundLogId} not found`);
+      throw new NotFoundError(
+        `Không tìm thấy yêu cầu hoàn trả với mã ${refundLogId}`
+      );
     }
 
     if (refundLog.status !== RefundStatus.PENDING) {
-      throw new BadRequestError('Refund request is not in PENDING status');
+      throw new BadRequestError(
+        'Yêu cầu hoàn trả không ở trạng thái chờ xử lý'
+      );
     }
 
     if (
@@ -182,7 +188,7 @@ class RefundService {
       typeof rejectReason !== 'string' ||
       rejectReason.trim().length === 0
     ) {
-      throw new BadRequestError('Reject reason is required');
+      throw new BadRequestError('Lý do từ chối là bắt buộc');
     }
 
     const updatedRefundLog = await this.refundLogRepository.updateById(
@@ -196,7 +202,7 @@ class RefundService {
     );
 
     if (!updatedRefundLog) {
-      throw new InternalServerError('Failed to reject refund request');
+      throw new InternalServerError('Từ chối yêu cầu hoàn trả thất bại');
     }
 
     return {
@@ -249,7 +255,7 @@ class RefundService {
     // Validate inputs
 
     if (!Array.isArray(refundLogIds)) {
-      throw new BadRequestError('refundLogIds must be an array');
+      throw new BadRequestError('Danh sách mã hoàn trả phải là một mảng');
     }
 
     refundLogIds = refundLogIds.filter(
@@ -257,7 +263,7 @@ class RefundService {
     );
 
     if (refundLogIds.length === 0) {
-      throw new BadRequestError('At least one valid refundLogId is required');
+      throw new BadRequestError('Cần ít nhất một mã hoàn trả hợp lệ');
     }
 
     // Validate refund logs and ensure they belong to the same order
@@ -271,19 +277,21 @@ class RefundService {
 
       console.log(refundLog);
       if (!refundLog) {
-        throw new NotFoundError(`Refund request ${refundLogId} not found`);
+        throw new NotFoundError(
+          `Không tìm thấy yêu cầu hoàn trả với mã ${refundLogId}`
+        );
       }
 
       if (refundLog.status !== RefundStatus.APPROVED) {
         throw new BadRequestError(
-          `Refund request ${refundLogId} must be APPROVED`
+          `Yêu cầu hoàn trả ${refundLogId} phải ở trạng thái đã duyệt`
         );
       }
       if (!orderId) {
         orderId = refundLog.orderId;
       } else if (refundLog.orderId.toString() !== orderId.toString()) {
         throw new BadRequestError(
-          'All refund requests must belong to the same order'
+          'Tất cả yêu cầu hoàn trả phải thuộc cùng một đơn hàng'
         );
       }
       refundLogs.push(refundLog);
@@ -292,7 +300,7 @@ class RefundService {
 
     const order = await this.orderRepository.getById(orderId);
     if (!order) {
-      throw new NotFoundError(`Order ${orderId} not found`);
+      throw new NotFoundError(`Không tìm thấy đơn hàng với mã ${orderId}`);
     }
 
     // Process refund
@@ -347,7 +355,7 @@ class RefundService {
         ipAddress,
       });
     } else {
-      throw new BadRequestError('Unsupported payment method');
+      throw new BadRequestError('Phương thức thanh toán không được hỗ trợ');
     }
 
     // Update refund logs based on refund result
@@ -381,7 +389,7 @@ class RefundService {
       }
     } else {
       throw new InternalServerError(
-        `Unexpected refund status: ${refundResult.status}`
+        `Trạng thái hoàn trả không hợp lệ: ${refundResult.status}`
       );
     }
 
@@ -416,7 +424,9 @@ class RefundService {
       ]
     );
     if (!refundLog) {
-      throw new NotFoundError(`Refund log ${refundLogId} not found`);
+      throw new NotFoundError(
+        `Không tìm thấy log hoàn trả với mã ${refundLogId}`
+      );
     }
 
     return omitFields({
@@ -429,7 +439,7 @@ class RefundService {
     page = parseInt(page, 10) || 1;
     size = parseInt(size, 10) || 10;
     if (page < 1 || size < 1) {
-      throw new BadRequestError('Invalid page or size');
+      throw new BadRequestError('Trang hoặc kích thước trang không hợp lệ');
     }
 
     const filter = {};
@@ -515,12 +525,12 @@ class RefundService {
 
   async getRefundLogByUser({ userId, page = 1, size = 10, orderId }) {
     if (!userId) {
-      throw new BadRequestError('User ID is required');
+      throw new BadRequestError('Thiếu thông tin người dùng');
     }
     page = parseInt(page, 10) || 1;
     size = parseInt(size, 10) || 10;
     if (page < 1 || size < 1) {
-      throw new BadRequestError('Invalid page or size');
+      throw new BadRequestError('Trang hoặc kích thước trang không hợp lệ');
     }
 
     const filter = {
@@ -632,11 +642,13 @@ class RefundService {
   async _validateProductAndVariant(productId, variantId) {
     const product = await this.productRepository.getById(productId);
     if (!product) {
-      throw new BadRequestError('Product not found');
+      throw new BadRequestError('Không tìm thấy sản phẩm');
     }
 
     if (product.variants?.length > 0 && !variantId) {
-      throw new BadRequestError('Variant ID is required for this product');
+      throw new BadRequestError(
+        'Sản phẩm này có biến thể, vui lòng cung cấp mã biến thể'
+      );
     }
 
     if (variantId) {
@@ -644,7 +656,7 @@ class RefundService {
         filter: { _id: convertToObjectIdMongodb(variantId), prd_id: productId },
       });
       if (!variant) {
-        throw new BadRequestError('Variant not found');
+        throw new BadRequestError('Không tìm thấy biến thể');
       }
     }
 
@@ -655,12 +667,14 @@ class RefundService {
     const order = await this.orderRepository.getById(orderId);
 
     if (!order || order.userId.toString() !== userId.toString()) {
-      throw new BadRequestError('Order not found or does not belong to user');
+      throw new BadRequestError(
+        'Không tìm thấy đơn hàng hoặc đơn hàng không thuộc về người dùng'
+      );
     }
 
     if (![OrderStatus.DELIVERED, OrderStatus.RETURN].includes(order.status)) {
       throw new BadRequestError(
-        'Order must be delivered or have an ongoing return request to refund'
+        'Đơn hàng phải ở trạng thái đã giao hoặc đang hoàn trả mới được hoàn tiền'
       );
     }
 

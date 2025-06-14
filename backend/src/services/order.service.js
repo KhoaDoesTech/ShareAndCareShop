@@ -63,7 +63,7 @@ class OrderService {
       });
 
       if (!addressDetails[0]?.placeId) {
-        throw new BadRequestError('Invalid shipping address');
+        throw new BadRequestError('Địa chỉ giao hàng không hợp lệ');
       }
 
       shippingPrice = await this.deliveryService.calculateDeliveryFee({
@@ -241,11 +241,11 @@ class OrderService {
       filter: { _id: orderId, ord_user_id: userId },
     });
     if (!order) {
-      throw new NotFoundError(`Order ${orderId} not found`);
+      throw new NotFoundError(`Không tìm thấy đơn hàng ${orderId}`);
     }
 
     if (order.status === OrderStatus.CANCELLED) {
-      throw new BadRequestError('Order is already cancelled');
+      throw new BadRequestError('Đơn hàng đã bị hủy');
     }
 
     if (
@@ -256,7 +256,7 @@ class OrderService {
       ].includes(order.status)
     ) {
       throw new BadRequestError(
-        `Can only cancel orders in PENDING or AWAITING_PAYMENT or PROCESSING status, current status: ${order.status}`
+        'Chỉ có thể hủy đơn hàng ở trạng thái CHỜ XỬ LÝ, CHỜ THANH TOÁN hoặc ĐANG XỬ LÝ'
       );
     }
 
@@ -270,7 +270,7 @@ class OrderService {
 
     if (order.isPaid && order.paymentMethod !== PaymentMethod.COD) {
       if (!order.transactionId) {
-        throw new BadRequestError('Missing transaction ID for refund');
+        throw new BadRequestError('Thiếu mã giao dịch để hoàn tiền');
       }
 
       let refundResult;
@@ -294,16 +294,16 @@ class OrderService {
           refundStatus = 'MANUAL_REQUIRED';
           refundMessage =
             refundResult.message ||
-            'Refund failed, please contact support for manual refund';
+            'Có lỗi khi xử lý hoàn tiền, vui lòng liên hệ hỗ trợ';
           updates.ord_payment_status = PaymentStatus.PENDING_REFUND;
         } else {
           refundStatus = 'SUCCESS';
-          refundMessage = 'Refund processed successfully';
+          refundMessage = 'Hoàn tiền thành công';
         }
       } catch (error) {
         console.log(error);
         refundStatus = 'FAILED';
-        refundMessage = 'Refund processing error, please contact support';
+        refundMessage = 'Có lỗi khi xử lý hoàn tiền, vui lòng liên hệ hỗ trợ';
         updates.ord_payment_status = PaymentStatus.PENDING_REFUND;
       }
     }
@@ -326,12 +326,14 @@ class OrderService {
   async updateOrderStatus({ orderId, adminId }) {
     const order = await this.orderRepository.getById(orderId);
     if (!order) {
-      throw new NotFoundError(`Order ${orderId} not found`);
+      throw new NotFoundError(`Không tìm thấy đơn hàng ${orderId}`);
     }
 
     const nextStatus = this._getNextStatus(order.status);
     if (!nextStatus) {
-      throw new BadRequestError(`No valid next status for ${order.status}`);
+      throw new BadRequestError(
+        `Không có trạng thái tiếp theo hợp lệ cho trạng thái hiện tại: ${order.status}`
+      );
     }
 
     const updates = {
@@ -356,7 +358,7 @@ class OrderService {
       updates
     );
     if (!updatedOrder) {
-      throw new InternalServerError('Failed to update order status');
+      throw new InternalServerError('Cập nhật trạng thái đơn hàng thất bại');
     }
 
     return updatedOrder;
@@ -370,7 +372,7 @@ class OrderService {
       },
     });
     if (!order) {
-      throw new NotFoundError(`Order ${orderId} not found`);
+      throw new NotFoundError(`Không tìm thấy đơn hàng ${orderId}`);
     }
 
     let paymentUrl = null;
@@ -509,7 +511,7 @@ class OrderService {
   async getOrderDetailsForAdmin({ orderId }) {
     const order = await this.orderRepository.getById(orderId);
     if (!order) {
-      throw new NotFoundError(`Order ${orderId} not found`);
+      throw new NotFoundError(`Không tìm thấy đơn hàng ${orderId}`);
     }
 
     return {
@@ -572,7 +574,7 @@ class OrderService {
     page = parseInt(page, 10) || 1;
     size = parseInt(size, 10) || 10;
     if (page < 1 || size < 1) {
-      throw new BadRequestError('Invalid page or size');
+      throw new BadRequestError('Trang hoặc kích thước không hợp lệ');
     }
 
     const filter = { ord_user_id: userId };
@@ -688,7 +690,7 @@ class OrderService {
     page = parseInt(page, 10) || 1;
     size = parseInt(size, 10) || 10;
     if (page < 1 || size < 1) {
-      throw new BadRequestError('Invalid page or size');
+      throw new BadRequestError('Trang hoặc kích thước không hợp lệ');
     }
 
     const filter = {};
@@ -767,12 +769,12 @@ class OrderService {
     for (const item of items) {
       const product = await this.productRepository.getById(item.productId);
       if (!product) {
-        throw new NotFoundError(`Product ${item.productId} not found`);
+        throw new NotFoundError(`Không tìm thấy sản phẩm ${item.productId}`);
       }
 
       if (product.variants.length > 0 && !item.variantId) {
         throw new BadRequestError(
-          `Product ${product.name} requires a variantId`
+          `Sản phẩm ${product.name} yêu cầu chọn biến thể`
         );
       }
 
@@ -783,20 +785,22 @@ class OrderService {
         : null;
 
       if (item.variantId && !variant) {
-        throw new NotFoundError(`Variant ${item.variantId} not found`);
+        throw new NotFoundError(`Không tìm thấy biến thể ${item.variantId}`);
       }
 
       const availableQuantity = variant ? variant.quantity : product.quantity;
       if (availableQuantity < item.quantity) {
         throw new BadRequestError(
-          `Insufficient stock for product ${item.productId}`
+          `Không đủ hàng tồn kho cho sản phẩm ${item.productId}`
         );
       }
 
       if (
         (variant ? variant.status : product.status) !== ProductStatus.PUBLISHED
       ) {
-        throw new BadRequestError(`Product ${item.productId} is not available`);
+        throw new BadRequestError(
+          `Sản phẩm ${item.productId} hiện không khả dụng`
+        );
       }
 
       const price = variant ? variant.price : product.originalPrice;

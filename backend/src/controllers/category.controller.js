@@ -12,35 +12,35 @@ class CategoryController {
 
   createCategory = async (req, res, next) => {
     new CreateSuccess({
-      message: 'Category created successfully',
+      message: 'Tạo danh mục thành công',
       metadata: await this.categoryService.createCategory(req.body),
     }).send(res);
   };
 
   getCategoriesByParentId = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Categories retrieved successfully',
+      message: 'Lấy danh sách danh mục theo danh mục cha thành công',
       metadata: await this.categoryService.getCategoriesByParentId(req.query),
     }).send(res);
   };
 
   getAllCategories = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Categories retrieved successfully',
+      message: 'Lấy tất cả danh mục thành công',
       metadata: await this.categoryService.getAllCategories(req.query),
     }).send(res);
   };
 
   deleteCategory = async (req, res, next) => {
     new NoContentSuccess({
-      message: 'Category deleted successfully',
+      message: 'Xóa danh mục thành công',
       metadata: await this.categoryService.deleteCategory(req.query),
     }).send(res);
   };
 
   updateCategory = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Category updated successfully',
+      message: 'Cập nhật danh mục thành công',
       metadata: await this.categoryService.updateCategory(req.body),
     }).send(res);
   };

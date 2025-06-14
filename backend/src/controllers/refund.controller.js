@@ -14,7 +14,7 @@ class RefundController {
 
   createRefundRequest = async (req, res, next) => {
     new CreateSuccess({
-      message: 'Refund request created successfully',
+      message: 'Tạo yêu cầu hoàn trả thành công',
       metadata: await this.refundService.createRefundRequest({
         orderId: req.params.orderId,
         userId: req.user.id,
@@ -28,7 +28,7 @@ class RefundController {
 
   approveRefundRequest = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Refund request approved successfully',
+      message: 'Duyệt yêu cầu hoàn trả thành công',
       metadata: await this.refundService.approveRefundRequest({
         refundLogId: req.params.refundLogId,
         adminId: req.user.id,
@@ -38,7 +38,7 @@ class RefundController {
 
   rejectRefundRequest = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Refund request rejected successfully',
+      message: 'Từ chối yêu cầu hoàn trả thành công',
       metadata: await this.refundService.rejectRefundRequest({
         refundLogId: req.params.refundLogId,
         adminId: req.user.id,
@@ -51,7 +51,7 @@ class RefundController {
     const ipAddress =
       req.headers['x-forwarded-for'] || req.connection.remoteAddress;
     new ActionSuccess({
-      message: 'Refund confirmed successfully',
+      message: 'Xác nhận hoàn trả thành công',
       metadata: await this.refundService.confirmReturnReceived({
         adminId: req.user.id,
         ipAddress,
@@ -62,7 +62,7 @@ class RefundController {
 
   getRefundDetails = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Refund status retrieved successfully',
+      message: 'Lấy trạng thái hoàn trả thành công',
       metadata: await this.refundService.getRefundDetails(
         req.params.refundLogId
       ),
@@ -71,7 +71,7 @@ class RefundController {
 
   getRefundRequestsForAdmin = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Refund requests retrieved successfully',
+      message: 'Lấy danh sách yêu cầu hoàn trả thành công',
       metadata: await this.refundService.getRefundRequestsForAdmin({
         ...req.query,
       }),

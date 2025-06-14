@@ -21,9 +21,7 @@ class AddressService {
 
   async getAddressSuggestions({ query, sessionToken }) {
     if (!query)
-      throw new BadRequestError(
-        'Please provide a query to search for addresses'
-      );
+      throw new BadRequestError('Vui lòng nhập từ khóa để tìm kiếm địa chỉ');
 
     const session = sessionToken || generateSessionToken();
 
@@ -39,7 +37,7 @@ class AddressService {
     );
 
     if (response.data.status !== 'OK') {
-      throw new BadRequestError('Goong API returned an error');
+      throw new BadRequestError('Hệ thống Goong API trả về lỗi');
     }
     console.log(response.data.predictions[0]);
     return response.data.predictions.map((prediction) => ({
@@ -63,7 +61,7 @@ class AddressService {
     });
 
     if (response.data.status !== 'OK') {
-      throw new BadRequestError('Goong API returned an error');
+      throw new BadRequestError('Hệ thống Goong API trả về lỗi');
     }
 
     return response.data.results.map((result) => ({
@@ -79,18 +77,19 @@ class AddressService {
 
   async calculateDistance(destinationId) {
     const foundAdmin = await this.userRepository.getAdmin();
-    if (!foundAdmin) throw new BadRequestError('Admin not found');
+    if (!foundAdmin) throw new BadRequestError('Không tìm thấy quản trị viên');
 
     const foundOrigin = await this.addressRepository.getByQuery({
       usr_id: foundAdmin.id,
       adr_type: AddressType.DEFAULT,
     });
-    if (!foundOrigin) throw new BadRequestError('Origin not found');
+    if (!foundOrigin) throw new BadRequestError('Không tìm thấy địa chỉ gốc');
 
     const foundDestination = await this.getPlaceDetailsById({
       placeId: destinationId,
     });
-    if (!foundDestination) throw new BadRequestError('Destination not found');
+    if (!foundDestination)
+      throw new BadRequestError('Không tìm thấy địa chỉ đích');
 
     const distanceMatrix = await this.getDistanceMatrix({
       origins: foundOrigin.location,
@@ -122,7 +121,7 @@ class AddressService {
     });
 
     if (response.data.status !== 'OK') {
-      throw new BadRequestError('Goong API returned an error');
+      throw new BadRequestError('Hệ thống Goong API trả về lỗi');
     }
 
     return response.data.result;
@@ -137,7 +136,7 @@ class AddressService {
     });
 
     if (response.data.status !== 'OK') {
-      throw new BadRequestError('Goong API returned an error');
+      throw new BadRequestError('Hệ thống Goong API trả về lỗi');
     }
 
     return response.data.results.map((result) => ({
@@ -149,7 +148,7 @@ class AddressService {
   async createAddress({ userId, name, phone, street, ward, district, city }) {
     // Validate input parameters to ensure required fields are provided
     if (!userId || !name || !phone || !street || !ward || !district || !city) {
-      throw new BadRequestError('Missing required address fields');
+      throw new BadRequestError('Thiếu thông tin địa chỉ bắt buộc');
     }
 
     const placeDetails = await this.getPlaceDetails({
@@ -161,7 +160,9 @@ class AddressService {
 
     // Check if the place details API returned valid results
     if (!placeDetails || placeDetails.length === 0) {
-      throw new BadRequestError('No place details found for the given address');
+      throw new BadRequestError(
+        'Không tìm thấy thông tin vị trí cho địa chỉ đã nhập'
+      );
     }
 
     const existingAddress = await this.addressRepository.getByQuery({
@@ -252,7 +253,7 @@ class AddressService {
   }) {
     // Step 1: Get existing address for reference
     const foundAddress = await this.addressRepository.getById(addressId);
-    if (!foundAddress) throw new BadRequestError('Address not found');
+    if (!foundAddress) throw new BadRequestError('Không tìm thấy địa chỉ');
 
     // Step 2: Prepare updated address fields
     const updatedFields = {
@@ -268,7 +269,7 @@ class AddressService {
       const placeDetails = await this.getPlaceDetails(updatedFields);
       if (!placeDetails || placeDetails.length === 0) {
         throw new BadRequestError(
-          'Unable to fetch place details for the updated address'
+          'Không thể lấy thông tin vị trí cho địa chỉ đã cập nhật'
         );
       }
 
@@ -291,7 +292,7 @@ class AddressService {
     });
 
     if (Object.keys(updateData).length === 0) {
-      throw new BadRequestError('No valid fields provided for update');
+      throw new BadRequestError('Không có trường hợp lệ để cập nhật');
     }
 
     // Step 5: Flatten the update data for MongoDB
@@ -331,10 +332,10 @@ class AddressService {
       _id: addressId,
       usr_id: userId,
     });
-    if (!foundAddress) throw new BadRequestError('Address not found');
+    if (!foundAddress) throw new BadRequestError('Không tìm thấy địa chỉ');
 
     if (foundAddress.type === AddressType.DEFAULT) {
-      throw new BadRequestError('Cannot delete the default address');
+      throw new BadRequestError('Không thể xóa địa chỉ mặc định');
     }
 
     await this.addressRepository.deleteById(foundAddress.id);

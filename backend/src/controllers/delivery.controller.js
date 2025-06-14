@@ -12,35 +12,35 @@ class DeliveryController {
 
   createDelivery = async (req, res, next) => {
     new CreateSuccess({
-      message: 'Delivery created successfully',
+      message: 'Tạo phương thức giao hàng thành công',
       metadata: await this.deliveryService.createDelivery(req.body),
     }).send(res);
   };
 
   calculateDeliveryFee = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Delivery fee calculated successfully',
+      message: 'Tính phí giao hàng thành công',
       metadata: await this.deliveryService.calculateDeliveryFee(req.query),
     }).send(res);
   };
 
   getDeliveries = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Deliveries retrieved successfully',
+      message: 'Lấy danh sách phương thức giao hàng thành công',
       metadata: await this.deliveryService.getAllDeliveries(),
     }).send(res);
   };
 
   getDeliveryFees = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Delivery fees retrieved successfully',
+      message: 'Lấy danh sách phí giao hàng thành công',
       metadata: await this.deliveryService.getAllDeliveryWithFee(req.query),
     }).send(res);
   };
 
   getDelivery = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Delivery retrieved successfully',
+      message: 'Lấy thông tin phương thức giao hàng thành công',
       metadata: await this.deliveryService.getDeliveryById(
         req.params.deliveryId
       ),
@@ -49,7 +49,7 @@ class DeliveryController {
 
   activateDelivery = async (req, res, next) => {
     new NoContentSuccess({
-      message: 'Delivery activated successfully',
+      message: 'Kích hoạt phương thức giao hàng thành công',
       metadata: await this.deliveryService.activateDelivery(
         req.params.deliveryId
       ),
@@ -58,7 +58,7 @@ class DeliveryController {
 
   deactivateDelivery = async (req, res, next) => {
     new NoContentSuccess({
-      message: 'Delivery deactivated successfully',
+      message: 'Ngừng kích hoạt phương thức giao hàng thành công',
       metadata: await this.deliveryService.deactivateDelivery(
         req.params.deliveryId
       ),
@@ -67,7 +67,7 @@ class DeliveryController {
 
   updateDelivery = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Delivery updated successfully',
+      message: 'Cập nhật phương thức giao hàng thành công',
       metadata: await this.deliveryService.updateDelivery({
         deliveryId: req.params.deliveryId,
         ...req.body,

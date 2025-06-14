@@ -75,12 +75,12 @@ class UserService {
   async assignRoleToUser({ userId, roleId }) {
     const foundUser = await this.userRepository.getById(userId);
     if (!foundUser) {
-      throw new BadRequestError('User not found');
+      throw new BadRequestError('Không tìm thấy người dùng');
     }
 
     const foundRole = await this.roleRepository.getById(roleId);
     if (!foundRole) {
-      throw new BadRequestError('Role not found');
+      throw new BadRequestError('Không tìm thấy vai trò');
     }
 
     const updatedUser = await this.userRepository.updateById(userId, {
@@ -88,7 +88,7 @@ class UserService {
     });
 
     if (!updatedUser) {
-      throw new BadRequestError('Failed to assign role to user');
+      throw new BadRequestError('Phân quyền cho người dùng thất bại');
     }
 
     return {
@@ -103,12 +103,12 @@ class UserService {
   async changePassword({ userId, oldPassword, newPassword }) {
     const foundUser = await this.userRepository.getById(userId);
     if (!foundUser) {
-      throw new BadRequestError('User not found');
+      throw new BadRequestError('Không tìm thấy người dùng');
     }
 
     const isMatch = await comparePassword(oldPassword, foundUser.password);
     if (!isMatch) {
-      throw new BadRequestError('Old password is incorrect');
+      throw new BadRequestError('Mật khẩu cũ không đúng');
     }
 
     const updatedUser = await this.userRepository.updateById(userId, {
@@ -116,14 +116,14 @@ class UserService {
     });
 
     if (!updatedUser) {
-      throw new BadRequestError('Failed to change password');
+      throw new BadRequestError('Đổi mật khẩu thất bại');
     }
   }
 
   async blockUser(userId) {
     const foundUser = await this.userRepository.getById(userId);
     if (!foundUser) {
-      throw new BadRequestError('User not found');
+      throw new BadRequestError('Không tìm thấy người dùng');
     }
 
     const updatedUser = await this.userRepository.updateById(userId, {
@@ -131,7 +131,7 @@ class UserService {
     });
 
     if (!updatedUser) {
-      throw new BadRequestError('Failed to block user');
+      throw new BadRequestError('Khóa người dùng thất bại');
     }
 
     return {
@@ -143,7 +143,7 @@ class UserService {
   async unblockUser(userId) {
     const foundUser = await this.userRepository.getById(userId);
     if (!foundUser) {
-      throw new BadRequestError('User not found');
+      throw new BadRequestError('Không tìm thấy người dùng');
     }
 
     const updatedUser = await this.userRepository.updateById(userId, {
@@ -151,7 +151,7 @@ class UserService {
     });
 
     if (!updatedUser) {
-      throw new BadRequestError('Failed to unblock user');
+      throw new BadRequestError('Mở khóa người dùng thất bại');
     }
 
     return {

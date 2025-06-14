@@ -22,7 +22,7 @@ class DeliveryService {
       maxDistance === undefined ||
       baseFee === undefined
     ) {
-      throw new BadRequestError('Missing required fields');
+      throw new BadRequestError('Thiếu trường thông tin bắt buộc');
     }
 
     console.log(baseFee);
@@ -81,7 +81,8 @@ class DeliveryService {
     pricing,
   }) {
     const foundDelivery = await this.deliveryRepository.getById(deliveryId);
-    if (!foundDelivery) throw new BadRequestError('Delivery not found');
+    if (!foundDelivery)
+      throw new BadRequestError('Không tìm thấy phương thức giao hàng');
 
     const updateData = removeUndefinedObject({
       dlv_name: name,
@@ -124,7 +125,8 @@ class DeliveryService {
 
   async getDeliveryById(deliveryId) {
     const delivery = await this.deliveryRepository.getById(deliveryId);
-    if (!delivery) throw new BadRequestError('Delivery not found');
+    if (!delivery)
+      throw new BadRequestError('Không tìm thấy phương thức giao hàng');
 
     return omitFields({
       object: delivery,
@@ -136,19 +138,22 @@ class DeliveryService {
     const delivery = await this.deliveryRepository.updateById(deliveryId, {
       dlv_is_active: true,
     });
-    if (!delivery) throw new BadRequestError('Delivery not found');
+    if (!delivery)
+      throw new BadRequestError('Không tìm thấy phương thức giao hàng');
   }
 
   async deactivateDelivery(deliveryId) {
     const delivery = await this.deliveryRepository.updateById(deliveryId, {
       dlv_is_active: false,
     });
-    if (!delivery) throw new BadRequestError('Delivery not found');
+    if (!delivery)
+      throw new BadRequestError('Không tìm thấy phương thức giao hàng');
   }
 
   async calculateDeliveryFee({ deliveryId, destinationId }) {
     const foundDelivery = await this.deliveryRepository.getById(deliveryId);
-    if (!foundDelivery) throw new BadRequestError('Delivery not found');
+    if (!foundDelivery)
+      throw new BadRequestError('Không tìm thấy phương thức giao hàng');
 
     const distance = await this.addressService.calculateDistance(destinationId);
     const deliveryFee = this._calculateFee(foundDelivery, distance);
@@ -161,7 +166,7 @@ class DeliveryService {
 
     if (distance > maxDistance) {
       throw new BadRequestError(
-        `Distance exceeds the maximum limit of ${maxDistance} km`
+        `Khoảng cách vượt quá giới hạn tối đa là ${maxDistance} km`
       );
     }
 

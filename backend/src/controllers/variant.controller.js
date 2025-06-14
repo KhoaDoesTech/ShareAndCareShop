@@ -8,14 +8,14 @@ class VariantController {
 
   createVariants = async (req, res, next) => {
     new CreateSuccess({
-      message: 'Variant created successfully',
+      message: 'Tạo biến thể thành công',
       metadata: await this.variantService.createVariants(req.body),
     }).send(res);
   };
 
   publicAllVariants = async (req, res, next) => {
     new ActionSuccess({
-      message: 'All variants published successfully',
+      message: 'Đăng bán tất cả biến thể thành công',
       metadata: await this.variantService.publicAllVariants(
         req.params.productId
       ),
@@ -24,14 +24,14 @@ class VariantController {
 
   updateVariants = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Variant updated successfully',
+      message: 'Cập nhật biến thể thành công',
       metadata: await this.variantService.updateVariants(req.body),
     }).send(res);
   };
 
   getPublicVariantByProductId = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Public variant retrieved successfully',
+      message: 'Lấy biến thể công khai thành công',
       metadata: await this.variantService.getPublicVariantByProductId(
         req.params.productId
       ),
@@ -40,7 +40,7 @@ class VariantController {
 
   getVariantByProductId = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Variant retrieved successfully',
+      message: 'Lấy biến thể thành công',
       metadata: await this.variantService.getVariantByProductId(
         req.params.productId
       ),
@@ -49,21 +49,21 @@ class VariantController {
 
   publicVariant = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Variant published successfully',
+      message: 'Đăng bán biến thể thành công',
       metadata: await this.variantService.publicVariant(req.params.variantId),
     }).send(res);
   };
 
   unPublicVariant = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Variant unpublished successfully',
+      message: 'Ngừng đăng bán biến thể thành công',
       metadata: await this.variantService.unPublicVariant(req.params.variantId),
     }).send(res);
   };
 
   unPublicAllVariants = async (req, res, next) => {
     new ActionSuccess({
-      message: 'All variants unpublished successfully',
+      message: 'Ngừng đăng bán tất cả biến thể thành công',
       metadata: await this.variantService.unPublicAllVariants(
         req.params.productId
       ),

@@ -55,7 +55,7 @@ class ReviewService {
     );
     if (!canReview) {
       throw new BadRequestError(
-        'You can only review products you have purchased and not yet reviewed'
+        'Bạn chỉ có thể đánh giá sản phẩm đã mua và chưa từng đánh giá.'
       );
     }
 
@@ -104,11 +104,11 @@ class ReviewService {
   async replyReview({ userId, reviewId, content } = {}) {
     const review = await this.reviewRepository.getById(reviewId);
     if (!review) {
-      throw new BadRequestError('Review not found');
+      throw new BadRequestError('Không tìm thấy đánh giá');
     }
 
     if (review.reply) {
-      throw new BadRequestError('This review already has a reply');
+      throw new BadRequestError('Đánh giá này đã được phản hồi');
     }
 
     const newReply = await this.reviewRepository.updateById(reviewId, {
@@ -144,7 +144,7 @@ class ReviewService {
     const formatSize = parseInt(size);
 
     if (!productId || !convertToObjectIdMongodb(productId)) {
-      throw new BadRequestError('Invalid product ID');
+      throw new BadRequestError('Mã sản phẩm không hợp lệ');
     }
 
     const filter = {
@@ -230,7 +230,7 @@ class ReviewService {
     );
 
     if (!review) {
-      throw new NotFoundError('Review not found');
+      throw new NotFoundError('Không tìm thấy đánh giá');
     }
 
     // Find matching item in ord_items
@@ -317,7 +317,7 @@ class ReviewService {
   async hideReview({ reviewId }) {
     const review = await this.reviewRepository.getById(reviewId);
     if (!review) {
-      throw new BadRequestError('Review not found');
+      throw new BadRequestError('Không tìm thấy đánh giá');
     }
 
     const updatedReview = await this.reviewRepository.updateById(reviewId, {
@@ -342,7 +342,7 @@ class ReviewService {
     ]);
 
     if (!review) {
-      throw new NotFoundError('Review not found or has been hidden');
+      throw new NotFoundError('Không tìm thấy đánh giá hoặc đánh giá đã bị ẩn');
     }
 
     return {
@@ -364,7 +364,7 @@ class ReviewService {
   async reportReview({ userId, reviewId, reason }) {
     const review = await this.reviewRepository.getById(reviewId);
     if (!review) {
-      throw new BadRequestError('Review not found');
+      throw new BadRequestError('Không tìm thấy đánh giá');
     }
 
     const updatedReview = await this.reviewRepository.updateById(reviewId, {
@@ -395,19 +395,17 @@ class ReviewService {
     images,
   }) {
     if (!userId || !productId || !orderId || !star || !content) {
-      throw new BadRequestError(
-        'Missing required parameters for creating a review'
-      );
+      throw new BadRequestError('Thiếu thông tin bắt buộc để tạo đánh giá');
     }
     if (star < 1 || star > 5) {
-      throw new BadRequestError('Star rating must be between 1 and 5');
+      throw new BadRequestError('Số sao phải từ 1 đến 5');
     }
     if (!Array.isArray(images)) {
-      throw new BadRequestError('Images must be an array of URLs');
+      throw new BadRequestError('Danh sách ảnh phải là một mảng URL');
     }
     for (const img of images) {
       if (typeof img !== 'string' || !img.startsWith('http')) {
-        throw new BadRequestError('Each image must be a valid URL');
+        throw new BadRequestError('Mỗi ảnh phải là một URL hợp lệ');
       }
     }
   }
@@ -415,11 +413,13 @@ class ReviewService {
   async _validateProductAndVariant(productId, variantId) {
     const product = await this.productRepository.getById(productId);
     if (!product) {
-      throw new BadRequestError('Product not found');
+      throw new BadRequestError('Không tìm thấy sản phẩm');
     }
 
     if (product.variants?.length > 0 && !variantId) {
-      throw new BadRequestError('Variant ID is required for this product');
+      throw new BadRequestError(
+        'Sản phẩm này có biến thể, vui lòng cung cấp mã biến thể'
+      );
     }
 
     if (variantId) {
@@ -427,7 +427,7 @@ class ReviewService {
         filter: { _id: convertToObjectIdMongodb(variantId), prd_id: productId },
       });
       if (!variant) {
-        throw new BadRequestError('Variant not found');
+        throw new BadRequestError('Không tìm thấy biến thể');
       }
     }
 
@@ -438,10 +438,14 @@ class ReviewService {
     const order = await this.orderRepository.getById(orderId);
 
     if (!order || order.userId.toString() !== userId.toString()) {
-      throw new BadRequestError('Order not found or does not belong to user');
+      throw new BadRequestError(
+        'Không tìm thấy đơn hàng hoặc đơn hàng không thuộc về người dùng'
+      );
     }
     if (order.status !== OrderStatus.DELIVERED) {
-      throw new BadRequestError('Order must be delivered to write a review');
+      throw new BadRequestError(
+        'Đơn hàng phải ở trạng thái đã giao mới được đánh giá'
+      );
     }
 
     return order;

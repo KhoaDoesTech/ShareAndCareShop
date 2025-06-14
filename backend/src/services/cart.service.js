@@ -11,7 +11,7 @@ class CartService {
       crt_user_id: user.id,
     });
 
-    if (!foundCart) throw new BadRequestError('Cart not found');
+    if (!foundCart) throw new BadRequestError('Không tìm thấy giỏ hàng');
 
     const itemIndex = foundCart.items.findIndex((item) => {
       const isSameProduct =
@@ -95,7 +95,7 @@ class CartService {
       crt_user_id: user.id,
     });
 
-    if (!foundCart) throw new BadRequestError('Cart not found');
+    if (!foundCart) throw new BadRequestError('Không tìm thấy giỏ hàng');
 
     const itemIndex = foundCart.items.findIndex(
       (item) =>
@@ -104,7 +104,8 @@ class CartService {
           item.variantId?.toString() === variantId?.toString())
     );
 
-    if (itemIndex === -1) throw new BadRequestError('Item not found in cart');
+    if (itemIndex === -1)
+      throw new BadRequestError('Không tìm thấy sản phẩm trong giỏ hàng');
 
     foundCart.items.splice(itemIndex, 1);
 
@@ -124,7 +125,7 @@ class CartService {
       crt_user_id: user.id,
     });
 
-    if (!foundCart) throw new BadRequestError('Cart not found');
+    if (!foundCart) throw new BadRequestError('Không tìm thấy giỏ hàng');
 
     foundCart.items = [];
 

@@ -21,10 +21,10 @@ const authentication = asyncHandler(async (req, res, next) => {
 
   // Decode the token and validate userId
   const decodedToken = parseJwt(accessToken || refreshToken);
-  if (!decodedToken.userId) throw new BadRequestError('Invalid request');
+  if (!decodedToken.userId) throw new BadRequestError('Yêu cầu không hợp lệ');
 
   const userId = clientId === decodedToken.userId ? decodedToken.userId : null;
-  if (!userId) throw new BadRequestError('Invalid request');
+  if (!userId) throw new BadRequestError('Yêu cầu không hợp lệ');
 
   // Fetch the token details
   const tokenRepository = new TokenRepository();
@@ -33,7 +33,7 @@ const authentication = asyncHandler(async (req, res, next) => {
     deviceToken: decodedToken.deviceToken,
   });
 
-  if (!keyStore) throw new BadRequestError('Resource not found');
+  if (!keyStore) throw new BadRequestError('Không tìm thấy tài nguyên');
 
   // Fetch the user details
   const userRepository = new UserRepository();
@@ -47,7 +47,7 @@ const authentication = asyncHandler(async (req, res, next) => {
       select: 'rol_name rol_permissions',
     }
   );
-  if (!foundUser) throw new NotFoundError('Not found User');
+  if (!foundUser) throw new NotFoundError('Không tìm thấy người dùng');
 
   // Handle refresh token scenario
   if (refreshToken) {
@@ -61,7 +61,7 @@ const authentication = asyncHandler(async (req, res, next) => {
   }
 
   // Handle access token scenario
-  if (!accessToken) throw new BadRequestError('Invalid Request');
+  if (!accessToken) throw new BadRequestError('Yêu cầu không hợp lệ');
 
   await validateToken(accessToken, keyStore.publicKey, userId);
 
@@ -75,14 +75,14 @@ const verifyPermission = (permissions) =>
   asyncHandler(async (req, res, next) => {
     const { user } = req;
 
-    if (!user) throw new UnauthorizedError('Unauthorized request');
+    if (!user) throw new UnauthorizedError('Bạn chưa được xác thực');
 
     const hasPermission =
       permissions.includes(user.role.permissions) ||
       user?.role?.permissions?.includes(CONFIG_PERMISSIONS.ADMIN);
 
     if (!hasPermission)
-      throw new ForbiddenError('You are not allowed to perform this action');
+      throw new ForbiddenError('Bạn không có quyền thực hiện hành động này');
 
     return next();
   });
@@ -99,7 +99,7 @@ const _handleRefreshToken = async (
       deviceToken: keyStore.deviceToken,
     });
 
-    throw new ForbiddenError('Something went wrong! Please re-login');
+    throw new ForbiddenError('Có lỗi xảy ra! Vui lòng đăng nhập lại');
   }
 
   await validateToken(refreshToken, keyStore.publicKey, userId, true);

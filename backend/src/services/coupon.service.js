@@ -42,7 +42,7 @@ class CouponService {
 
     const existingCoupon = await this.couponRepository.findByCode(code);
     if (existingCoupon) {
-      throw new BadRequestError('Coupon code already exists');
+      throw new BadRequestError('Mã giảm giá đã tồn tại');
     }
 
     const newCoupon = await this.couponRepository.create({
@@ -72,7 +72,7 @@ class CouponService {
   async useCoupon(couponCode, userId) {
     const foundCoupon = await this.couponRepository.findByCode(couponCode);
     if (!foundCoupon) {
-      throw new BadRequestError('Coupon not found');
+      throw new BadRequestError('Không tìm thấy mã giảm giá');
     }
 
     const userUsageIndex = foundCoupon.usersUsed.findIndex(
@@ -94,7 +94,7 @@ class CouponService {
   async revokeCouponUsage(couponCode, userId) {
     const foundCoupon = await this.couponRepository.findByCode(couponCode);
     if (!foundCoupon) {
-      throw new BadRequestError('Coupon not found');
+      throw new BadRequestError('Không tìm thấy mã giảm giá');
     }
 
     const userUsageIndex = foundCoupon.usersUsed.findIndex(
@@ -102,7 +102,7 @@ class CouponService {
     );
 
     if (userUsageIndex === -1) {
-      throw new BadRequestError('User has not used this coupon yet');
+      throw new BadRequestError('Người dùng chưa sử dụng mã giảm giá này');
     }
 
     foundCoupon.usersUsed[userUsageIndex].usageCount -= 1;
@@ -150,7 +150,7 @@ class CouponService {
     const formatSize = parseInt(size, 10);
 
     if (formatPage < 1 || formatSize < 1) {
-      throw new BadRequestError('Page and size must be positive integers');
+      throw new BadRequestError('Trang và kích thước phải là số nguyên dương');
     }
 
     const filter = {};
@@ -191,7 +191,7 @@ class CouponService {
     for (const item of items) {
       const product = await this.productRepository.getById(item.productId);
       if (!product) {
-        throw new BadRequestError(`Product ${item.productId} not found`);
+        throw new BadRequestError(`Không tìm thấy sản phẩm ${item.productId}`);
       }
 
       const isEligible = product.category.some((cat) =>
@@ -204,7 +204,9 @@ class CouponService {
           : product.originalPrice;
 
         if (!price) {
-          throw new BadRequestError('Price not found for product or variant');
+          throw new BadRequestError(
+            'Không tìm thấy giá sản phẩm hoặc biến thể'
+          );
         }
 
         // Apply product discount first
@@ -247,7 +249,7 @@ class CouponService {
     for (const item of items) {
       const product = await this.productRepository.getById(item.productId);
       if (!product) {
-        throw new BadRequestError(`Product ${item.productId} not found`);
+        throw new BadRequestError(`Không tìm thấy sản phẩm ${item.productId}`);
       }
 
       if (coupon.targetIds.includes(product.id.toString())) {
@@ -256,7 +258,9 @@ class CouponService {
           : product.originalPrice;
 
         if (!price) {
-          throw new BadRequestError('Price not found for product or variant');
+          throw new BadRequestError(
+            'Không tìm thấy giá sản phẩm hoặc biến thể'
+          );
         }
 
         // Apply product discount first
@@ -307,23 +311,23 @@ class CouponService {
 
   _checkCoupon(coupon, userId) {
     if (!coupon) {
-      throw new BadRequestError('Coupon code not found');
+      throw new BadRequestError('Không tìm thấy mã giảm giá');
     }
 
     if (!coupon.isActive) {
-      throw new BadRequestError('Coupon code is not active');
+      throw new BadRequestError('Mã giảm giá không còn hiệu lực');
     }
 
     if (new Date(coupon.startDate) > new Date()) {
-      throw new BadRequestError('Coupon code is not yet active');
+      throw new BadRequestError('Mã giảm giá chưa đến thời gian sử dụng');
     }
 
     if (new Date(coupon.endDate) < new Date()) {
-      throw new BadRequestError('Coupon code has expired');
+      throw new BadRequestError('Mã giảm giá đã hết hạn');
     }
 
     if (coupon.maxUses <= coupon.usesCount) {
-      throw new BadRequestError('Coupon code has reached its maximum uses');
+      throw new BadRequestError('Mã giảm giá đã đạt số lần sử dụng tối đa');
     }
 
     if (coupon.maxUsesPerUser > 0) {
@@ -333,7 +337,7 @@ class CouponService {
 
       if (userUsage?.usageCount >= coupon.maxUsesPerUser) {
         throw new BadRequestError(
-          `Coupon can only be used ${coupon.maxUsesPerUser} times per user`
+          `Mỗi người dùng chỉ được sử dụng mã giảm giá này tối đa ${coupon.maxUsesPerUser} lần`
         );
       }
     }
@@ -363,26 +367,28 @@ class CouponService {
     targetIds,
   }) {
     if (!code || !startDate || !endDate || !value) {
-      throw new BadRequestError('Missing required fields');
+      throw new BadRequestError('Thiếu trường thông tin bắt buộc');
     }
 
     if (
       ['Product', 'Category'].includes(targetType) &&
       (!targetIds || targetIds.length === 0)
     ) {
-      throw new BadRequestError('Target IDs are required for targetType');
+      throw new BadRequestError(
+        'Cần cung cấp danh sách đối tượng áp dụng cho loại này'
+      );
     }
 
     if (new Date(startDate) >= new Date(endDate)) {
-      throw new BadRequestError('Start date must be before end date');
+      throw new BadRequestError('Ngày bắt đầu phải trước ngày kết thúc');
     }
 
     if (new Date(endDate) <= new Date()) {
-      throw new BadRequestError('End date must be in the future');
+      throw new BadRequestError('Ngày kết thúc phải lớn hơn ngày hiện tại');
     }
 
     if (value <= 0) {
-      throw new BadRequestError('Coupon value must be greater than zero');
+      throw new BadRequestError('Giá trị mã giảm giá phải lớn hơn 0');
     }
   }
 }

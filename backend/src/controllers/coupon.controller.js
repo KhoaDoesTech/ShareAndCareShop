@@ -12,14 +12,14 @@ class CouponController {
 
   createCoupon = async (req, res, next) => {
     new CreateSuccess({
-      message: 'Coupon created successfully',
+      message: 'Tạo mã giảm giá thành công',
       metadata: await this.couponService.createCoupon(req.body),
     }).send(res);
   };
 
   reviewDiscount = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Coupon reviewed successfully',
+      message: 'Kiểm tra mã giảm giá thành công',
       metadata: await this.couponService.reviewDiscount({
         ...req.body,
         userId: req.user.id,
@@ -29,7 +29,7 @@ class CouponController {
 
   getAllCoupons = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Coupons retrieved successfully',
+      message: 'Lấy danh sách mã giảm giá thành công',
       metadata: await this.couponService.getAllCoupons(req.query),
     }).send(res);
   };

@@ -11,21 +11,21 @@ class AddressController {
 
   suggestAddresses = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Address suggestions fetched successfully',
+      message: 'Gợi ý địa chỉ thành công',
       metadata: await this.addressService.getAddressSuggestions(req.query),
     }).send(res);
   };
 
   getAddressByCoordinates = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Address fetched successfully',
+      message: 'Lấy địa chỉ theo tọa độ thành công',
       metadata: await this.addressService.getAddressByCoordinates(req.query),
     }).send(res);
   };
 
   createAddress = async (req, res, next) => {
     new CreateSuccess({
-      message: 'Address created successfully',
+      message: 'Tạo địa chỉ thành công',
       metadata: await this.addressService.createAddress({
         ...req.body,
         userId: req.user.id,
@@ -35,7 +35,7 @@ class AddressController {
 
   updateAddress = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Address updated successfully',
+      message: 'Cập nhật địa chỉ thành công',
       metadata: await this.addressService.updateAddress({
         ...req.body,
         userId: req.user.id,
@@ -45,7 +45,7 @@ class AddressController {
 
   deleteAddress = async (req, res, next) => {
     new NoContentSuccess({
-      message: 'Address deleted successfully',
+      message: 'Xóa địa chỉ thành công',
       metadata: await this.addressService.deleteAddress({
         addressId: req.params.addressId,
         userId: req.user.id,
@@ -55,7 +55,7 @@ class AddressController {
 
   getAddressDefault = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Address fetched successfully',
+      message: 'Lấy địa chỉ mặc định thành công',
       metadata: await this.addressService.getDefaultAddress({
         userId: req.user.id,
       }),
@@ -64,7 +64,7 @@ class AddressController {
 
   getAllAddress = async (req, res, next) => {
     new ActionSuccess({
-      message: 'Addresses fetched successfully',
+      message: 'Lấy danh sách địa chỉ thành công',
       metadata: await this.addressService.getAddresses({
         userId: req.user.id,
       }),
@@ -73,7 +73,7 @@ class AddressController {
 
   setDefaultAddress = async (req, res, next) => {
     new NoContentSuccess({
-      message: 'Default address set successfully',
+      message: 'Đặt địa chỉ mặc định thành công',
       metadata: await this.addressService.setDefaultAddress({
         addressId: req.params.addressId,
         userId: req.user.id,

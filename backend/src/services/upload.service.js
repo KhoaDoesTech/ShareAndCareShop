@@ -15,7 +15,7 @@ class UploadService {
 
   async uploadProductImage({ file, temporary = true }) {
     if (!file) {
-      throw new BadRequestError('Please upload a valid file');
+      throw new BadRequestError('Vui lòng tải lên tệp hợp lệ');
     }
 
     try {
@@ -39,7 +39,7 @@ class UploadService {
 
       return result.secure_url;
     } catch (error) {
-      throw new InternalServerError('Failed to upload image');
+      throw new InternalServerError('Tải ảnh thất bại');
     } finally {
       removeLocalFile(file.path);
     }
@@ -47,7 +47,7 @@ class UploadService {
 
   async uploadChatImage({ file }) {
     if (!file) {
-      throw new BadRequestError('Please upload a valid file');
+      throw new BadRequestError('Vui lòng tải lên tệp hợp lệ');
     }
 
     try {
@@ -64,7 +64,7 @@ class UploadService {
 
       return result.secure_url;
     } catch (error) {
-      throw new InternalServerError('Failed to upload chat image');
+      throw new InternalServerError('Tải ảnh chat thất bại');
     } finally {
       removeLocalFile(file.path);
     }
@@ -72,7 +72,7 @@ class UploadService {
 
   async uploadReviewImage({ file }) {
     if (!file) {
-      throw new BadRequestError('Please upload a valid file');
+      throw new BadRequestError('Vui lòng tải lên tệp hợp lệ');
     }
 
     try {
@@ -89,7 +89,7 @@ class UploadService {
 
       return result.secure_url;
     } catch (error) {
-      throw new InternalServerError('Failed to upload review image');
+      throw new InternalServerError('Tải ảnh đánh giá thất bại');
     } finally {
       removeLocalFile(file.path);
     }
@@ -97,7 +97,7 @@ class UploadService {
 
   async uploadTransferImage({ file }) {
     if (!file) {
-      throw new BadRequestError('Please upload a valid file');
+      throw new BadRequestError('Vui lòng tải lên tệp hợp lệ');
     }
 
     try {
@@ -114,7 +114,7 @@ class UploadService {
 
       return result.secure_url;
     } catch (error) {
-      throw new InternalServerError('Failed to upload transfer image');
+      throw new InternalServerError('Tải ảnh chuyển khoản thất bại');
     } finally {
       removeLocalFile(file.path);
     }
@@ -122,7 +122,7 @@ class UploadService {
 
   async uploadQRCode({ text, temporary = false }) {
     if (!text) {
-      throw new Error('Please provide valid text for QR code');
+      throw new Error('Vui lòng cung cấp nội dung hợp lệ cho mã QR');
     }
 
     const uniqueFileName = `${uuidv4()}`;
@@ -149,7 +149,7 @@ class UploadService {
 
       return result.secure_url;
     } catch (error) {
-      throw new Error('Failed to upload QR code');
+      throw new Error('Tải mã QR thất bại');
     } finally {
       removeLocalFile(tempPath);
     }
@@ -161,7 +161,7 @@ class UploadService {
 
       await cloudinary.uploader.destroy(publicId);
     } catch (error) {
-      throw new InternalServerError('Failed to delete image');
+      throw new InternalServerError('Xóa ảnh thất bại');
     }
   }
 
@@ -171,7 +171,7 @@ class UploadService {
 
       await this.uploadRepository.deleteOne({ upl_public_id: publicId });
     } catch (error) {
-      throw new InternalServerError('Failed to delete image');
+      throw new InternalServerError('Xóa ảnh thất bại');
     }
   }
 
@@ -201,7 +201,7 @@ class UploadService {
         upl_public_id: { $in: imagesToDelete },
       });
     } catch (error) {
-      throw new InternalServerError('Failed to delete images');
+      throw new InternalServerError('Xóa nhiều ảnh thất bại');
     }
   }
 }

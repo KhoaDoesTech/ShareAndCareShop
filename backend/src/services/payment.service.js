@@ -124,7 +124,7 @@ class PaymentService {
     const expectedHash = generateHmacHash(signData, VNPAY_CONFIG.SECRET);
 
     if (secureHash !== expectedHash) {
-      throw new BadRequestError('Invalid VNPay signature');
+      throw new BadRequestError('Chữ ký VNPay không hợp lệ');
     }
 
     const isSuccess = params.vnp_TransactionStatus === '00';
@@ -138,7 +138,7 @@ class PaymentService {
     });
     console.log(transaction);
     if (!transaction) {
-      throw new NotFoundError(`Transaction ${transId} not found`);
+      throw new NotFoundError(`Không tìm thấy giao dịch ${transId}`);
     }
 
     if (isSuccess) {
@@ -201,7 +201,7 @@ class PaymentService {
 
     const { data } = await axios.post(MOMO_CONFIG.API_URL, params);
     if (!data.payUrl) {
-      throw new BadRequestError('Failed to create MoMo payment URL');
+      throw new BadRequestError('Tạo liên kết thanh toán MoMo thất bại');
     }
 
     await this._createOrUpdatePaymentSession(
@@ -266,7 +266,7 @@ class PaymentService {
       throw new NotFoundError(`Order ${orderId} not found`);
     }
     if (!order.isPaid) {
-      throw new BadRequestError('Order is not paid');
+      throw new BadRequestError('Đơn hàng chưa được thanh toán');
     }
 
     const paymentTransaction =
@@ -278,7 +278,7 @@ class PaymentService {
       });
 
     if (!paymentTransaction) {
-      throw new NotFoundError('No completed MoMo transaction found');
+      throw new NotFoundError('Không tìm thấy giao dịch MoMo đã hoàn tất');
     }
 
     const refundTransactionId = `MOMO_REFUND_${orderId}_${Date.now()}`;
@@ -310,7 +310,7 @@ class PaymentService {
       return {
         status: 'MANUAL_REQUIRED',
         message:
-          'MoMo refund failed. Please process refund manually by providing bank details.',
+          'Hoàn tiền MoMo thất bại. Vui lòng hoàn tiền thủ công và cung cấp thông tin ngân hàng.',
         refundTransaction: manualRefundTransaction,
       };
     }
@@ -322,7 +322,7 @@ class PaymentService {
       throw new NotFoundError(`Order ${orderId} not found`);
     }
     if (!order.isPaid) {
-      throw new BadRequestError('Order is not paid');
+      throw new BadRequestError('Đơn hàng chưa được thanh toán');
     }
 
     const paymentTransaction =
@@ -334,7 +334,7 @@ class PaymentService {
       });
 
     if (!paymentTransaction) {
-      throw new NotFoundError('No completed VNPay transaction found');
+      throw new NotFoundError('Không tìm thấy giao dịch VNPay đã hoàn tất');
     }
 
     const refundTransactionId = `VNPAY_REFUND_${orderId}_${Date.now()}`;
@@ -376,7 +376,7 @@ class PaymentService {
       return {
         status: 'MANUAL_REQUIRED',
         message:
-          'VNPay refund failed. Please process refund manually by providing bank details.',
+          'Hoàn tiền VNPay thất bại. Vui lòng hoàn tiền thủ công và cung cấp thông tin ngân hàng.',
         refundTransaction: manualRefundTransaction,
       };
     }
@@ -395,7 +395,7 @@ class PaymentService {
       throw new NotFoundError(`Order ${orderId} not found`);
     }
     if (!order.isPaid) {
-      throw new BadRequestError('Order is not paid');
+      throw new BadRequestError('Đơn hàng chưa được thanh toán');
     }
 
     const paymentTransaction =
@@ -406,7 +406,7 @@ class PaymentService {
       });
 
     if (!paymentTransaction) {
-      throw new NotFoundError('No completed COD transaction found');
+      throw new NotFoundError('Không tìm thấy giao dịch COD đã hoàn tất');
     }
 
     if (isCashRefund) {
@@ -440,7 +440,7 @@ class PaymentService {
       return {
         status: 'MANUAL_REQUIRED',
         message:
-          'COD refund requires manual processing. Please provide bank details for refund.',
+          'Hoàn tiền COD cần xử lý thủ công. Vui lòng cung cấp thông tin ngân hàng để hoàn tiền.',
         refundTransaction: manualRefundTransaction,
       };
     }
@@ -459,18 +459,18 @@ class PaymentService {
     );
 
     if (!transaction) {
-      throw new NotFoundError('Payment transaction not found');
+      throw new NotFoundError('Không tìm thấy giao dịch thanh toán');
     }
 
     if (transaction.status !== PaymentStatus.PENDING) {
       throw new BadRequestError(
-        `Transaction must be in ${PaymentStatus.PENDING} refundStatus, current refundStatus: ${transaction.status}`
+        `Giao dịch phải ở trạng thái chờ hoàn tiền (${PaymentStatus.PENDING}), trạng thái hiện tại: ${transaction.status}`
       );
     }
 
     const order = await this.orderRepository.getById(transaction.orderId);
     if (!order) {
-      throw new NotFoundError(`Order ${transaction.orderId} not found`);
+      throw new NotFoundError(`Không tìm thấy đơn hàng ${transaction.orderId}`);
     }
 
     // Update PaymentTransaction
@@ -486,7 +486,7 @@ class PaymentService {
       });
 
     if (!updatedTransaction) {
-      throw new InternalServerError('Failed to update payment transaction');
+      throw new InternalServerError('Cập nhật giao dịch thanh toán thất bại');
     }
 
     const refundIds =
@@ -589,7 +589,7 @@ class PaymentService {
     page = parseInt(page, 10) || 1;
     size = parseInt(size, 10) || 10;
     if (page < 1 || size < 1) {
-      throw new BadRequestError('Invalid page or size');
+      throw new BadRequestError('Trang hoặc kích thước không hợp lệ');
     }
 
     const filter = {};
@@ -663,7 +663,7 @@ class PaymentService {
       );
       return {
         status: 'MANUAL_REQUIRED',
-        message: `MoMo refund failed: ${params.message}`,
+        message: `Hoàn tiền MoMo thất bại: ${params.message}`,
         refundTransaction: manualRefundTransaction,
       };
     }
@@ -682,7 +682,7 @@ class PaymentService {
     const expectedHash = generateHmacHash(signData, VNPAY_CONFIG.SECRET);
 
     if (secureHash !== expectedHash) {
-      throw new BadRequestError('Invalid VNPay IPN signature');
+      throw new BadRequestError('Chữ ký IPN VNPay không hợp lệ');
     }
 
     const transactionId = params.vnp_TxnRef;
@@ -714,7 +714,7 @@ class PaymentService {
       );
       return {
         status: 'MANUAL_REQUIRED',
-        message: `VNPay refund failed: ${params.vnp_Message}`,
+        message: `Hoàn tiền VNPay thất bại: ${params.vnp_Message}`,
         refundTransaction: manualRefundTransaction,
       };
     }
@@ -729,7 +729,7 @@ class PaymentService {
       throw new NotFoundError(`Order ${orderId} not found`);
     }
     if (order.paymentMethod !== PaymentMethod.COD) {
-      throw new BadRequestError('Order is not a COD order');
+      throw new BadRequestError('Đơn hàng không phải là COD');
     }
 
     const transactionId = `COD_${orderId}_${Date.now()}`;
@@ -758,11 +758,11 @@ class PaymentService {
       throw new NotFoundError(`Order ${orderId} not found`);
     }
     if (order.paymentMethod !== PaymentMethod.COD) {
-      throw new BadRequestError('Order is not a COD order');
+      throw new BadRequestError('Đơn hàng không phải là COD');
     }
     if (order.status !== OrderStatus.IN_TRANSIT) {
       throw new BadRequestError(
-        'Order must be delivered to confirm COD payment'
+        'Đơn hàng phải ở trạng thái ĐANG GIAO để xác nhận thanh toán COD'
       );
     }
 
@@ -775,7 +775,7 @@ class PaymentService {
 
     if (!transaction) {
       throw new NotFoundError(
-        `No pending COD transaction found for order ${orderId}`
+        `Không tìm thấy giao dịch COD đang chờ xử lý cho đơn hàng ${orderId}`
       );
     }
 
@@ -812,7 +812,7 @@ class PaymentService {
 
     if (!transaction) {
       throw new NotFoundError(
-        `No pending COD transaction found for order ${orderId}`
+        `Không tìm thấy giao dịch COD đang chờ xử lý cho đơn hàng ${orderId}`
       );
     }
 
@@ -839,11 +839,11 @@ class PaymentService {
   async resendPaymentUrl({ orderId, userId, ipAddress }) {
     const order = await this.orderRepository.getById(orderId);
     if (!order || order.userId.toString() !== userId.toString()) {
-      throw new NotFoundError(`Order ${orderId} not found`);
+      throw new NotFoundError(`Không tìm thấy đơn hàng ${orderId}`);
     }
 
     if (order.status !== OrderStatus.AWAITING_PAYMENT) {
-      throw new BadRequestError('Order is not in AWAITING_PAYMENT status');
+      throw new BadRequestError('Đơn hàng không ở trạng thái CHỜ THANH TOÁN');
     }
 
     if (order.paymentMethod === PaymentMethod.VNPAY) {
@@ -852,7 +852,7 @@ class PaymentService {
       return await this.createMoMoPaymentUrl({ orderId, ipAddress });
     } else {
       throw new BadRequestError(
-        'Payment method does not support resending URL'
+        'Phương thức thanh toán không hỗ trợ gửi lại URL'
       );
     }
   }
@@ -960,7 +960,9 @@ class PaymentService {
       ord_transaction_id: transactionId,
     });
     if (!updatedOrder) {
-      throw new BadRequestError('Failed to mark order as paid');
+      throw new BadRequestError(
+        'Cập nhật trạng thái thanh toán đơn hàng thất bại'
+      );
     }
   }
 
@@ -972,7 +974,7 @@ class PaymentService {
       pms_expires_at: { $gt: new Date() },
     });
     if (session && (session.retryCount || 0) >= 5) {
-      throw new BadRequestError('Max retry limit reached');
+      throw new BadRequestError('Đã vượt quá số lần thử lại tối đa');
     }
     return session;
   }
