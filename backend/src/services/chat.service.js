@@ -1,6 +1,12 @@
 'use strict';
 
 const OpenAI = require('openai');
+const { QdrantClient } = require('@qdrant/js-client-rest');
+const { OpenAIEmbeddings, ChatOpenAI } = require('@langchain/openai');
+const { QdrantVectorStore } = require('@langchain/qdrant');
+const { ChatPromptTemplate } = require('@langchain/core/prompts');
+const { RunnableSequence } = require('@langchain/core/runnables');
+const { StringOutputParser } = require('@langchain/core/output_parsers');
 const config = require('../configs/server.config');
 const ChatRoomRepository = require('../repositories/chatRoom.repository');
 const ChatMessageRepository = require('../repositories/chatMessage.repository');
@@ -10,6 +16,7 @@ const { BadRequestError } = require('../utils/errorResponse');
 const ProductRepository = require('../repositories/product.repository');
 const { ProductStatus } = require('../constants/status');
 const { ChatEventEnum } = require('../constants/chatEvent');
+const documents = require('../../data/documents');
 
 class ChatService {
   constructor() {
@@ -18,7 +25,38 @@ class ChatService {
     this.userRepository = new UserRepository();
     this.productRepository = new ProductRepository();
     this.openai = new OpenAI({ apiKey: config.openAi.API_KEY });
+    this.qdrant = new QdrantClient({
+      url: config.qdrant.URL,
+      apiKey: config.qdrant.API_KEY,
+    });
+    this.embeddings = new OpenAIEmbeddings({
+      model: 'text-embedding-3-small',
+      openAIApiKey: config.openAi.API_KEY,
+    });
+    this.chatModel = new ChatOpenAI({
+      model: 'gpt-3.5-turbo',
+      maxTokens: 512,
+      temperature: 0.7,
+      openAIApiKey: config.openAi.API_KEY,
+    });
+
     this.io = null;
+    this.vectorStore = null;
+  }
+
+  async init() {
+    console.log('Initializing ChatService...');
+    // Ensure Qdrant collection exists
+    await this._initQdrantCollection();
+    // Initialize Qdrant vector store
+    this.vectorStore = await QdrantVectorStore.fromExistingCollection(
+      this.embeddings,
+      {
+        collectionName: config.qdrant.COLLECTION_NAME,
+        url: config.qdrant.URL,
+        apiKey: config.qdrant.API_KEY,
+      }
+    );
   }
 
   setSocketIO(io) {
@@ -30,6 +68,67 @@ class ChatService {
       throw new Error('Socket.IO instance is not initialized');
     }
     return this.io;
+  }
+
+  async _initQdrantCollection() {
+    const collectionName = config.qdrant.COLLECTION_NAME;
+    const collections = await this.qdrant.getCollections();
+    const collectionExists = collections.collections.some(
+      (c) => c.name === collectionName
+    );
+    if (!collectionExists) {
+      await this.qdrant.createCollection(collectionName, {
+        vectors: { size: 1536, distance: 'Cosine' },
+      });
+      console.log(`Created Qdrant collection: ${collectionName}`);
+    }
+  }
+
+  async textToNoSQL() {
+    try {
+      await this.qdrant.deleteCollection(config.qdrant.COLLECTION_NAME);
+      await this._initQdrantCollection();
+      // 1. Fetch products from MongoDB
+      const mongoProducts = await this.productRepository.getAll({
+        filter: { prd_status: ProductStatus.PUBLISHED },
+      });
+
+      // Format MongoDB products into documents
+      const mongoDocuments = mongoProducts.map((product) => ({
+        pageContent: [
+          `Sản phẩm: ${product.name}`,
+          `Mã sản phẩm: ${product.code}`,
+          `Giá: ${product.price} ₫`,
+          `Tình trạng kho: Còn ${product.quantity || 0} sản phẩm`,
+        ].join('\n'),
+        metadata: {
+          source: `https://share-and-care-client.vercel.app/products/${product.code}`,
+          type: 'product',
+          productId: String(product.code),
+        },
+      }));
+
+      // 2. Load documents from documents.js
+      const staticDocuments = documents; // Already in the correct format
+
+      // 3. Combine documents
+      const allDocuments = [...mongoDocuments, ...staticDocuments];
+
+      // 4. Add documents to Qdrant
+      if (allDocuments.length > 0) {
+        await this.vectorStore.addDocuments(allDocuments);
+        console.log(
+          `Added ${allDocuments.length} documents to Qdrant collection ${config.qdrant.COLLECTION_NAME}`
+        );
+      } else {
+        console.log('No documents to add to Qdrant');
+      }
+
+      return { status: 'success', documentCount: allDocuments.length };
+    } catch (error) {
+      console.error('Error in textToNoSQL:', error.message);
+      throw new Error(`Failed to add documents to Qdrant: ${error.message}`);
+    }
   }
 
   async postMessageByAnonymous({
@@ -483,33 +582,111 @@ class ChatService {
     return messages;
   }
 
+  // async _generateEnhancedAIResponse(conversationId) {
+  //   console.log(conversationId);
+  //   const previousMessages = await this.messageRepository.getAll({
+  //     filter: { msg_conversation_id: conversationId },
+  //     queryOptions: { sort: 'createdAt', size: 20 },
+  //   });
+
+  //   console.log(previousMessages);
+
+  //   const systemPrompt = await this._buildSystemPrompt();
+
+  //   const messages = [
+  //     { role: 'system', content: systemPrompt },
+  //     ...previousMessages.map((msg) => this._normalizeMessageRole(msg)),
+  //   ];
+
+  //   console.log(messages);
+
+  //   const aiResponse = await this.openai.chat.completions.create({
+  //     model: 'gpt-3.5-turbo',
+  //     messages,
+  //     max_tokens: 500,
+  //     temperature: 0.7,
+  //   });
+
+  //   const aiContent = aiResponse.choices[0].message.content;
+
+  //   return await this.messageRepository.create({
+  //     msg_conversation_id: conversationId,
+  //     msg_sender: 'AI_Assistant',
+  //     msg_sender_type: 'assistant',
+  //     msg_content: aiContent,
+  //     msg_seen: false,
+  //   });
+  // }
+
   async _generateEnhancedAIResponse(conversationId) {
-    console.log(conversationId);
-    const previousMessages = await this.messageRepository.getAll({
-      filter: { msg_conversation_id: conversationId },
-      queryOptions: { sort: 'createdAt', size: 20 },
+    // Get the latest user message to use as the query
+    const latestMessage =
+      await this.messageRepository.getLastestMessageByConversationId(
+        conversationId
+      );
+
+    if (!latestMessage || !latestMessage.content) {
+      return await this.messageRepository.create({
+        msg_conversation_id: conversationId,
+        msg_sender: 'AI_Assistant',
+        msg_sender_type: 'assistant',
+        msg_content:
+          'Vui long cung cap them thong tin de toi co the ho tro ban.',
+        msg_seen: false,
+      });
+    }
+
+    const userQuestion = latestMessage.content.trim();
+
+    // Initialize the retriever
+    const retriever = this.vectorStore.asRetriever({
+      k: 4, // Retrieve top 4 relevant documents
+      searchType: 'similarity',
     });
 
-    console.log(previousMessages);
+    // Format documents for the prompt
+    const formatDocuments = (docs) => {
+      return docs
+        .map((doc, index) => `Tai lieu ${index + 1}: ${doc.pageContent}`)
+        .join('\n\n');
+    };
 
-    const systemPrompt = await this._buildSystemPrompt();
+    // Define the prompt template
+    const promptTemplate = ChatPromptTemplate.fromTemplate(`
+      Ban la tro ly mua sam ao cua cua hang ShareAndCare, chuyen cung cap quan ao cho moi lua tuoi va phong cach.
 
-    const messages = [
-      { role: 'system', content: systemPrompt },
-      ...previousMessages.map((msg) => this._normalizeMessageRole(msg)),
-    ];
+      Thong tin tham khao:
+      {context}
 
-    console.log(messages);
+      Cau hoi: {question}
 
-    const aiResponse = await this.openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      messages,
-      max_tokens: 500,
-      temperature: 0.7,
-    });
+      Yeu cau bat buoc:
+      - Chi su dung van ban thuan tuy (plain text). Tuyet doi khong su dung emoji, ky tu dac biet, HTML, Markdown, hoac lien ket hinh anh.
+      - Luon lich su, than thien, ngan gon va de hieu.
+      - Tra loi theo cach tu nhien nhu mot nhan vien tu van thuc thu.
+      - Chi tra loi dua tren thong tin duoc cung cap. Neu khong co thong tin lien quan, hay thong bao khong du du lieu.
+      - Neu thong tin khach hang chua ro, hay dat mot cau hoi don gian de tim hieu them nhu cau truoc khi dua ra tu van.
+      - Tra loi bang tieng Viet ro rang va chinh xac.
 
-    const aiContent = aiResponse.choices[0].message.content;
+      Cau tra loi:
+    `);
 
+    // Create the RAG chain
+    const ragChain = RunnableSequence.from([
+      {
+        context: (input) =>
+          retriever.invoke(input.question).then(formatDocuments),
+        question: (input) => input.question,
+      },
+      promptTemplate,
+      this.chatModel,
+      new StringOutputParser(),
+    ]);
+
+    // Generate the AI response using the RAG chain
+    const aiContent = await ragChain.invoke({ question: userQuestion });
+
+    // Save and return the AI response
     return await this.messageRepository.create({
       msg_conversation_id: conversationId,
       msg_sender: 'AI_Assistant',

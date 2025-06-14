@@ -21,6 +21,11 @@ const SERVER_CONFIG = {
   openAi: {
     API_KEY: process.env.OPENAI_API_KEY,
   },
+  qdrant: {
+    URL: process.env.QDRANT_URL || 'http://localhost:6333',
+    API_KEY: process.env.QDRANT_API_KEY || '',
+    COLLECTION_NAME: process.env.QDRANT_COLLECTION || 'product_vectors',
+  },
 };
 
 module.exports = SERVER_CONFIG;

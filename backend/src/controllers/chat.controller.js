@@ -6,6 +6,7 @@ const { ActionSuccess, CreateSuccess } = require('../utils/successResponse');
 class ChatController {
   constructor() {
     this.chatService = new ChatService();
+    this.chatService.init();
   }
 
   postMessageByUser = async (req, res, next) => {
@@ -74,6 +75,13 @@ class ChatController {
         conversationId: req.params.conversationId,
         userId: req.user.id,
       }),
+    }).send(res);
+  };
+
+  syncQdrant = async (req, res, next) => {
+    new ActionSuccess({
+      message: 'Qdrant sync completed successfully',
+      metadata: await this.chatService.textToNoSQL(),
     }).send(res);
   };
 }

@@ -15,6 +15,7 @@ class ChatSocketHandler {
   constructor(io) {
     this.io = io;
     this.chatService = new ChatService();
+    this.chatService.init();
     this.chatService.setSocketIO(io);
 
     this.chatRoomRepository = new ChatRoomRepository();

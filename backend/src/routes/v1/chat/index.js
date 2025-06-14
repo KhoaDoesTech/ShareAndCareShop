@@ -45,4 +45,10 @@ router.get(
   asyncHandler(ChatController.getAllConversationsByAdmin)
 );
 
+router.post(
+  '/sync-qdrant',
+  verifyPermission(CONFIG_PERMISSIONS.PAGE.PANEL),
+  asyncHandler(ChatController.syncQdrant)
+);
+
 module.exports = router;
