@@ -43,7 +43,7 @@ const generateTemporaryToken = () => {
 
 const generateHmacHash = (data, secretKey) => {
   const hmac = crypto.createHmac('sha512', secretKey);
-  return hmac.update(new Buffer.from(data, 'utf-8')).digest('hex');
+  return hmac.update(Buffer.from(data, 'utf-8')).digest('hex');
 };
 
 const generateSessionToken = () => {

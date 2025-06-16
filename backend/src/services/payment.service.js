@@ -83,7 +83,7 @@ class PaymentService {
       vnp_ReturnUrl:
         redirectUrl ||
         `${process.env.BACKEND_URL}/api/v1/payment/vnpay/callback`,
-      vnp_IpAddr: ipAddress,
+      vnp_IpAddr: ipAddress || '127.0.0.1',
       vnp_CreateDate: createDate,
       ...(bankCode && { vnp_BankCode: bankCode }),
     });
@@ -1080,27 +1080,55 @@ class PaymentService {
     refundTransactionId,
   }) {
     const createDate = moment().format('YYYYMMDDHHmmss');
-    const vnp_TransactionType = '02';
+    const requestId = moment().format('HHmmss');
+    const vnp_TransactionType = '02'; // Hoàn tiền toàn phần
     const vnp_CreateBy = 'System';
 
-    const params = sortObjectV2({
+    const params = {
+      vnp_RequestId: requestId,
       vnp_Version: VNPAY_CONFIG.VERSION,
       vnp_Command: 'refund',
       vnp_TmnCode: VNPAY_CONFIG.TMN_CODE,
-      vnp_TransactionType,
+      vnp_TransactionType: vnp_TransactionType,
       vnp_TxnRef: refundTransactionId,
       vnp_Amount: amount * 100,
-      vnp_TransactionNo: transNo,
+      vnp_TransactionNo: transNo || '0',
       vnp_TransactionDate: moment(paidAt).format('YYYYMMDDHHmmss'),
       vnp_CreateBy: vnp_CreateBy,
       vnp_CreateDate: createDate,
-      vnp_IpAddr: '127.0.0.1',
-      vnp_OrderInfo: `Refund for order ${orderId}`,
-    });
+      vnp_IpAddr: ipAddress || '127.0.0.1',
+      vnp_OrderInfo: `Hoan tien GD ma:${orderId}`,
+    };
 
-    const signData = buildQueryString(params);
-    console.log(signData);
-    params.vnp_SecureHash = generateHmacHash(signData, VNPAY_CONFIG.SECRET);
+    // Tạo chữ ký theo cách của order.js
+    const data =
+      params.vnp_RequestId +
+      '|' +
+      params.vnp_Version +
+      '|' +
+      params.vnp_Command +
+      '|' +
+      params.vnp_TmnCode +
+      '|' +
+      params.vnp_TransactionType +
+      '|' +
+      params.vnp_TxnRef +
+      '|' +
+      params.vnp_Amount +
+      '|' +
+      params.vnp_TransactionNo +
+      '|' +
+      params.vnp_TransactionDate +
+      '|' +
+      params.vnp_CreateBy +
+      '|' +
+      params.vnp_CreateDate +
+      '|' +
+      params.vnp_IpAddr +
+      '|' +
+      params.vnp_OrderInfo;
+
+    params.vnp_SecureHash = generateHmacHash(data, VNPAY_CONFIG.SECRET);
     return params;
   }
 
