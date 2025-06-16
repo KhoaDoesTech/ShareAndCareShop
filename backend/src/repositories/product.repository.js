@@ -20,7 +20,13 @@ class ProductRepository extends BaseRepository {
   }
 
   async getProductByCategory(categoryIds) {
-    return await this.model.find({ prd_category: { $in: categoryIds } });
+    const products = await this.model.find({
+      prd_category: {
+        $elemMatch: { id: { $in: categoryIds } },
+      },
+    });
+
+    return products.map((product) => this.formatDocument(product));
   }
 
   async getProduct(identifier) {

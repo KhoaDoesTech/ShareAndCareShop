@@ -1,3 +1,4 @@
+const { ProductStatus } = require('../constants/status');
 const CouponRepository = require('../repositories/coupon.repository');
 const ProductRepository = require('../repositories/product.repository');
 const VariantRepository = require('../repositories/variant.repository');
@@ -185,6 +186,136 @@ class CouponService {
     });
   }
 
+  async getCouponDetailsByAdmin({ couponKey, page = 1, size = 10 }) {
+    const coupon = await this.couponRepository.getCouponByIndentifier(
+      couponKey
+    );
+    if (!coupon) {
+      throw new BadRequestError('Không tìm thấy mã giảm giá');
+    }
+
+    let targets = [];
+    let totalTargets = 0;
+    const formatPage = parseInt(page, 10);
+    const formatSize = parseInt(size, 10);
+    const queryOptions = { page: formatPage, size: formatSize };
+
+    try {
+      if (coupon.targetType === 'Product') {
+        const filter = {
+          _id: { $in: coupon.targetIds },
+        };
+        targets = await this.productRepository.getAll({
+          filter,
+          queryOptions,
+        });
+        totalTargets = await this.productRepository.countDocuments(filter);
+      } else if (coupon.targetType === 'Category') {
+        const filter = {
+          prd_category: {
+            $elemMatch: {
+              id: { $in: coupon.targetIds },
+            },
+          },
+        };
+        targets = await this.productRepository.getAll({
+          filter,
+          queryOptions,
+        });
+        totalTargets = await this.productRepository.countDocuments(filter);
+      }
+    } catch (error) {
+      throw new BadRequestError(
+        `Lỗi khi lấy thông tin mục tiêu: ${error.message}`
+      );
+    }
+
+    return {
+      coupon,
+      targets: listResponse({
+        items: targets.map((target) =>
+          pickFields({
+            fields: ['id', 'code', 'name', 'mainImage'],
+            object: target,
+          })
+        ),
+        total: totalTargets,
+        page: formatPage,
+        size: formatSize,
+      }),
+    };
+  }
+
+  async getCouponDetailsByUser({ couponKey, page = 1, size = 10 }) {
+    const coupon = await this.couponRepository.getCouponByIndentifier(
+      couponKey
+    );
+    this._checkCouponByUser(coupon);
+
+    let targets = [];
+    let totalTargets = 0;
+    const formatPage = parseInt(page, 10);
+    const formatSize = parseInt(size, 10);
+    const queryOptions = { page: formatPage, size: formatSize };
+
+    try {
+      if (coupon.targetType === 'Product') {
+        const filter = {
+          _id: { $in: coupon.targetIds },
+          prd_status: ProductStatus.PUBLISHED,
+        };
+        targets = await this.productRepository.getAll({
+          filter,
+          queryOptions,
+        });
+        totalTargets = await this.productRepository.countDocuments(filter);
+      } else if (coupon.targetType === 'Category') {
+        const filter = {
+          prd_status: ProductStatus.PUBLISHED,
+          prd_category: {
+            $elemMatch: {
+              id: { $in: coupon.targetIds },
+            },
+          },
+        };
+        targets = await this.productRepository.getAll({
+          filter,
+          queryOptions,
+        });
+        totalTargets = await this.productRepository.countDocuments(filter);
+      }
+    } catch (error) {
+      throw new BadRequestError(
+        `Lỗi khi lấy thông tin mục tiêu: ${error.message}`
+      );
+    }
+
+    return {
+      coupon: omitFields({
+        fields: [
+          'maxUses',
+          'usesCount',
+          'usersUsed',
+          'createdAt',
+          'updatedAt',
+          'isActive',
+        ],
+        object: coupon,
+      }),
+      targets: listResponse({
+        items: targets.map((target) =>
+          pickFields({
+            fields: ['id', 'code', 'name', 'mainImage'],
+            object: target,
+          })
+        ),
+        total: totalTargets,
+        page: formatPage,
+        size: formatSize,
+      }),
+    };
+  }
+
   async _applyCategoryDiscount(coupon, items, discountDetails) {
     let totalDiscount = 0;
 
@@ -307,6 +438,28 @@ class CouponService {
     const discount = this._applyDiscount(totalOrder, coupon);
     discountDetails.push({ type: 'Order', discount, totalOrder });
     return discount;
+  }
+
+  _checkCouponByUser(coupon) {
+    if (!coupon) {
+      throw new BadRequestError('Không tìm thấy mã giảm giá');
+    }
+
+    if (!coupon.isActive) {
+      throw new BadRequestError('Mã giảm giá không còn hiệu lực');
+    }
+
+    if (new Date(coupon.startDate) > new Date()) {
+      throw new BadRequestError('Mã giảm giá chưa đến thời gian sử dụng');
+    }
+
+    if (new Date(coupon.endDate) < new Date()) {
+      throw new BadRequestError('Mã giảm giá đã hết hạn');
+    }
+
+    if (coupon.maxUses <= coupon.usesCount) {
+      throw new BadRequestError('Mã giảm giá đã đạt số lần sử dụng tối đa');
+    }
   }
 
   _checkCoupon(coupon, userId) {

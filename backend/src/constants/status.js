@@ -202,6 +202,20 @@ const SortFieldReview = {
   STAR: 'rvw_star',
 };
 
+const DiscountStatus = {
+  ACTIVE: 'ACTIVE',
+  EXPIRED: 'EXPIRED',
+  CANCELLED: 'CANCELLED',
+};
+const AvailableDiscountStatus = Object.values(DiscountStatus);
+
+const SortFieldInventory = {
+  BATCH_CODE: 'inv_batch_code',
+  TOTAL_PRICE: 'inv_total_import_price',
+  CREATED_AT: 'createdAt',
+  TOTAL_QUANTITY: 'inv_total_quantity',
+};
+
 module.exports = {
   // Auth
   UserLoginType,
@@ -267,4 +281,8 @@ module.exports = {
   AvailableRefundReasons,
 
   SortFieldReview,
+  DiscountStatus,
+  AvailableDiscountStatus,
+
+  SortFieldInventory,
 };

@@ -33,6 +33,26 @@ class CouponController {
       metadata: await this.couponService.getAllCoupons(req.query),
     }).send(res);
   };
+
+  getCouponDetailsByAdmin = async (req, res, next) => {
+    new ActionSuccess({
+      message: 'Lấy thông tin mã giảm giá thành công',
+      metadata: await this.couponService.getCouponDetailsByAdmin({
+        couponKey: req.params.couponKey,
+        ...req.query,
+      }),
+    }).send(res);
+  };
+
+  getCouponDetailsByUser = async (req, res, next) => {
+    new ActionSuccess({
+      message: 'Lấy thông tin mã giảm giá thành công',
+      metadata: await this.couponService.getCouponDetailsByUser({
+        couponKey: req.params.couponKey,
+        ...req.query,
+      }),
+    }).send(res);
+  };
 }
 
 module.exports = new CouponController();

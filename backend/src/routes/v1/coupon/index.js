@@ -11,6 +11,11 @@ const CONFIG_PERMISSIONS = require('../../../constants/permissions');
 
 const router = express.Router();
 
+router.get(
+  '/user/:couponKey',
+  asyncHandler(CouponController.getCouponDetailsByUser)
+);
+
 router.post(
   '/',
   authentication,
@@ -29,6 +34,13 @@ router.get(
   authentication,
   verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.COUPON.VIEW),
   asyncHandler(CouponController.getAllCoupons)
+);
+
+router.get(
+  '/:couponKey',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.COUPON.VIEW),
+  asyncHandler(CouponController.getCouponDetailsByAdmin)
 );
 
 module.exports = router;

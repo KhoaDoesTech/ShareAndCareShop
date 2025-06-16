@@ -24,5 +24,6 @@ router.use('/api/v1/refund', require('./refund'));
 router.use('/api/v1/attributes', require('./attributes'));
 router.use('/api/v1/blogs', require('./blog'));
 router.use('/api/v1/chats', require('./chat'));
+router.use('/api/v1/inventory', require('./inventory'));
 
 module.exports = router;

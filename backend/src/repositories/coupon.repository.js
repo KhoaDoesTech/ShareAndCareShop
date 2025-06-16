@@ -2,6 +2,7 @@
 
 const BaseRepository = require('./base.repository');
 const couponModels = require('../models/coupon.model');
+const mongoose = require('mongoose');
 
 class CouponRepository extends BaseRepository {
   constructor() {
@@ -11,6 +12,20 @@ class CouponRepository extends BaseRepository {
 
   async findByCode(code) {
     const foundCoupon = await this.model.findOne({ cpn_code: code });
+
+    return this.formatDocument(foundCoupon);
+  }
+
+  async getCouponByIndentifier(identifier) {
+    let query = {};
+
+    if (mongoose.Types.ObjectId.isValid(identifier)) {
+      query = { _id: identifier };
+    } else {
+      query = { cpn_code: identifier };
+    }
+
+    const foundCoupon = await this.model.findOne(query);
 
     return this.formatDocument(foundCoupon);
   }
