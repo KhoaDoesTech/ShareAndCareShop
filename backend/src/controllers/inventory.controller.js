@@ -37,6 +37,32 @@ class InventoryController {
       ),
     }).send(res);
   };
+
+  applyBulkDiscount = async (req, res, next) => {
+    new ActionSuccess({
+      message: 'Áp dụng giảm giá hàng loạt thành công',
+      metadata: await this.inventoryService.applyBulkDiscount({
+        userId: req.user.id,
+        ...req.body,
+      }),
+    }).send(res);
+  };
+
+  getAllDiscounts = async (req, res, next) => {
+    new ActionSuccess({
+      message: 'Lấy danh sách giảm giá thành công',
+      metadata: await this.inventoryService.getAllDiscounts(req.query),
+    }).send(res);
+  };
+
+  getDiscountById = async (req, res, next) => {
+    new ActionSuccess({
+      message: 'Lấy thông tin giảm giá thành công',
+      metadata: await this.inventoryService.getDiscountById(
+        req.params.discountId
+      ),
+    }).send(res);
+  };
 }
 
 module.exports = new InventoryController();

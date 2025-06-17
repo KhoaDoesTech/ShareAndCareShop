@@ -1,10 +1,14 @@
 'use strict';
 
-const path = require('path');
-const { SortFieldInventory } = require('../constants/status');
+const {
+  SortFieldInventory,
+  AvailableCouponType,
+} = require('../constants/status');
 const InventoryRepository = require('../repositories/inventory.repository');
 const ProductRepository = require('../repositories/product.repository');
 const VariantRepository = require('../repositories/variant.repository');
+const CategoryRepository = require('../repositories/category.repository');
+const DiscountRepository = require('../repositories/discount.repository');
 const { BadRequestError } = require('../utils/errorResponse');
 const {
   convertToObjectIdMongodb,
@@ -17,6 +21,175 @@ class InventoryService {
     this.inventoryRepository = new InventoryRepository();
     this.productRepository = new ProductRepository();
     this.variantRepository = new VariantRepository();
+    this.categoryRepository = new CategoryRepository();
+    this.discountRepository = new DiscountRepository();
+  }
+
+  async applyBulkDiscount({
+    productIds = [],
+    categoryIds = [],
+    discountType,
+    discountValue,
+    startDate,
+    endDate,
+    note = '',
+    userId,
+  }) {
+    // Validate input
+    if (!productIds.length && !categoryIds.length) {
+      throw new BadRequestError(
+        'Phải cung cấp ít nhất một productId hoặc categoryId'
+      );
+    }
+    if (!AvailableCouponType.includes(discountType)) {
+      throw new BadRequestError(
+        `Loại discount không hợp lệ. Phải là một trong: ${AvailableCouponType.join(
+          ', '
+        )}`
+      );
+    }
+    if (discountValue <= 0) {
+      throw new BadRequestError('Giá trị discount phải lớn hơn 0');
+    }
+    if (!startDate || !endDate || new Date(startDate) >= new Date(endDate)) {
+      throw new BadRequestError('Ngày bắt đầu và kết thúc không hợp lệ');
+    }
+
+    // Get products from productIds and categoryIds
+    const products = await this._getProductsForDiscount({
+      productIds,
+      categoryIds,
+    });
+
+    if (!products.length) {
+      throw new BadRequestError(
+        'Không tìm thấy sản phẩm phù hợp để áp dụng discount'
+      );
+    }
+
+    // Prepare discount data
+    const discountData = {
+      dsc_type: discountType,
+      dsc_value: discountValue,
+      dsc_start: new Date(startDate),
+      dsc_end: new Date(endDate),
+      dsc_note: note,
+      dsc_created_by: convertToObjectIdMongodb(userId),
+      dsc_updated_by: convertToObjectIdMongodb(userId),
+      dsc_items: products.map((product) => ({
+        prd_id: product.id,
+        prd_name: product.name,
+      })),
+      dsc_categories: categoryIds.map((catId) => ({
+        cat_id: convertToObjectIdMongodb(catId),
+        cat_name: '', // Will be updated after category fetch
+      })),
+    };
+
+    // Update category names
+    if (categoryIds.length) {
+      const categories = await this._fetchCategories(categoryIds);
+      discountData.dsc_categories = discountData.dsc_categories.map((cat) => ({
+        ...cat,
+        cat_name:
+          categories.find((c) => c.id.toString() === cat.cat_id.toString())
+            ?.name || '',
+      }));
+    }
+
+    // Create discount record
+    const newDiscount = await this.discountRepository.create(discountData);
+    if (!newDiscount) {
+      throw new BadRequestError('Không thể tạo bản ghi discount');
+    }
+
+    // Update products with discount information
+    const updatePromises = products.map((product) =>
+      this.productRepository.updateById(product.id, {
+        prd_discount_type: discountType,
+        prd_discount_value: discountValue,
+        prd_discount_start: new Date(startDate),
+        prd_discount_end: new Date(endDate),
+        updatedBy: userId,
+      })
+    );
+
+    await Promise.all(updatePromises);
+
+    return omitFields({
+      fields: ['createdBy', 'updatedBy', 'updatedAt'],
+      object: newDiscount,
+    });
+  }
+
+  async getAllDiscounts({ search, status, page = 1, size = 10 }) {
+    const formatPage = parseInt(page);
+    const formatSize = parseInt(size);
+
+    // Build filter
+    const filter = this._buildDiscountFilter({ search, status });
+
+    const query = {
+      page: formatPage,
+      size: formatSize,
+    };
+
+    // Fetch discounts
+    const discounts = await this.discountRepository.getAll({
+      filter,
+      queryOptions: query,
+      populateOptions: [
+        { path: 'dsc_created_by', select: 'usr_name usr_avatar' },
+        { path: 'dsc_updated_by', select: 'usr_name usr_avatar' },
+      ],
+    });
+
+    const totalDiscounts = await this.discountRepository.countDocuments(filter);
+
+    return listResponse({
+      items: discounts.map((discount) =>
+        omitFields({
+          fields: ['discount', 'status', 'categories', 'note', 'items'],
+          object: discount,
+        })
+      ),
+      total: totalDiscounts,
+      page: formatPage,
+      size: formatSize,
+    });
+  }
+
+  async getDiscountById(discountId) {
+    const discount = await this.discountRepository.getById(discountId, [
+      { path: 'dsc_created_by', select: 'usr_name usr_avatar' },
+      { path: 'dsc_updated_by', select: 'usr_name usr_avatar' },
+      { path: 'dsc_items.prd_id', select: 'prd_name prd_slug prd_main_image ' },
+    ]);
+
+    if (!discount) {
+      throw new BadRequestError('Không tìm thấy discount với ID đã cho');
+    }
+
+    return discount;
+  }
+
+  _buildDiscountFilter({ search, status }) {
+    const filter = {};
+
+    if (search) {
+      filter.$or = [
+        { dsc_code: { $regex: search, $options: 'i' } },
+        { dsc_note: { $regex: search, $options: 'i' } },
+        { 'dsc_items.prd_name': { $regex: search, $options: 'i' } },
+        { 'dsc_categories.cat_name': { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    if (status) {
+      filter.dsc_status = status;
+    }
+
+    return filter;
   }
 
   async importStock({ items, userId, batchCode, supplier, note }) {
@@ -292,6 +465,49 @@ class InventoryService {
     }
 
     return { product, totalProductQuantity, inventoryItems };
+  }
+
+  async _getProductsForDiscount({ productIds, categoryIds }) {
+    const uniqueProductIds = new Set();
+    const products = [];
+
+    // Get products by productIds
+    if (productIds.length) {
+      const productPromises = productIds.map(async (id) => {
+        const product = await this.productRepository.getProduct(id);
+        if (product) {
+          uniqueProductIds.add(product.id.toString());
+          products.push(product);
+        }
+      });
+      await Promise.all(productPromises);
+    }
+
+    // Get products by categoryIds
+    if (categoryIds.length) {
+      const categoryProducts =
+        await this.productRepository.getProductByCategory(
+          categoryIds.map((id) => convertToObjectIdMongodb(id))
+        );
+
+      categoryProducts.forEach((product) => {
+        if (!uniqueProductIds.has(product.id.toString())) {
+          uniqueProductIds.add(product.id.toString());
+          products.push(product);
+        }
+      });
+    }
+
+    return products;
+  }
+
+  async _fetchCategories(categoryIds) {
+    const categories = await this.categoryRepository.getAll({
+      filter: {
+        _id: { $in: categoryIds.map((id) => convertToObjectIdMongodb(id)) },
+      },
+    });
+    return categories;
   }
 }
 

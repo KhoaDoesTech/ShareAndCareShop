@@ -19,11 +19,25 @@ router.get(
   asyncHandler(inventoryController.getAllInventory)
 );
 
+router.post(
+  '/discount',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.PRODUCT.UPDATE),
+  asyncHandler(inventoryController.applyBulkDiscount)
+);
+
 router.get(
-  '/:inventoryKey',
+  '/discount',
   authentication,
   verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.PRODUCT.VIEW),
-  asyncHandler(inventoryController.getInventoryById)
+  asyncHandler(inventoryController.getAllDiscounts)
+);
+
+router.get(
+  '/discount/:discountId',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.PRODUCT.VIEW),
+  asyncHandler(inventoryController.getDiscountById)
 );
 
 router.post(
@@ -31,6 +45,13 @@ router.post(
   authentication,
   verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.PRODUCT.UPDATE),
   asyncHandler(inventoryController.importStock)
+);
+
+router.get(
+  '/:inventoryKey',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.PRODUCT.VIEW),
+  asyncHandler(inventoryController.getInventoryById)
 );
 
 module.exports = router;

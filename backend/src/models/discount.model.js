@@ -30,6 +30,17 @@ const discountSchema = new Schema(
         prd_name: { type: String, required: true },
       },
     ],
+    dsc_categories: [
+      {
+        _id: false,
+        cat_id: {
+          type: Schema.Types.ObjectId,
+          ref: 'Category',
+          required: true,
+        },
+        cat_name: { type: String, required: true },
+      },
+    ],
     dsc_type: {
       type: String,
       enum: AvailableCouponType,

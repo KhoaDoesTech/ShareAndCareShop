@@ -18,20 +18,37 @@ class DiscountRepository extends BaseRepository {
       type: discount.dsc_type,
       status: discount.dsc_status,
       items: (discount.dsc_items || []).map((item) => ({
-        productId: item.prd_id,
+        productId: item.prd_id._id,
         productName: item.prd_name,
+        productImage: item.prd_id.prd_main_image || null,
+      })),
+      categories: (discount.dsc_categories || []).map((category) => ({
+        categoryId: category.cat_id,
+        categoryName: category.cat_name,
       })),
       discountType: discount.dsc_type,
       discountValue: discount.dsc_value,
       discountStart: discount.dsc_start,
       discountEnd: discount.dsc_end,
       note: discount.dsc_note,
-      createdBy: discount.dsc_created_by,
-      updatedBy: discount.dsc_updated_by,
+      createdBy: discount.dsc_created_by
+        ? {
+            id: discount.dsc_created_by._id,
+            name: discount.dsc_created_by.usr_name,
+            avatar: discount.dsc_created_by.usr_avatar,
+          }
+        : null,
+      updatedBy: discount.dsc_updated_by
+        ? {
+            id: discount.dsc_updated_by._id,
+            name: discount.dsc_updated_by.usr_name,
+            avatar: discount.dsc_updated_by.usr_avatar,
+          }
+        : null,
       createdAt: discount.createdAt,
       updatedAt: discount.updatedAt,
     };
   }
 }
 
-module.exports = new DiscountRepository();
+module.exports = DiscountRepository;
