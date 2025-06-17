@@ -5,8 +5,10 @@ const ProductRepository = require('../repositories/product.repository');
 const ReviewRepository = require('../repositories/review.repository');
 const UserRepository = require('../repositories/user.repository');
 const InventoryRepository = require('../repositories/inventory.repository');
+const RefundLogRepository = require('../repositories/refundLog.repository');
 const CategoryService = require('./category.service');
 const { listResponse } = require('../utils/helpers');
+const { RefundStatus, OrderStatus } = require('../constants/status');
 class StatisticsService {
   constructor() {
     this.orderRepository = new OrderRepository();
@@ -14,6 +16,7 @@ class StatisticsService {
     this.userRepository = new UserRepository();
     this.reviewRepository = new ReviewRepository();
     this.inventoryRepository = new InventoryRepository();
+    this.refundLogRepository = new RefundLogRepository();
     this.categoryService = new CategoryService();
   }
 
@@ -91,8 +94,6 @@ class StatisticsService {
     const revenueByCategory = await this.orderRepository.getRevenueByCategory({
       startDate,
       endDate,
-      parentId,
-      maxDepth,
     });
 
     // Tạo map để tra cứu doanh thu theo categoryId
@@ -158,7 +159,112 @@ class StatisticsService {
   }
 
   // Thống kê tỷ lệ hoàn trả
-  async getReturnRate({ startDate, endDate, page, size } = {}) {}
+  async getReturnRate({ startDate, endDate, page = 1, size = 10 } = {}) {
+    this._validateDateRange(startDate, endDate);
+
+    const skip = (page - 1) * size;
+    const refundMatch = { rfl_status: RefundStatus.COMPLETED };
+    const orderMatch = { ord_status: OrderStatus.DELIVERED };
+
+    if (startDate && endDate) {
+      refundMatch.rfl_requested_at = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate),
+      };
+      orderMatch.createdAt = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate),
+      };
+    }
+
+    // Tính totalReturned từ RefundLog
+    const totalReturnedArr = await this.refundLogRepository.model.aggregate([
+      { $match: refundMatch },
+      {
+        $group: {
+          _id: '$rfl_item.prd_id',
+          totalReturned: { $sum: '$rfl_item.prd_quantity' },
+        },
+      },
+      {
+        $project: {
+          productId: '$_id',
+          totalReturned: 1,
+          _id: 0,
+        },
+      },
+    ]);
+
+    // Tính totalSold từ Order
+    const totalSoldArr = await this.orderRepository.model.aggregate([
+      { $match: orderMatch },
+      { $unwind: '$ord_items' },
+      {
+        $group: {
+          _id: '$ord_items.prd_id',
+          totalSold: { $sum: '$ord_items.prd_quantity' },
+        },
+      },
+      {
+        $project: {
+          productId: '$_id',
+          totalSold: 1,
+          _id: 0,
+        },
+      },
+    ]);
+
+    // Tạo map để tra cứu nhanh
+    const totalReturnedMap = new Map();
+    totalReturnedArr.forEach((item) => {
+      totalReturnedMap.set(String(item.productId), item.totalReturned);
+    });
+    const totalSoldMap = new Map();
+    totalSoldArr.forEach((item) => {
+      totalSoldMap.set(String(item.productId), item.totalSold);
+    });
+
+    // Lấy danh sách sản phẩm
+    const products = await this.productRepository.model.find(
+      {},
+      {
+        _id: 1,
+        prd_name: 1,
+        prd_main_image: 1,
+      }
+    );
+
+    // Kết hợp dữ liệu và tính returnRate
+    const combined = products
+      .map((product) => {
+        const productId = String(product._id);
+        const totalSold = totalSoldMap.get(productId) || 0;
+        const totalReturned = totalReturnedMap.get(productId) || 0;
+        const returnRate = totalSold === 0 ? 0 : totalReturned / totalSold;
+        return {
+          productId: product._id,
+          productName: product.prd_name,
+          mainImage: product.prd_main_image,
+          totalSold,
+          totalReturned,
+          returnRate,
+        };
+      })
+      .filter((item) => item.totalSold > 0 || item.totalReturned > 0);
+
+    // Sắp xếp theo returnRate giảm dần
+    combined.sort((a, b) => b.returnRate - a.returnRate);
+
+    // Phân trang
+    const paged = combined.slice(skip, skip + size);
+
+    return listResponse({
+      items: paged,
+      total: combined.length,
+      page,
+      size,
+    });
+  }
 
   _validateDateRange(startDate, endDate) {
     if (startDate && endDate) {

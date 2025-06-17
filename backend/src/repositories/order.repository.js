@@ -259,12 +259,7 @@ class OrderRepository extends BaseRepository {
   }
 
   // Thống kê doanh thu theo danh mục sản phẩm
-  async getRevenueByCategory({
-    startDate,
-    endDate,
-    parentId = null,
-    maxDepth = Infinity,
-  } = {}) {
+  async getRevenueByCategory({ startDate, endDate }) {
     // Bước 1: Tính doanh thu theo danh mục
     const match = { ord_status: OrderStatus.DELIVERED };
     if (startDate && endDate) {
@@ -362,8 +357,6 @@ class OrderRepository extends BaseRepository {
 
     return result;
   }
-
-  // Tỷ lệ hoàn trả sản phẩm
 
   formatDocument(order) {
     if (!order) return null;
