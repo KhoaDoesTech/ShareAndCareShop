@@ -3,6 +3,7 @@ const {
   ProductStatus,
   SortFieldProduct,
   SELLABLE_STATUSES,
+  CouponType,
 } = require('../constants/status');
 const AttributeRepository = require('../repositories/attribute.repository');
 const AttributeValueRepository = require('../repositories/attributeValue.repository');

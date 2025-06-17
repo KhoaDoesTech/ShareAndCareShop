@@ -1,6 +1,10 @@
 'use strict';
 
-const { OrderStatus, AvailableOrderStatus } = require('../constants/status');
+const {
+  OrderStatus,
+  AvailableOrderStatus,
+  ProductStatus,
+} = require('../constants/status');
 const orderModel = require('../models/order.model');
 const APIFeatures = require('../utils/apiFeatures');
 const BaseRepository = require('./base.repository');
@@ -93,7 +97,7 @@ class OrderRepository extends BaseRepository {
         path: 'ord_items',
         populate: [
           { path: 'prd_id', select: 'prd_name prd_main_image' },
-          { path: 'var_id', select: 'var_name var_slug' },
+          { path: 'var_id', select: 'var_slug' },
         ],
       });
 
@@ -156,8 +160,172 @@ class OrderRepository extends BaseRepository {
   }
 
   // Thống kê sản phẩm bán chạy
+  async getTopSellingProducts({
+    startDate,
+    endDate,
+    page = 1,
+    size = 10,
+  } = {}) {
+    const match = { ord_status: OrderStatus.DELIVERED };
+    if (startDate && endDate) {
+      match.createdAt = { $gte: new Date(startDate), $lte: new Date(endDate) };
+    }
+
+    const skip = (page - 1) * size;
+    const result = await this.model.aggregate([
+      { $match: match },
+      { $unwind: '$ord_items' },
+      {
+        $lookup: {
+          from: 'Products',
+          localField: 'ord_items.prd_id',
+          foreignField: '_id',
+          as: 'product',
+        },
+      },
+      { $unwind: '$product' },
+      {
+        $lookup: {
+          from: 'Variants',
+          localField: 'ord_items.var_id',
+          foreignField: '_id',
+          as: 'variant',
+        },
+      },
+      {
+        $group: {
+          _id: {
+            productId: '$product._id',
+            productName: '$product.prd_name',
+            mainImage: '$product.prd_main_image',
+            variantId: { $arrayElemAt: ['$variant._id', 0] },
+            variantName: { $arrayElemAt: ['$variant.var_slug', 0] },
+          },
+          totalQuantitySold: { $sum: '$ord_items.prd_quantity' },
+          totalRevenue: {
+            $sum: {
+              $multiply: [
+                '$ord_items.prd_price',
+                '$ord_items.prd_quantity',
+                {
+                  $subtract: [
+                    1,
+                    {
+                      $divide: [
+                        {
+                          $add: [
+                            '$ord_items.itm_product_discount',
+                            '$ord_items.itm_coupon_discount',
+                          ],
+                        },
+                        '$ord_items.prd_price',
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          productId: '$_id.productId',
+          variantId: '$_id.variantId',
+          productName: '$_id.productName',
+          variantName: '$_id.variantName',
+          mainImage: '$_id.mainImage',
+          totalQuantitySold: 1,
+          totalRevenue: 1,
+          _id: 0,
+        },
+      },
+      { $sort: { totalQuantitySold: -1 } },
+      { $skip: skip },
+      { $limit: size },
+    ]);
+
+    const total = await this.model.aggregate([
+      { $match: match },
+      { $unwind: '$ord_items' },
+      { $group: { _id: '$ord_items.prd_id' } },
+      { $count: 'total' },
+    ]);
+
+    return {
+      products: result,
+      total: total.length ? total[0].total : 0,
+    };
+  }
 
   // Thống kê doanh thu theo danh mục sản phẩm
+  async getRevenueByCategory({
+    startDate,
+    endDate,
+    parentId = null,
+    maxDepth = Infinity,
+  } = {}) {
+    // Bước 1: Tính doanh thu theo danh mục
+    const match = { ord_status: OrderStatus.DELIVERED };
+    if (startDate && endDate) {
+      match.createdAt = { $gte: new Date(startDate), $lte: new Date(endDate) };
+    }
+
+    const revenueByCategory = await this.model.aggregate([
+      { $match: match },
+      { $unwind: '$ord_items' },
+      {
+        $lookup: {
+          from: 'Products',
+          localField: 'ord_items.prd_id',
+          foreignField: '_id',
+          as: 'product',
+        },
+      },
+      { $unwind: '$product' },
+      { $unwind: '$product.prd_category' },
+      {
+        $group: {
+          _id: '$product.prd_category.id',
+          totalRevenue: {
+            $sum: {
+              $multiply: [
+                '$ord_items.prd_price',
+                '$ord_items.prd_quantity',
+                {
+                  $subtract: [
+                    1,
+                    {
+                      $divide: [
+                        {
+                          $add: [
+                            '$ord_items.itm_product_discount',
+                            '$ord_items.itm_coupon_discount',
+                          ],
+                        },
+                        '$ord_items.prd_price',
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+          totalOrders: { $addToSet: '$_id' },
+        },
+      },
+      {
+        $project: {
+          categoryId: '$_id',
+          totalRevenue: 1,
+          totalOrders: { $size: '$totalOrders' },
+          _id: 0,
+        },
+      },
+    ]);
+
+    return revenueByCategory;
+  }
 
   // Thống kê xu hướng doanh thu
   async revenueTrend({ startDate, endDate, groupBy = 'day' } = {}) {

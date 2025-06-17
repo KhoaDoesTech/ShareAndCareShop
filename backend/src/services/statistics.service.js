@@ -5,6 +5,8 @@ const ProductRepository = require('../repositories/product.repository');
 const ReviewRepository = require('../repositories/review.repository');
 const UserRepository = require('../repositories/user.repository');
 const InventoryRepository = require('../repositories/inventory.repository');
+const CategoryService = require('./category.service');
+const { listResponse } = require('../utils/helpers');
 class StatisticsService {
   constructor() {
     this.orderRepository = new OrderRepository();
@@ -12,6 +14,7 @@ class StatisticsService {
     this.userRepository = new UserRepository();
     this.reviewRepository = new ReviewRepository();
     this.inventoryRepository = new InventoryRepository();
+    this.categoryService = new CategoryService();
   }
 
   async getReportCountRecords() {
@@ -78,45 +81,84 @@ class StatisticsService {
   }
 
   // Thống kê doanh thu theo danh mục
-  async getRevenueByCategory({ startDate, endDate } = {}) {
+  async getRevenueByCategory({
+    startDate,
+    endDate,
+    parentId = null,
+    maxDepth = Infinity,
+  }) {
     this._validateDateRange(startDate, endDate);
-    const categoryStats = await this.orderRepository.revenueByCategory({
+    const revenueByCategory = await this.orderRepository.getRevenueByCategory({
       startDate,
       endDate,
+      parentId,
+      maxDepth,
     });
-    return categoryStats;
+
+    // Tạo map để tra cứu doanh thu theo categoryId
+    const revenueMap = new Map();
+    revenueByCategory.forEach((item) => {
+      revenueMap.set(item.categoryId.toString(), {
+        totalRevenue: item.totalRevenue,
+        totalOrders: item.totalOrders,
+      });
+    });
+
+    // Bước 2: Lấy danh sách danh mục và xây dựng cây
+    const categories = await this.categoryService.getAllCategories({
+      parentId,
+      size: maxDepth,
+    });
+
+    // Bước 3: Gắn thông tin doanh thu vào cây danh mục
+    const attachRevenueToTree = (node) => {
+      const revenueData = revenueMap.get(node.id.toString()) || {
+        totalRevenue: 0,
+        totalOrders: 0,
+      };
+      return {
+        id: node.id,
+        name: node.name,
+        parentId: node.parentId,
+        totalRevenue: revenueData.totalRevenue,
+        totalOrders: revenueData.totalOrders,
+        children: node.children.map(attachRevenueToTree),
+      };
+    };
+
+    return categories.map(attachRevenueToTree);
   }
 
   // Thống kê sản phẩm bán chạy
-  async getTopSellingProducts({ limit = 10, startDate, endDate } = {}) {
+  async getTopSellingProducts({
+    startDate,
+    endDate,
+    page = 1,
+    size = 10,
+  } = {}) {
+    const formatPage = parseInt(page);
+    const formatSize = parseInt(size);
+
     this._validateDateRange(startDate, endDate);
-    const topProducts = await this.orderRepository.topSellingProducts({
-      limit,
-      startDate,
-      endDate,
+    const topSellingProducts = await this.orderRepository.getTopSellingProducts(
+      {
+        startDate,
+        endDate,
+        page: formatPage,
+        size: formatSize,
+      }
+    );
+
+    return listResponse({
+      items: topSellingProducts.products,
+      total: topSellingProducts.total,
+      page: formatPage,
+      size: formatSize,
     });
-    return topProducts;
   }
 
   // Thống kê tỷ lệ hoàn trả
-  async getReturnRate({ startDate, endDate } = {}) {
-    this._validateDateRange(startDate, endDate);
-    const returnStats = await this.orderRepository.returnRate({
-      startDate,
-      endDate,
-    });
-    return returnStats;
-  }
-
-  // Thống kê hiệu quả nhập kho
-  async getImportProfitAnalysis({ startDate, endDate } = {}) {
-    this._validateDateRange(startDate, endDate);
-    const profitAnalysis = await this.inventoryRepository.importProfitAnalysis({
-      startDate,
-      endDate,
-    });
-    return profitAnalysis;
-  }
+  async getReturnRate({ startDate, endDate, page, size } = {}) {}
 
   _validateDateRange(startDate, endDate) {
     if (startDate && endDate) {
