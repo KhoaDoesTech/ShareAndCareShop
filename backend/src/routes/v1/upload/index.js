@@ -21,6 +21,14 @@ router.post(
 );
 
 router.post(
+  '/banners',
+  authentication,
+  verifyPermission(CONFIG_PERMISSIONS.MANAGE_PRODUCT.UPLOAD.CREATE),
+  upload.single('banners'),
+  asyncHandler(UploadController.uploadBannerImage)
+);
+
+router.post(
   '/chat',
   upload.single('chat'),
   asyncHandler(UploadController.uploadChatImage)

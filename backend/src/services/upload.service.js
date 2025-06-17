@@ -45,6 +45,37 @@ class UploadService {
     }
   }
 
+  async uploadBannerImage({ file, temporary = true }) {
+    if (!file) {
+      throw new BadRequestError('Vui lòng tải lên tệp hợp lệ');
+    }
+
+    try {
+      const uniqueFileName = `${uuidv4()}`;
+      const result = await cloudinary.uploader.upload(file.path, {
+        public_id: uniqueFileName,
+        folder: `shareandcare/banners`,
+        transformation: [
+          { width: 1920, height: 600, crop: 'fill' },
+          { quality: 'auto:good', fetch_format: 'auto' },
+        ],
+      });
+
+      if (temporary) {
+        await this.uploadRepository.create({
+          upl_public_id: result.public_id,
+          upl_url: result.secure_url,
+        });
+      }
+
+      return result.secure_url;
+    } catch (error) {
+      throw new InternalServerError('Tải ảnh banner thất bại');
+    } finally {
+      removeLocalFile(file.path);
+    }
+  }
+
   async uploadChatImage({ file }) {
     if (!file) {
       throw new BadRequestError('Vui lòng tải lên tệp hợp lệ');

@@ -177,7 +177,10 @@ class CouponService {
             'targetType',
             'isActive',
           ],
-          object: coupon,
+          object: {
+            ...coupon,
+            isActive: this._checkCouponActive(coupon),
+          },
         })
       ),
       total: totalCoupons,
@@ -231,7 +234,13 @@ class CouponService {
     }
 
     return {
-      coupon,
+      coupon: {
+        ...omitFields({
+          fields: ['isActive'],
+          object: coupon,
+        }),
+        isActive: this._checkCouponActive(coupon),
+      },
       targets: listResponse({
         items: targets.map((target) =>
           pickFields({
@@ -438,6 +447,20 @@ class CouponService {
     const discount = this._applyDiscount(totalOrder, coupon);
     discountDetails.push({ type: 'Order', discount, totalOrder });
     return discount;
+  }
+
+  _checkCouponActive(coupon) {
+    const now = new Date();
+    if (coupon.startDate && now < new Date(coupon.startDate)) {
+      return false;
+    }
+    if (coupon.endDate && now > new Date(coupon.endDate)) {
+      return false;
+    }
+    if (coupon.maxUses && coupon.usesCount >= coupon.maxUses) {
+      return false;
+    }
+    return coupon.isActive;
   }
 
   _checkCouponByUser(coupon) {

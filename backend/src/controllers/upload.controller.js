@@ -16,6 +16,16 @@ class UploadController {
     }).send(res);
   };
 
+  uploadBannerImage = async (req, res, next) => {
+    new CreateSuccess({
+      message: 'Tải ảnh banner thành công',
+      metadata: await this.uploadService.uploadBannerImage({
+        file: req.file,
+        temporary: true,
+      }),
+    }).send(res);
+  };
+
   uploadChatImage = async (req, res, next) => {
     new CreateSuccess({
       message: 'Tải ảnh chat thành công',
