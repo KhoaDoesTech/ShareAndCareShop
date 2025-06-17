@@ -1,6 +1,6 @@
 'use strict';
 
-const { OrderStatus } = require('../constants/status');
+const { OrderStatus, AvailableOrderStatus } = require('../constants/status');
 const orderModel = require('../models/order.model');
 const APIFeatures = require('../utils/apiFeatures');
 const BaseRepository = require('./base.repository');
@@ -9,6 +9,25 @@ class OrderRepository extends BaseRepository {
   constructor() {
     super(orderModel);
     this.model = orderModel;
+  }
+
+  async totalProductsSold() {
+    const result = await this.model.aggregate([
+      {
+        $match: {
+          ord_status: OrderStatus.DELIVERED,
+        },
+      },
+      { $unwind: '$ord_items' },
+      {
+        $group: {
+          _id: null,
+          totalQuantitySold: { $sum: '$ord_items.prd_quantity' },
+        },
+      },
+    ]);
+
+    return result.length ? result[0].totalQuantitySold : 0;
   }
 
   async updateOne(filter, update, options = {}) {
@@ -82,24 +101,101 @@ class OrderRepository extends BaseRepository {
     return this.formatDocument(document);
   }
 
-  async totalProductsSold() {
+  // Thống kê doanh thu tổng
+  async totalRevenue({ startDate, endDate } = {}) {
+    const match = { ord_status: OrderStatus.DELIVERED };
+    if (startDate && endDate) {
+      match.createdAt = { $gte: new Date(startDate), $lte: new Date(endDate) };
+    }
+
     const result = await this.model.aggregate([
-      {
-        $match: {
-          ord_status: OrderStatus.DELIVERED,
-        },
-      },
-      { $unwind: '$ord_items' },
+      { $match: match },
       {
         $group: {
           _id: null,
-          totalQuantitySold: { $sum: '$ord_items.prd_quantity' },
+          totalRevenue: { $sum: '$ord_total_price' },
+          totalOrders: { $sum: 1 },
         },
       },
     ]);
 
-    return result.length ? result[0].totalQuantitySold : 0;
+    return result.length
+      ? {
+          totalRevenue: result[0].totalRevenue,
+          totalOrders: result[0].totalOrders,
+        }
+      : { totalRevenue: 0, totalOrders: 0 };
   }
+
+  // Thống kê số lượng đơn hàng theo trạng thái
+  async orderStatusCount({ startDate, endDate } = {}) {
+    const match = {};
+    if (startDate && endDate) {
+      match.createdAt = { $gte: new Date(startDate), $lte: new Date(endDate) };
+    }
+
+    const result = await this.model.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: '$ord_status',
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const statusCounts = {};
+    AvailableOrderStatus.forEach((status) => {
+      statusCounts[status] = 0;
+    });
+    result.forEach((item) => {
+      statusCounts[item._id] = item.count;
+    });
+
+    return statusCounts;
+  }
+
+  // Thống kê sản phẩm bán chạy
+
+  // Thống kê doanh thu theo danh mục sản phẩm
+
+  // Thống kê xu hướng doanh thu
+  async revenueTrend({ startDate, endDate, groupBy = 'day' } = {}) {
+    if (!startDate || !endDate) {
+      throw new Error('Revenue trend requires startDate and endDate');
+    }
+
+    const match = { ord_status: OrderStatus.DELIVERED };
+    if (startDate && endDate) {
+      match.createdAt = { $gte: new Date(startDate), $lte: new Date(endDate) };
+    }
+
+    const groupFields = {
+      day: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+      week: { $week: '$createdAt' },
+      month: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
+    };
+
+    if (!groupBy in groupFields) {
+      throw new Error('Invalid groupBy value. Use "day", "week", or "month".');
+    }
+
+    const result = await this.model.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: groupFields[groupBy],
+          totalRevenue: { $sum: '$ord_total_price' },
+          totalOrders: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    return result;
+  }
+
+  // Tỷ lệ hoàn trả sản phẩm
 
   formatDocument(order) {
     if (!order) return null;

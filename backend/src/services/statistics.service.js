@@ -4,13 +4,14 @@ const OrderRepository = require('../repositories/order.repository');
 const ProductRepository = require('../repositories/product.repository');
 const ReviewRepository = require('../repositories/review.repository');
 const UserRepository = require('../repositories/user.repository');
-
+const InventoryRepository = require('../repositories/inventory.repository');
 class StatisticsService {
   constructor() {
     this.orderRepository = new OrderRepository();
     this.productRepository = new ProductRepository();
     this.userRepository = new UserRepository();
     this.reviewRepository = new ReviewRepository();
+    this.inventoryRepository = new InventoryRepository();
   }
 
   async getReportCountRecords() {
@@ -50,27 +51,78 @@ class StatisticsService {
     };
   }
 
-  // async getReportTotalRevenue() {
-  //   const totalRevenue = await this.orderRepository.totalRevenue();
+  async getBasicStats({ startDate, endDate } = {}) {
+    this._validateDateRange(startDate, endDate);
 
-  //   return totalRevenue;
-  // }
+    const [totalRevenue, orderStatusCount] = await Promise.all([
+      this.orderRepository.totalRevenue({ startDate, endDate }),
+      this.orderRepository.orderStatusCount({ startDate, endDate }),
+    ]);
 
-  // async getOrderStatistics() {
-  //   const orderStatistics = await this.orderRepository.getOrderStatistics();
+    return {
+      totalRevenue: totalRevenue.totalRevenue,
+      totalOrders: totalRevenue.totalOrders,
+      orderStatusCounts: orderStatusCount,
+    };
+  }
 
-  //   return orderStatistics;
-  // }
+  // Thống kê xu hướng doanh thu
+  async getRevenueTrend({ startDate, endDate, groupBy = 'day' } = {}) {
+    this._validateDateRange(startDate, endDate);
+    const trend = await this.orderRepository.revenueTrend({
+      startDate,
+      endDate,
+      groupBy,
+    });
+    return trend;
+  }
+
+  // Thống kê doanh thu theo danh mục
+  async getRevenueByCategory({ startDate, endDate } = {}) {
+    this._validateDateRange(startDate, endDate);
+    const categoryStats = await this.orderRepository.revenueByCategory({
+      startDate,
+      endDate,
+    });
+    return categoryStats;
+  }
+
+  // Thống kê sản phẩm bán chạy
+  async getTopSellingProducts({ limit = 10, startDate, endDate } = {}) {
+    this._validateDateRange(startDate, endDate);
+    const topProducts = await this.orderRepository.topSellingProducts({
+      limit,
+      startDate,
+      endDate,
+    });
+    return topProducts;
+  }
+
+  // Thống kê tỷ lệ hoàn trả
+  async getReturnRate({ startDate, endDate } = {}) {
+    this._validateDateRange(startDate, endDate);
+    const returnStats = await this.orderRepository.returnRate({
+      startDate,
+      endDate,
+    });
+    return returnStats;
+  }
+
+  // Thống kê hiệu quả nhập kho
+  async getImportProfitAnalysis({ startDate, endDate } = {}) {
+    this._validateDateRange(startDate, endDate);
+    const profitAnalysis = await this.inventoryRepository.importProfitAnalysis({
+      startDate,
+      endDate,
+    });
+    return profitAnalysis;
+  }
 
   _validateDateRange(startDate, endDate) {
-    if (!startDate || !endDate) {
-      throw new Error('Vui lòng nhập đầy đủ ngày bắt đầu và ngày kết thúc');
-    }
-    if (new Date(startDate) >= new Date(endDate)) {
-      throw new Error('Ngày bắt đầu phải trước ngày kết thúc');
-    }
-    if (new Date(endDate) <= new Date()) {
-      throw new Error('Ngày kết thúc phải lớn hơn ngày hiện tại');
+    if (startDate && endDate) {
+      if (new Date(startDate) >= new Date(endDate)) {
+        throw new Error('Start date must be before end date');
+      }
     }
   }
 }
