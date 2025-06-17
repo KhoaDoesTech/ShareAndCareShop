@@ -216,6 +216,14 @@ const SortFieldInventory = {
   TOTAL_QUANTITY: 'inv_total_quantity',
 };
 
+const BannerPositions = {
+  SLIDE: 'SLIDE',
+  CATEGORY: 'CATEGORY',
+  FOOTER: 'FOOTER',
+};
+
+const AvailableBannerPositions = Object.values(BannerPositions);
+
 module.exports = {
   // Auth
   UserLoginType,
@@ -285,4 +293,7 @@ module.exports = {
   AvailableDiscountStatus,
 
   SortFieldInventory,
+
+  BannerPositions,
+  AvailableBannerPositions,
 };

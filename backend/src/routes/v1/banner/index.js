@@ -12,11 +12,7 @@ const CONFIG_PERMISSIONS = require('../../../constants/permissions');
 const router = express.Router();
 
 // Public routes
-router.get('/public', asyncHandler(BannerController.getAllBannersPublic));
-router.get(
-  '/public/:bannerId',
-  asyncHandler(BannerController.getBannerDetailsPublic)
-);
+router.get('/public', asyncHandler(BannerController.getActiveBanners));
 
 // Admin routes
 router.post(

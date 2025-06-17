@@ -1,6 +1,10 @@
 'use strict';
 
 const { model, Schema } = require('mongoose');
+const {
+  AvailableBannerPositions,
+  BannerPositions,
+} = require('../constants/status');
 
 const DOCUMENT_NAME = 'Banner';
 const COLLECTION_NAME = 'Banners';
@@ -15,6 +19,21 @@ const bannerSchema = new Schema(
     bnn_public_id: { type: String, required: true },
     bnn_display_order: { type: Number, default: 0, min: 0 },
     bnn_is_active: { type: Boolean, default: true },
+    bnn_position: {
+      type: String,
+      enum: AvailableBannerPositions,
+      default: BannerPositions.SLIDE,
+    },
+    bnn_category: {
+      type: [
+        {
+          _id: false,
+          id: { type: Schema.Types.ObjectId, ref: 'Category' },
+          name: { type: String },
+        },
+      ],
+      default: [],
+    },
     bnn_start_date: { type: Date },
     bnn_end_date: { type: Date },
     bnn_created_by: {

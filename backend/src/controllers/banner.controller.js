@@ -29,7 +29,6 @@ class BannerController {
         bannerId: req.params.bannerId,
         userId: req.user.id,
         ...req.body,
-        imageFile: req.file, // nếu có upload file
       }),
     }).send(res);
   };
@@ -43,17 +42,17 @@ class BannerController {
     }).send(res);
   };
 
-  getAllBannersPublic = async (req, res, next) => {
+  getActiveBanners = async (req, res, next) => {
     new ActionSuccess({
       message: 'Lấy danh sách banner thành công',
-      metadata: await this.bannerService.getAllBannersPublic(req.query),
+      metadata: await this.bannerService.getActiveBanners(req.query),
     }).send(res);
   };
 
-  getAllBannersAdmin = async (req, res, next) => {
+  getAllBanners = async (req, res, next) => {
     new ActionSuccess({
       message: 'Lấy danh sách banner (admin) thành công',
-      metadata: await this.bannerService.getAllBannersAdmin(req.query),
+      metadata: await this.bannerService.getAllBanners(req.query),
     }).send(res);
   };
 
