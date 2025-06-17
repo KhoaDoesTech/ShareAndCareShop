@@ -56,19 +56,10 @@ class BannerController {
     }).send(res);
   };
 
-  getBannerDetailsPublic = async (req, res, next) => {
+  getBannerDetails = async (req, res, next) => {
     new ActionSuccess({
       message: 'Lấy chi tiết banner thành công',
-      metadata: await this.bannerService.getBannerDetailsPublic({
-        bannerId: req.params.bannerId,
-      }),
-    }).send(res);
-  };
-
-  getBannerDetailsAdmin = async (req, res, next) => {
-    new ActionSuccess({
-      message: 'Lấy chi tiết banner (admin) thành công',
-      metadata: await this.bannerService.getBannerDetailsAdmin({
+      metadata: await this.bannerService.getBannerDetails({
         bannerId: req.params.bannerId,
       }),
     }).send(res);

@@ -1,8 +1,10 @@
 'use strict';
 
+const mongoose = require('mongoose');
 const BannerModel = require('../models/banner.model');
 const { convertToObjectIdMongodb } = require('../utils/helpers');
 const BaseRepository = require('./base.repository');
+const { BannerPositions } = require('../constants/status');
 
 class BannerRepository extends BaseRepository {
   constructor() {
@@ -52,7 +54,7 @@ class BannerRepository extends BaseRepository {
 
   async getBanner(identifier) {
     let query = {};
-    if (this.model.Types.ObjectId.isValid(identifier)) {
+    if (mongoose.Types.ObjectId.isValid(identifier)) {
       query = { _id: identifier };
     } else {
       query = { bnn_public_id: identifier };
@@ -60,56 +62,62 @@ class BannerRepository extends BaseRepository {
     return this.formatDocument(await this.model.findOne(query).lean());
   }
 
-  async getAllGroupedByPosition({ filter = {}, queryOptions = {} }) {
-    const { sort = '-createdAt', page = 1, size = 10 } = queryOptions;
-    const skip = (page - 1) * size;
-
+  async aggregateCategoryBanners() {
     const aggregation = [
-      { $match: filter },
-      {
-        $sort: {
-          [sort.startsWith('-') ? sort.slice(1) : sort]: sort.startsWith('-')
-            ? -1
-            : 1,
-        },
-      },
+      { $match: { bnn_position: BannerPositions.CATEGORY } },
+      { $unwind: '$bnn_category' },
+      { $sort: { bnn_display_order: 1, createdAt: -1 } },
       {
         $group: {
-          _id: '$bnn_position',
+          _id: '$bnn_category.name',
+          categoryId: { $first: '$bnn_category.id' },
           banners: { $push: '$$ROOT' },
         },
       },
       {
         $project: {
-          position: '$_id',
-          banners: {
-            $slice: ['$banners', skip, size],
-          },
+          id: '$categoryId',
+          name: '$_id',
+          items: '$banners',
           total: { $size: '$banners' },
         },
       },
+      { $sort: { name: 1 } },
     ];
 
     const result = await this.model.aggregate(aggregation);
-    const groupedBanners = result.reduce(
-      (acc, { position, banners, total }) => {
-        acc[position] = {
-          items: banners.map(this.formatDocument),
-          total,
-        };
-        return acc;
-      },
-      {}
-    );
-
-    const totalDocuments = await this.model.countDocuments(filter);
+    const totalDocuments = await this.model.countDocuments({
+      bnn_position: BannerPositions.CATEGORY,
+    });
 
     return {
-      groupedBanners,
+      groupedBanners: result,
       total: totalDocuments,
-      page,
-      size,
     };
+  }
+
+  async fetchFlatBanners({ position }) {
+    const banners = await this.model
+      .find({ ...(position ? { bnn_position: position } : {}) })
+      .sort({ bnn_display_order: 1, createdAt: -1 })
+      .lean();
+
+    const totalDocuments = await this.model.countDocuments({
+      ...(position ? { bnn_position: position } : {}),
+    });
+
+    return {
+      groupedBanners: banners.map((banner) =>
+        this.formatDocument(banner, true)
+      ),
+      total: totalDocuments,
+    };
+  }
+
+  parseSort(sort) {
+    const isDesc = sort.startsWith('-');
+    const field = isDesc ? sort.slice(1) : sort;
+    return { [field]: isDesc ? -1 : 1 };
   }
 
   async updateMany(filter, update) {

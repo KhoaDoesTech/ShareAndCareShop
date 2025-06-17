@@ -40,14 +40,14 @@ router.get(
   '/',
   authentication,
   verifyPermission(CONFIG_PERMISSIONS.SYSTEM.BANNER.VIEW),
-  asyncHandler(BannerController.getAllBannersAdmin)
+  asyncHandler(BannerController.getAllBanners)
 );
 
 router.get(
   '/:bannerId',
   authentication,
   verifyPermission(CONFIG_PERMISSIONS.SYSTEM.BANNER.VIEW),
-  asyncHandler(BannerController.getBannerDetailsAdmin)
+  asyncHandler(BannerController.getBannerDetails)
 );
 
 router.patch(
