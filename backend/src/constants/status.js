@@ -43,7 +43,7 @@ const SELLABLE_STATUSES = new Set([
 
 const SortFieldProduct = {
   VIEWS: 'prd_views',
-  PRICE: 'prd_price',
+  MIN_PRICE: 'prd_min_price',
   QUANTITY: 'prd_quantity',
   SOLD: 'prd_sold',
   RATING: 'prd_rating',

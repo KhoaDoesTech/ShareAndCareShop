@@ -238,6 +238,7 @@ class ProductService {
     category,
     minPrice,
     maxPrice,
+    minRating,
     sort,
     page = 1,
     size = 10,
@@ -252,6 +253,7 @@ class ProductService {
       category,
       minPrice,
       maxPrice,
+      minRating, // No minRating for public products
       attributes,
       status: ProductStatus.PUBLISHED,
     });
@@ -317,6 +319,8 @@ class ProductService {
     category,
     minPrice,
     maxPrice,
+    minRating,
+    status,
     sort,
     page = 1,
     size = 10,
@@ -331,7 +335,9 @@ class ProductService {
       category,
       minPrice,
       maxPrice,
+      minRating,
       attributes,
+      status,
     });
 
     // Sort
@@ -618,6 +624,7 @@ class ProductService {
     minPrice,
     maxPrice,
     attributes,
+    minRating,
     status,
   }) {
     const filter = status ? { prd_status: status } : {};
@@ -641,20 +648,82 @@ class ProductService {
     }
 
     if (minPrice || maxPrice) {
+      const priceFilter = {
+        $gte: parseFloat(minPrice || 0),
+        $lte: parseFloat(maxPrice || Infinity),
+      };
       filter.$or = [
-        {
-          prd_min_price: {
-            $gte: parseFloat(minPrice || 0),
-            $lte: parseFloat(maxPrice || Infinity),
-          },
-        },
-        {
-          prd_max_price: {
-            $gte: parseFloat(minPrice || 0),
-            $lte: parseFloat(maxPrice || Infinity),
-          },
-        },
+        { prd_min_price: priceFilter },
+        { prd_max_price: priceFilter },
       ];
+
+      // Check if discount is active and include discounted price in filter
+      const now = new Date();
+      filter.$or.push({
+        $and: [
+          { prd_discount_value: { $gt: 0 } },
+          { prd_discount_start: { $lte: now } },
+          { prd_discount_end: { $gte: now } },
+          {
+            $expr: {
+              $and: [
+                {
+                  $gte: [
+                    {
+                      $cond: {
+                        if: { $eq: ['$prd_discount_type', CouponType.PERCENT] },
+                        then: {
+                          $multiply: [
+                            '$prd_min_price',
+                            {
+                              $subtract: [
+                                1,
+                                { $divide: ['$prd_discount_value', 100] },
+                              ],
+                            },
+                          ],
+                        },
+                        else: {
+                          $subtract: ['$prd_min_price', '$prd_discount_value'],
+                        },
+                      },
+                    },
+                    parseFloat(minPrice || 0),
+                  ],
+                },
+                {
+                  $lte: [
+                    {
+                      $cond: {
+                        if: { $eq: ['$prd_discount_type', CouponType.PERCENT] },
+                        then: {
+                          $multiply: [
+                            '$prd_max_price',
+                            {
+                              $subtract: [
+                                1,
+                                { $divide: ['$prd_discount_value', 100] },
+                              ],
+                            },
+                          ],
+                        },
+                        else: {
+                          $subtract: ['$prd_max_price', '$prd_discount_value'],
+                        },
+                      },
+                    },
+                    parseFloat(maxPrice || Infinity),
+                  ],
+                },
+              ],
+            },
+          },
+        ],
+      });
+    }
+
+    if (minRating) {
+      filter.prd_rating = { $gte: parseFloat(minRating) };
     }
 
     if (attributes) {
