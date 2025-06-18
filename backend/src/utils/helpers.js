@@ -4,6 +4,7 @@ const fs = require('fs');
 const logger = require('../helpers/logger.helper');
 const { Types } = require('mongoose');
 const _ = require('lodash');
+const { CouponType } = require('../constants/status');
 
 const convertToObjectIdMongodb = (id) => new Types.ObjectId(id);
 
