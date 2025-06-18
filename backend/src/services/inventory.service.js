@@ -3,6 +3,7 @@
 const {
   SortFieldInventory,
   AvailableCouponType,
+  ProductStatus,
 } = require('../constants/status');
 const InventoryRepository = require('../repositories/inventory.repository');
 const ProductRepository = require('../repositories/product.repository');
@@ -220,6 +221,7 @@ class InventoryService {
         id: product.id,
         update: {
           prd_quantity: product.quantity + totalProductQuantity,
+          prd_status: ProductStatus.PUBLISHED,
           updatedBy: userId,
         },
       });
@@ -235,6 +237,7 @@ class InventoryService {
             id: item.var_id,
             update: {
               var_quantity: variant.quantity + item.prd_quantity,
+              var_status: ProductStatus.PUBLISHED,
               updatedBy: userId,
             },
           });
