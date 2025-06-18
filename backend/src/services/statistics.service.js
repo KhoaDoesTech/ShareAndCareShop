@@ -164,7 +164,9 @@ class StatisticsService {
 
     const skip = (page - 1) * size;
     const refundMatch = { rfl_status: RefundStatus.COMPLETED };
-    const orderMatch = { ord_status: OrderStatus.DELIVERED };
+    const orderMatch = {
+      ord_status: { $in: [OrderStatus.DELIVERED, OrderStatus.RETURN] },
+    };
 
     if (startDate && endDate) {
       refundMatch.rfl_requested_at = {
