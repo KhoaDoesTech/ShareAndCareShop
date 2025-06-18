@@ -98,8 +98,7 @@ class VariantService {
 
   async getPublicVariantByProductId(productId) {
     const variants = await this.variantRepository.getVariantsByProductId(
-      productId,
-      ProductStatus.PUBLISHED
+      productId
     );
 
     return {
@@ -115,6 +114,8 @@ class VariantService {
             'productId',
             'createdBy',
             'updatedBy',
+            'createdDetail',
+            'updatedDetail',
           ],
           object: sku,
         })
@@ -130,7 +131,17 @@ class VariantService {
     return {
       skuList: variants.map((sku) =>
         omitFields({
-          fields: ['createdAt', 'updatedAt', 'name', 'productId', 'product'],
+          fields: [
+            'createdAt',
+            'updatedAt',
+            'name',
+            'productId',
+            'product',
+            'createdBy',
+            'updatedBy',
+            'createdDetail',
+            'updatedDetail',
+          ],
           object: sku,
         })
       ),

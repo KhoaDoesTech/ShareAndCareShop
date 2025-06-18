@@ -415,7 +415,7 @@ class ProductService {
     this._updateProductViews(foundProduct.id);
 
     const priceInfo = calculateProductPrice(foundProduct);
-
+    console.log(skuList);
     const updatedSkuList = skuList.skuList.map((sku) => {
       const productDiscount = this._calculateProductDiscount(
         foundProduct,
