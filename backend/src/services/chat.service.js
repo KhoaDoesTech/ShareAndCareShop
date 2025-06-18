@@ -34,7 +34,7 @@ class ChatService {
       openAIApiKey: config.openAi.API_KEY,
     });
     this.chatModel = new ChatOpenAI({
-      model: 'gpt-3.5-turbo',
+      model: 'gpt-4.1-nano',
       maxTokens: 512,
       temperature: 0.7,
       openAIApiKey: config.openAi.API_KEY,
@@ -588,24 +588,30 @@ class ChatService {
   }
 
   async _generateEnhancedAIResponse(conversationId) {
-    // Get the latest user message to use as the query
-    const latestMessage =
-      await this.messageRepository.getLastestMessageByConversationId(
-        conversationId
-      );
+    const recentMessages = await this.messageRepository.getAll({
+      filter: { msg_conversation_id: conversationId },
+      queryOptions: { sort: '-createdAt', page: 1, size: 10 },
+    });
 
-    if (!latestMessage || !latestMessage.content) {
+    if (!recentMessages || recentMessages.length === 0) {
       return await this.messageRepository.create({
         msg_conversation_id: conversationId,
         msg_sender: 'AI_Assistant',
         msg_sender_type: 'assistant',
         msg_content:
-          'Vui long cung cap them thong tin de toi co the ho tro ban.',
+          'Vui lòng cung cấp thêm thông tin để tôi có thể hỗ trợ bạn.',
         msg_seen: false,
       });
     }
 
-    const userQuestion = latestMessage.content.trim();
+    const conversationHistory = recentMessages
+      .map((msg) => {
+        const { role, content } = this._normalizeMessageRole(msg);
+        return `${role === 'user' ? 'Người dùng' : 'Trợ lý'}: ${content}`;
+      })
+      .join('\n');
+
+    const userQuestion = recentMessages[0].content?.trim() || '';
 
     // Initialize the retriever
     const retriever = this.vectorStore.asRetriever({
@@ -629,6 +635,9 @@ class ChatService {
     const promptTemplate = ChatPromptTemplate.fromTemplate(`
       Bạn là trợ lý AI chuyên nghiệp. Hãy trả lời câu hỏi dựa trên thông tin được cung cấp.
 
+      Lịch sử trò chuyện:
+      {conversationHistory}
+
       Thông tin tham khảo:
       {context}
 
@@ -649,6 +658,7 @@ class ChatService {
         context: (input) =>
           retriever.invoke(input.question).then(formatDocuments),
         question: (input) => input.question,
+        conversationHistory: () => conversationHistory,
       },
       promptTemplate,
       this.chatModel,
