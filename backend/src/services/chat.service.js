@@ -103,7 +103,7 @@ class ChatService {
           `Tình trạng kho: Còn ${product.quantity || 0} sản phẩm`,
         ].join(' '),
         metadata: {
-          source: `https://share-and-care-client.vercel.app/products/${product.code}`,
+          source: `https://share-and-care-client.vercel.app/product/${product.code}`,
           type: 'product',
           productId: String(product.code),
         },

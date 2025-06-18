@@ -416,6 +416,18 @@ class ProductService {
 
     const priceInfo = calculateProductPrice(foundProduct);
 
+    const updatedSkuList = skuList.skuList.map((sku) => {
+      const productDiscount = this._calculateProductDiscount(
+        foundProduct,
+        sku.price
+      );
+      return {
+        ...sku,
+        productDiscount,
+        discountedPrice: sku.price - productDiscount,
+      };
+    });
+
     return {
       product: {
         ...pickFields({
@@ -448,7 +460,7 @@ class ProductService {
         discountedPrice: priceInfo.discountedPrice,
         hasDiscount: priceInfo.hasDiscount,
       },
-      skuList,
+      skuList: updatedSkuList,
     };
   }
 
@@ -469,6 +481,18 @@ class ProductService {
 
     const priceInfo = calculateProductPrice(foundProduct);
 
+    const updatedSkuList = skuList.skuList.map((sku) => {
+      const productDiscount = this._calculateProductDiscount(
+        foundProduct,
+        sku.price
+      );
+      return {
+        ...sku,
+        productDiscount,
+        discountedPrice: sku.price - productDiscount,
+      };
+    });
+
     return {
       product: {
         ...omitFields({
@@ -485,7 +509,7 @@ class ProductService {
         discountedPrice: priceInfo.discountedPrice,
         hasDiscount: priceInfo.hasDiscount,
       },
-      skuList,
+      skuList: updatedSkuList,
     };
   }
 
@@ -1026,6 +1050,24 @@ class ProductService {
       category: matchedCategory,
       attributes: matchedAttributes,
     };
+  }
+
+  _calculateProductDiscount(product, price) {
+    const now = new Date();
+    const isDiscountActive =
+      product.discountStart &&
+      product.discountEnd &&
+      now >= new Date(product.discountStart) &&
+      now <= new Date(product.discountEnd) &&
+      product.discountValue > 0;
+
+    if (!isDiscountActive) {
+      return 0;
+    }
+
+    return product.discountType === CouponType.AMOUNT
+      ? product.discountValue
+      : price * (product.discountValue / 100);
   }
 }
 
