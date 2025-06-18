@@ -93,13 +93,15 @@ class ChatService {
         filter: { prd_status: ProductStatus.PUBLISHED },
       });
 
-      console.log(mongoProducts);
-
-      // Format MongoDB products into documents
       const mongoDocuments = mongoProducts.map((product) => ({
         pageContent: [
           `Sản phẩm: ${product.name}`,
           `Mã sản phẩm: ${product.code}`,
+          `Danh mục: ${
+            Array.isArray(product.category)
+              ? product.category.map((c) => c.name).join(', ')
+              : product.category?.name || 'Không có danh mục'
+          }`,
           `Mô tả: ${product.description || 'Không có mô tả'}`,
           `Giá thấp nhất: ${product.minPrice} ₫`,
           `Giá cao nhất: ${product.maxPrice} ₫`,
@@ -621,6 +623,8 @@ class ChatService {
       k: 10,
       searchType: 'similarity',
     });
+
+    console.log(retriever);
 
     // Format documents for the prompt
     const formatDocuments = (docs) => {
