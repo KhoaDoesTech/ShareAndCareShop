@@ -30,7 +30,7 @@ class ChatService {
       apiKey: config.qdrant.API_KEY,
     });
     this.embeddings = new OpenAIEmbeddings({
-      model: 'text-embedding-3-small',
+      model: 'text-embedding-3-large',
       openAIApiKey: config.openAi.API_KEY,
     });
     this.chatModel = new ChatOpenAI({
@@ -78,7 +78,7 @@ class ChatService {
     );
     if (!collectionExists) {
       await this.qdrant.createCollection(collectionName, {
-        vectors: { size: 1536, distance: 'Cosine' },
+        vectors: { size: 3072, distance: 'Cosine' },
       });
       console.log(`Created Qdrant collection: ${collectionName}`);
     }
@@ -593,7 +593,7 @@ class ChatService {
   async _generateEnhancedAIResponse(conversationId) {
     const recentMessages = await this.messageRepository.getAll({
       filter: { msg_conversation_id: conversationId },
-      queryOptions: { sort: '-createdAt', page: 1, size: 10 },
+      queryOptions: { sort: '-createdAt', page: 1, size: 6 },
     });
 
     if (!recentMessages || recentMessages.length === 0) {
@@ -618,7 +618,7 @@ class ChatService {
 
     // Initialize the retriever
     const retriever = this.vectorStore.asRetriever({
-      k: 4, // Retrieve top 4 relevant documents
+      k: 10,
       searchType: 'similarity',
     });
 
@@ -636,7 +636,7 @@ class ChatService {
 
     // Define the prompt template
     const promptTemplate = ChatPromptTemplate.fromTemplate(`
-      Bạn là trợ lý AI chuyên nghiệp. Hãy trả lời câu hỏi dựa trên thông tin được cung cấp.
+      Bạn là một trợ lý AI chuyên nghiệp và thân thiện. Hãy trả lời bằng tiếng Việt, rõ ràng, ngắn gọn và đúng trọng tâm.
 
       Lịch sử trò chuyện:
       {conversationHistory}
@@ -646,11 +646,11 @@ class ChatService {
 
       Câu hỏi: {question}
 
-      Yêu cầu:
-      - Chỉ trả lời dựa trên thông tin được cung cấp
-      - Nếu không có thông tin liên quan, hãy thông báo không đủ dữ liệu
-      - Trả lời bằng tiếng Việt rõ ràng và chính xác
-      - Giữ thái độ chuyên nghiệp và thân thiện
+      Hướng dẫn:
+      - Dựa vào lịch sử hội thoại để hiểu rõ ngữ cảnh
+      - Chỉ sử dụng thông tin được cung cấp để trả lời
+      - Nếu thiếu dữ liệu, hãy thông báo rõ ràng là không đủ thông tin để trả lời
+      - Luôn giữ thái độ lịch sự, chuyên nghiệp và thân thiện
 
       Câu trả lời:
     `);
