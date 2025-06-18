@@ -336,6 +336,16 @@ class OrderService {
       );
     }
 
+    if (
+      nextStatus === OrderStatus.PROCESSING &&
+      !order.isPaid &&
+      order.paymentMethod !== PaymentMethod.COD
+    ) {
+      throw new BadRequestError(
+        "Không thể chuyển trạng thái sang 'ĐANG XỬ LÝ' khi đơn hàng chưa thanh toán hoặc không phải COD"
+      );
+    }
+
     const updates = {
       ord_status: nextStatus,
     };
