@@ -442,9 +442,9 @@ class ReviewService {
         'Không tìm thấy đơn hàng hoặc đơn hàng không thuộc về người dùng'
       );
     }
-    if (order.status !== OrderStatus.DELIVERED) {
+    if (![OrderStatus.DELIVERED, OrderStatus.RETURN].includes(order.status)) {
       throw new BadRequestError(
-        'Đơn hàng phải ở trạng thái đã giao mới được đánh giá'
+        'Chỉ đơn hàng đã giao hoặc đã hoàn trả mới được đánh giá'
       );
     }
 
