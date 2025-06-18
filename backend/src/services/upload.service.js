@@ -56,7 +56,7 @@ class UploadService {
         public_id: uniqueFileName,
         folder: `shareandcare/banners`,
         transformation: [
-          { width: 1920, height: 600, crop: 'fill' },
+          { width: 1920, height: 960, crop: 'fill' }, // 2:1
           { quality: 'auto:good', fetch_format: 'auto' },
         ],
       });
