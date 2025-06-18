@@ -93,11 +93,14 @@ class ChatService {
         filter: { prd_status: ProductStatus.PUBLISHED },
       });
 
+      console.log(mongoProducts);
+
       // Format MongoDB products into documents
       const mongoDocuments = mongoProducts.map((product) => ({
         pageContent: [
           `Sản phẩm: ${product.name}`,
           `Mã sản phẩm: ${product.code}`,
+          `Mô tả: ${product.description || 'Không có mô tả'}`,
           `Giá thấp nhất: ${product.minPrice} ₫`,
           `Giá cao nhất: ${product.maxPrice} ₫`,
           `Tình trạng kho: Còn ${product.quantity || 0} sản phẩm`,
