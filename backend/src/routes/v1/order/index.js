@@ -12,7 +12,7 @@ const CONFIG_PERMISSIONS = require('../../../constants/permissions');
 const router = express.Router();
 
 // User and Admin routes
-router.get(
+router.post(
   '/review',
   authentication,
   asyncHandler(OrderController.reviewOrder)
