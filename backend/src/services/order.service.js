@@ -791,7 +791,7 @@ class OrderService {
       const availableQuantity = variant ? variant.quantity : product.quantity;
       if (availableQuantity < item.quantity) {
         throw new BadRequestError(
-          `Không đủ hàng tồn kho cho sản phẩm ${product.name}`
+          `Không đủ hàng tồn kho cho sản phẩm ${product.name} chỉ còn ${availableQuantity} sản phẩm`
         );
       }
 
