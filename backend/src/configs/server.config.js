@@ -16,7 +16,8 @@ const SERVER_CONFIG = {
   },
   img: {
     product: 'https://via.placeholder.com/900x1200.png',
-    avatar: 'https://via.placeholder.com/400x400.png',
+    avatar:
+      'https://res.cloudinary.com/dkvobuzm9/image/upload/v1750279142/shareandcare/avatars/avatar_rkilfx.jpg',
   },
   openAi: {
     API_KEY: process.env.OPENAI_API_KEY,
