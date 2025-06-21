@@ -595,7 +595,7 @@ class ChatService {
   async _generateEnhancedAIResponse(conversationId) {
     const recentMessages = await this.messageRepository.getAll({
       filter: { msg_conversation_id: conversationId },
-      queryOptions: { sort: '-createdAt', page: 1, size: 6 },
+      queryOptions: { sort: '-createdAt', page: 1, size: 10 },
     });
 
     if (!recentMessages || recentMessages.length === 0) {
@@ -655,6 +655,7 @@ class ChatService {
       - Chỉ sử dụng thông tin được cung cấp để trả lời
       - Nếu thiếu dữ liệu, hãy thông báo rõ ràng là không đủ thông tin để trả lời
       - Luôn giữ thái độ lịch sự, chuyên nghiệp và thân thiện
+      - **Không sử dụng định dạng Markdown cho liên kết. Chỉ hiển thị liên kết dạng văn bản thuần túy**
 
       Câu trả lời:
     `);
